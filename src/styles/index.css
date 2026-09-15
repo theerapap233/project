@@ -612,6 +612,117 @@ button, input, select, textarea {
   box-shadow: 0 4px 10px rgba(7, 123, 56, 0.3);
 }
 
+/* Scope Tabs (ทุนภายใน vs ทุนภายนอก) */
+.scope-tabs-wrapper {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 860px) {
+  .scope-tabs-wrapper {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}
+
+.scope-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  background: var(--surface-white);
+  border: 2px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  text-align: left;
+  color: var(--navy-800);
+}
+
+.scope-tab-btn:hover {
+  border-color: var(--math-green-light);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
+}
+
+.scope-tab-btn.active {
+  border-color: var(--math-green);
+  background: linear-gradient(135deg, rgba(237, 247, 241, 0.9), rgba(255, 255, 255, 0.95));
+  box-shadow: 0 6px 20px rgba(7, 123, 56, 0.12);
+}
+
+.scope-tab-btn.external.active {
+  border-color: #2563eb;
+  background: linear-gradient(135deg, rgba(239, 246, 255, 0.9), rgba(255, 255, 255, 0.95));
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.12);
+}
+
+.scope-tab-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.scope-tab-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--navy-900);
+  line-height: 1.3;
+}
+
+.scope-tab-desc {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.scope-count-badge {
+  background: var(--surface-ground);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--navy-700);
+  border: 1px solid var(--border-light);
+}
+
+.scope-tab-btn.active .scope-count-badge {
+  background: var(--math-green);
+  color: white;
+  border-color: var(--math-green);
+}
+
+.scope-tab-btn.external.active .scope-count-badge {
+  background: #2563eb;
+  color: white;
+  border-color: #2563eb;
+}
+
+/* Scope Badges on Cards */
+.scope-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.scope-badge.internal {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.scope-badge.external {
+  background: #eff6ff;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+}
+
 /* Scholarships Grid */
 .scholarship-grid {
   display: grid;

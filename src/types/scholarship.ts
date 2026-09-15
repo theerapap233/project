@@ -6,12 +6,16 @@ export type ScholarshipCategory =
   | 'alumni'
   | 'activity';
 
+export type ScholarshipScope = 'all' | 'internal' | 'external';
+
 export type ScholarshipStatus = 'open' | 'closing_soon' | 'closed';
 
 export interface Scholarship {
   id: string;
   code: string;
   title: string;
+  scope: 'internal' | 'external'; // 'internal' = ทุนภายใน, 'external' = ทุนภายนอก
+  scopeName: string;
   category: Exclude<ScholarshipCategory, 'all'>;
   categoryName: string;
   badgeColor: 'gold' | 'blue' | 'purple' | 'emerald' | 'orange';

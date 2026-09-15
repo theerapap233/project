@@ -27,11 +27,13 @@ export const ScholarshipDetailModal: React.FC = () => {
         </div>
 
         <div className="modal-body">
-          <div style={{ marginBottom: 20 }}>
+          <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span className={`scope-badge ${sch.scope === 'external' ? 'external' : 'internal'}`}>
+              {sch.scope === 'external' ? '🌐 ทุนภายนอก' : '🏛️ ทุนภายใน'}
+            </span>
             <span className="category-tag">{sch.categoryName}</span>
             <span 
               className={`status-badge ${sch.status === 'closing_soon' ? 'closing_soon' : 'open'}`} 
-              style={{ marginLeft: 8 }}
             >
               รหัสทุน: {sch.code}
             </span>

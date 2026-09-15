@@ -31,9 +31,7 @@ export const Footer: React.FC = () => {
             <h5>ลิงก์ด่วน</h5>
             <ul>
               <li><a href="https://kmutnb.ac.th" target="_blank" rel="noopener noreferrer">เว็บไซต์ มหาวิทยาลัย มจพ.</a></li>
-              <li><a href="https://sci.kmutnb.ac.th" target="_blank" rel="noopener noreferrer">คณะวิทยาศาสตร์ประยุกต์ มจพ.</a></li>
-              <li><a href="https://reg.kmutnb.ac.th" target="_blank" rel="noopener noreferrer">สำนักทะเบียนและประมวลผล</a></li>
-              <li><a href="https://studentloan.kmutnb.ac.th" target="_blank" rel="noopener noreferrer">งานกองทุนกู้ยืม กยศ. มจพ.</a></li>
+              <li><a href="https://reg.kmutnb.ac.th" target="_blank" rel="noopener noreferrer">เว็บไซต์ ทะเบียนนักศึกษา</a></li>
             </ul>
           </div>
 

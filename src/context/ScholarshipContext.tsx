@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Scholarship, ScholarshipCategory } from '../types/scholarship';
+import { Scholarship, ScholarshipCategory, ScholarshipScope } from '../types/scholarship';
 import { Application, ApplicationStatus, ApplicationFormData, UploadedFiles } from '../types/application';
 import { ToastMessage, ToastType } from '../types/common';
 import { INITIAL_SCHOLARSHIPS } from '../data/scholarshipData';
@@ -22,6 +22,7 @@ interface ScholarshipContextType {
   scholarships: Scholarship[];
   applications: Application[];
   isAdminActive: boolean;
+  activeScope: ScholarshipScope;
   activeCategory: ScholarshipCategory;
   selectedScholarshipForDetail: Scholarship | null;
   selectedScholarshipIdForApply: string | null;
@@ -44,6 +45,7 @@ interface ScholarshipContextType {
   checkConnection: () => Promise<{ success: boolean; message: string }>;
 
   // Actions
+  setActiveScope: (scope: ScholarshipScope) => void;
   setActiveCategory: (cat: ScholarshipCategory) => void;
   openScholarshipDetail: (sch: Scholarship) => void;
   closeScholarshipDetail: () => void;
@@ -97,6 +99,7 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
   });
 
   const [isAdminActive, setIsAdminActive] = useState<boolean>(false);
+  const [activeScope, setActiveScope] = useState<ScholarshipScope>('all');
   const [activeCategory, setActiveCategory] = useState<ScholarshipCategory>('all');
   const [selectedScholarshipForDetail, setSelectedScholarshipForDetail] = useState<Scholarship | null>(null);
   const [selectedScholarshipIdForApply, setSelectedScholarshipIdForApply] = useState<string | null>(null);
@@ -427,6 +430,8 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
       id: `sch-${Date.now()}`,
       code: `MATH-NEW-${Math.floor(1000 + Math.random() * 9000)}`,
       title,
+      scope: 'internal',
+      scopeName: 'ทุนภายใน (ภาควิชา/มจพ.)',
       category: 'academic',
       categoryName: 'ทุนเรียนดี / พัฒนาศักยภาพ',
       badgeColor: 'gold',
@@ -532,6 +537,8 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
         searchTrackingId,
         currentUser,
         isLoginModalOpen,
+        activeScope,
+        setActiveScope,
         isSupabaseConnected: supabaseStatus === 'connected',
         supabaseStatus,
         isLoadingData,

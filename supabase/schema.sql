@@ -95,6 +95,7 @@ CREATE TABLE IF NOT EXISTS public.scholarship_programs (
   amount NUMERIC CHECK (amount IS NULL OR amount >= 0::numeric),
   quota INTEGER CHECK (quota IS NULL OR quota >= 0),
   is_open BOOLEAN NOT NULL DEFAULT true,
+  scholarship_type CHARACTER VARYING DEFAULT 'internal',
   description TEXT,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
@@ -330,8 +331,8 @@ INSERT INTO public.scholarship_categories (id, name) VALUES
   ('a0000000-0000-0000-0000-000000000005', 'ทุนกิจกรรมและจิตสาธารณะ')
 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
 
--- 7.2 โครงการทุนการศึกษา ภาควิชาคณิตศาสตร์ (6 ทุนหลัก)
-INSERT INTO public.scholarship_programs (id, name, category_id, amount, quota, is_open, description) VALUES
+-- 7.2 โครงการทุนการศึกษา ภาควิชาคณิตศาสตร์ (ทุนภายใน และ ทุนภายนอก)
+INSERT INTO public.scholarship_programs (id, name, category_id, amount, quota, is_open, scholarship_type, description) VALUES
 (
   'b0000000-0000-0000-0000-000000000001',
   'ทุนเรียนดีเด่นและสร้างชื่อเสียงทางคณิตศาสตร์ (MATH-EXC-2567)',
@@ -339,6 +340,7 @@ INSERT INTO public.scholarship_programs (id, name, category_id, amount, quota, i
   35000,
   10,
   true,
+  'internal',
   'ทุนสนับสนุนนักศึกษาที่มีผลการเรียนยอดเยี่ยม หรือสร้างชื่อเสียงทางวิชาการและงานวิจัยให้แก่ภาควิชาคณิตศาสตร์ คณะวิทยาศาสตร์ประยุกต์ มจพ. เกรดเฉลี่ยสะสมไม่ต่ำกว่า 3.25'
 ),
 (
@@ -348,6 +350,7 @@ INSERT INTO public.scholarship_programs (id, name, category_id, amount, quota, i
   25000,
   25,
   true,
+  'internal',
   'ทุนสนับสนุนค่าครองชีพและค่าอุปกรณ์การศึกษาแก่นักศึกษาที่ครอบครัวประสบปัญหาทางเศรษฐกิจ รายได้ครอบครัวไม่เกิน 300,000 บาท/ปี เกรดเฉลี่ยสะสมไม่ต่ำกว่า 2.00'
 ),
 (
@@ -357,6 +360,7 @@ INSERT INTO public.scholarship_programs (id, name, category_id, amount, quota, i
   20000,
   15,
   true,
+  'internal',
   'เปิดรับนักศึกษาชั้นปีที่ 3-4 หรือบัณฑิตศึกษา ช่วยสอน ตรวจแบบฝึกหัด ในรายวิชา Calculus I, II และ Linear Algebra'
 ),
 (
@@ -366,6 +370,7 @@ INSERT INTO public.scholarship_programs (id, name, category_id, amount, quota, i
   20000,
   12,
   true,
+  'external',
   'ทุนสนับสนุนจากชมรมศิษย์เก่าภาควิชาคณิตศาสตร์ มจพ. สำหรับนักศึกษาที่มุ่งมั่นพัฒนาทักษะ Data Science, Coding หรือสอบ Certificate วิชาชีพ'
 ),
 (
@@ -375,6 +380,7 @@ INSERT INTO public.scholarship_programs (id, name, category_id, amount, quota, i
   15000,
   8,
   true,
+  'internal',
   'มอบแก่นักศึกษาผู้มีจิตอาสา เสียสละเพื่อส่วนรวม และเป็นแกนนำในการจัดกิจกรรมค่ายคณิตศาสตร์สัญจรหรือกิจกรรมของมหาวิทยาลัย'
 ),
 (
@@ -384,6 +390,7 @@ INSERT INTO public.scholarship_programs (id, name, category_id, amount, quota, i
   30000,
   6,
   true,
+  'external',
   'ทุนสนับสนุนค่าเดินทาง ค่าลงทะเบียนสำหรับการแข่งขัน Hackathon, Data Competition หรืองานประชุมวิชาการ'
 )
 ON CONFLICT (id) DO UPDATE SET
@@ -392,6 +399,7 @@ ON CONFLICT (id) DO UPDATE SET
   amount = EXCLUDED.amount,
   quota = EXCLUDED.quota,
   is_open = EXCLUDED.is_open,
+  scholarship_type = EXCLUDED.scholarship_type,
   description = EXCLUDED.description,
   updated_at = now();
 

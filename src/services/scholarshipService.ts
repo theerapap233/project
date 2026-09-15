@@ -49,10 +49,24 @@ const mapProgramToScholarship = (row: DbScholarshipProgram, index: number): Scho
   const codeMatch = row.name.match(/\((MATH-[A-Z]+-\d+)\)/);
   const code = codeMatch ? codeMatch[1] : `MATH-SCH-${String(index + 1).padStart(2, '0')}`;
 
+  const isExternal = 
+    row.name.includes('ศิษย์เก่า') || 
+    row.name.includes('ALUMNI') || 
+    row.name.includes('INNOV') || 
+    row.name.includes('CORP') || 
+    row.name.includes('ภายนอก') || 
+    row.name.includes('มูลนิธิ') ||
+    (row.description ? (row.description.includes('ภายนอก') || row.description.includes('ศิษย์เก่า')) : false);
+
+  const scope: 'internal' | 'external' = isExternal ? 'external' : 'internal';
+  const scopeName = scope === 'external' ? 'ทุนภายนอก (องค์กร/ศิษย์เก่า)' : 'ทุนภายใน (ภาควิชา/มจพ.)';
+
   return {
     id: row.id,
     code,
     title: row.name.replace(/\s*\([A-Z0-9-]+\)\s*$/, ''),
+    scope,
+    scopeName,
     category: categorySlug,
     categoryName,
     badgeColor,

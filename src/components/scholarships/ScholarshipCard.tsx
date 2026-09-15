@@ -19,6 +19,9 @@ export const ScholarshipCard: React.FC<ScholarshipCardProps> = ({ scholarship })
       <div className={`card-top-bar ${scholarship.badgeColor}`} />
       <div className="card-content">
         <div className="card-header-tags">
+          <span className={`scope-badge ${scholarship.scope === 'external' ? 'external' : 'internal'}`}>
+            {scholarship.scope === 'external' ? '🌐 ทุนภายนอก' : '🏛️ ทุนภายใน'}
+          </span>
           <span className="category-tag">{scholarship.categoryName}</span>
           <span className={`status-badge ${statusClass}`}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', display: 'inline-block' }} />
