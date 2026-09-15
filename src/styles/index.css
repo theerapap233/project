@@ -152,18 +152,20 @@ button, input, select, textarea {
   align-items: center;
   justify-content: space-between;
   height: 80px;
+  gap: 16px;
 }
 
 .brand-wrapper {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .brand-logo-img {
-  width: 52px;
-  height: 52px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   object-fit: contain;
   background: white;
@@ -171,6 +173,7 @@ button, input, select, textarea {
   box-shadow: 0 4px 14px rgba(7, 123, 56, 0.28);
   border: 2px solid var(--math-green);
   transition: transform var(--transition-fast);
+  flex-shrink: 0;
 }
 
 .brand-wrapper:hover .brand-logo-img {
@@ -180,32 +183,38 @@ button, input, select, textarea {
 .brand-text {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .brand-title {
-  font-size: 1.15rem;
+  font-size: 1.05rem;
   font-weight: 700;
   color: var(--navy-900);
   line-height: 1.2;
+  white-space: nowrap;
 }
 
 .brand-subtitle {
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   color: var(--text-muted);
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .nav-links {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   list-style: none;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0;
 }
 
 .nav-item {
-  padding: 8px 16px;
+  padding: 7px 12px;
   font-family: var(--font-heading);
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   font-weight: 500;
   color: var(--navy-700);
   border-radius: var(--radius-md);
@@ -216,6 +225,7 @@ button, input, select, textarea {
   gap: 6px;
   border: none;
   background: transparent;
+  white-space: nowrap;
 }
 
 .nav-item:hover {
@@ -233,7 +243,9 @@ button, input, select, textarea {
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .admin-switch-btn {
@@ -1439,7 +1451,27 @@ button, input, select, textarea {
 }
 
 /* Responsive Media Queries */
+@media (max-width: 1200px) {
+  .nav-item {
+    padding: 6px 9px;
+    font-size: 0.88rem;
+  }
+  .brand-title {
+    font-size: 0.98rem;
+  }
+  .brand-subtitle {
+    font-size: 0.72rem;
+  }
+}
+
 @media (max-width: 992px) {
+  .brand-subtitle {
+    display: none;
+  }
+  .nav-item {
+    padding: 6px 8px;
+    font-size: 0.84rem;
+  }
   .hero-grid {
     grid-template-columns: 1fr;
   }

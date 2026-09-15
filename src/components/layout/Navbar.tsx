@@ -43,7 +43,7 @@ export const Navbar: React.FC = () => {
             </li>
             <li>
               <button className="nav-item" onClick={() => scrollToSection('scholarships')}>
-                ค้นหาทุนการศึกษา
+                ทุนการศึกษา
               </button>
             </li>
             <li>
