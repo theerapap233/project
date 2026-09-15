@@ -208,24 +208,6 @@ export const StatusTracking: React.FC = () => {
                     </span>
                   </div>
                 </div>
-
-                <div style={{ 
-                  borderTop: '1px solid var(--border-light)', 
-                  paddingTop: 16, 
-                  marginTop: 8, 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center', 
-                  flexWrap: 'wrap', 
-                  gap: 12 
-                }}>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                    เอกสารที่แนบ: <strong>{(searchedApp.documents || []).join(', ') || 'ไม่มีเอกสารแนบ'}</strong>
-                  </div>
-                  <button className="btn btn-secondary btn-sm" onClick={() => window.print()}>
-                    🖨️ พิมพ์หน้ารายละเอียด
-                  </button>
-                </div>
               </div>
             </div>
           )}
