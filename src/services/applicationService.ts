@@ -264,25 +264,9 @@ export const applicationService = {
 
       // 3. บันทึกใบสมัครลง scholarship_applications
       const fullFormDataPayload = {
+        ...formData, // include all fields like nickname, address, sponsor, etc.
         trackingId: appObj.trackingId,
-        scholarshipId: formData.scholarshipId,
         scholarshipName: appObj.scholarshipName,
-        studentId: formData.studentId,
-        fullName: formData.fullName,
-        major: formData.major,
-        year: formData.year,
-        gpax: formData.gpax,
-        phone: formData.phone,
-        email: formData.email,
-        familyIncome: formData.familyIncome,
-        fatherName: formData.fatherName,
-        fatherJob: formData.fatherJob,
-        motherName: formData.motherName,
-        motherJob: formData.motherJob,
-        loanStatus: formData.loanStatus,
-        volunteerHours: formData.volunteerHours,
-        activities: formData.activities,
-        reason: formData.reason,
         documents: appObj.documents,
         subStatus: 'submitted',
         interviewDate: 'รอการตรวจสอบเอกสาร',

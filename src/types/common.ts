@@ -35,3 +35,16 @@ export interface EligibilityQuery {
   income: number;
   volunteerHours: number;
 }
+
+export interface SiteSettings {
+  academicYear: string;
+  semester: string;
+  heroTitle: string;
+  heroSubtitle: string;
+  contactPhone: string;
+  contactEmail: string;
+  contactAddress: string;
+  tickerText: string;
+  facebookUrl?: string;
+}
+

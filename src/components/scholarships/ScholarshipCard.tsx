@@ -10,24 +10,13 @@ interface ScholarshipCardProps {
 export const ScholarshipCard: React.FC<ScholarshipCardProps> = ({ scholarship }) => {
   const { openScholarshipDetail, openApplicationModal } = useScholarship();
 
-  const isClosingSoon = scholarship.status === 'closing_soon';
-  const statusText = isClosingSoon ? 'ใกล้ปิดรับสมัคร' : 'เปิดรับสมัคร';
-  const statusClass = isClosingSoon ? 'closing_soon' : 'open';
+
 
   return (
     <div className="scholarship-card">
       <div className={`card-top-bar ${scholarship.badgeColor}`} />
       <div className="card-content">
-        <div className="card-header-tags">
-          <span className={`scope-badge ${scholarship.scope === 'external' ? 'external' : 'internal'}`}>
-            {scholarship.scope === 'external' ? '🌐 ทุนภายนอก' : '🏛️ ทุนภายใน'}
-          </span>
-          <span className="category-tag">{scholarship.categoryName}</span>
-          <span className={`status-badge ${statusClass}`}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', display: 'inline-block' }} />
-            {statusText}
-          </span>
-        </div>
+
 
         <h3 className="card-title">{scholarship.title}</h3>
 

@@ -1,12 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Scholarship, ScholarshipCategory, ScholarshipScope } from '../types/scholarship';
+import { Scholarship } from '../types/scholarship';
 import { Application, ApplicationStatus, ApplicationFormData, UploadedFiles } from '../types/application';
-import { ToastMessage, ToastType } from '../types/common';
+import { Announcement, FaqItem, DownloadDoc, SiteSettings, ToastMessage, ToastType } from '../types/common';
 import { INITIAL_SCHOLARSHIPS } from '../data/scholarshipData';
 import { INITIAL_APPLICATIONS } from '../data/initialApplications';
+import { ANNOUNCEMENTS, FAQ_LIST, DOWNLOAD_FORMS } from '../data/staticContent';
 import { isSupabaseConfigured, supabase, testSupabaseConnection } from '../lib/supabase';
 import { scholarshipService } from '../services/scholarshipService';
 import { applicationService } from '../services/applicationService';
+import { settingsService, DEFAULT_SITE_SETTINGS } from '../services/settingsService';
 
 export interface UserProfile {
   studentId: string;
@@ -14,6 +16,7 @@ export interface UserProfile {
   email: string;
   faculty: string;
   major: string;
+  role?: 'admin' | 'officer' | 'student';
 }
 
 export type SupabaseConnectionStatus = 'connected' | 'demo' | 'error' | 'loading';
@@ -22,8 +25,6 @@ interface ScholarshipContextType {
   scholarships: Scholarship[];
   applications: Application[];
   isAdminActive: boolean;
-  activeScope: ScholarshipScope;
-  activeCategory: ScholarshipCategory;
   selectedScholarshipForDetail: Scholarship | null;
   selectedScholarshipIdForApply: string | null;
   isDetailModalOpen: boolean;
@@ -36,7 +37,18 @@ interface ScholarshipContextType {
   searchTrackingId: string;
   currentUser: UserProfile | null;
   isLoginModalOpen: boolean;
+  isLogoutModalOpen: boolean;
   
+  // Preview Mode
+  isPreviewMode: boolean;
+  setIsPreviewMode: (val: boolean) => void;
+
+  // Website CMS State
+  announcements: Announcement[];
+  faqs: FaqItem[];
+  downloads: DownloadDoc[];
+  siteSettings: SiteSettings;
+
   // Supabase Status & Helpers
   isSupabaseConnected: boolean;
   supabaseStatus: SupabaseConnectionStatus;
@@ -45,8 +57,6 @@ interface ScholarshipContextType {
   checkConnection: () => Promise<{ success: boolean; message: string }>;
 
   // Actions
-  setActiveScope: (scope: ScholarshipScope) => void;
-  setActiveCategory: (cat: ScholarshipCategory) => void;
   openScholarshipDetail: (sch: Scholarship) => void;
   closeScholarshipDetail: () => void;
   openApplicationModal: (schId?: string) => void;
@@ -67,19 +77,39 @@ interface ScholarshipContextType {
   ) => void;
   quickApprove: (trackingId: string) => void;
   createNewScholarship: (title: string, amount: string, totalSlots: number) => void;
+  updateScholarship: (id: string, data: Partial<Scholarship>) => void;
+  deleteScholarship: (id: string) => void;
   exportApplicationsCSV: () => void;
   setSearchTrackingId: (id: string) => void;
   scrollToSection: (id: string) => void;
   openLoginModal: () => void;
   closeLoginModal: () => void;
-  login: (studentId: string, name?: string) => void;
+  openLogoutModal: () => void;
+  closeLogoutModal: () => void;
+  updateCurrentUser: (updates: Partial<UserProfile>) => void;
+  login: (identifier: string, customName?: string) => void;
   logout: () => void;
+
+  // Website CMS Actions
+  addAnnouncement: (ann: Omit<Announcement, 'id'>) => void;
+  updateAnnouncement: (id: string, ann: Partial<Announcement>) => void;
+  deleteAnnouncement: (id: string) => void;
+  addFaq: (faq: FaqItem) => void;
+  updateFaq: (index: number, faq: FaqItem) => void;
+  deleteFaq: (index: number) => void;
+  addDownload: (doc: Omit<DownloadDoc, 'id'>) => void;
+  deleteDownload: (id: string) => void;
+  updateSiteSettings: (settings: Partial<SiteSettings>) => void;
 }
 
 const ScholarshipContext = createContext<ScholarshipContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_APPS_KEY = 'KMUTNB_SCH_APPLICATIONS';
 const LOCAL_STORAGE_SCH_KEY = 'KMUTNB_SCH_SCHOLARSHIPS';
+const LOCAL_STORAGE_ANNOUNCEMENTS_KEY = 'KMUTNB_SCH_ANNOUNCEMENTS';
+const LOCAL_STORAGE_FAQS_KEY = 'KMUTNB_SCH_FAQS';
+const LOCAL_STORAGE_DOWNLOADS_KEY = 'KMUTNB_SCH_DOWNLOADS';
+const LOCAL_STORAGE_SETTINGS_KEY = 'KMUTNB_SCH_SETTINGS';
 
 export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [scholarships, setScholarships] = useState<Scholarship[]>(() => {
@@ -98,19 +128,6 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
     return INITIAL_APPLICATIONS;
   });
 
-  const [isAdminActive, setIsAdminActive] = useState<boolean>(false);
-  const [activeScope, setActiveScope] = useState<ScholarshipScope>('all');
-  const [activeCategory, setActiveCategory] = useState<ScholarshipCategory>('all');
-  const [selectedScholarshipForDetail, setSelectedScholarshipForDetail] = useState<Scholarship | null>(null);
-  const [selectedScholarshipIdForApply, setSelectedScholarshipIdForApply] = useState<string | null>(null);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
-  const [isWizardModalOpen, setIsWizardModalOpen] = useState<boolean>(false);
-  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState<boolean>(false);
-  const [isCommitteeModalOpen, setIsCommitteeModalOpen] = useState<boolean>(false);
-  const [reviewingApplication, setReviewingApplication] = useState<Application | null>(null);
-  const [latestTrackingId, setLatestTrackingId] = useState<string>('KMUTNB-SCH-670101');
-  const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [searchTrackingId, setSearchTrackingId] = useState<string>('KMUTNB-SCH-670101');
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
     const saved = localStorage.getItem('KMUTNB_SCH_USER');
     if (saved) {
@@ -118,7 +135,63 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
     return null;
   });
+
+  const [isAdminActive, setIsAdminActive] = useState<boolean>(() => {
+    const saved = localStorage.getItem('KMUTNB_SCH_USER');
+    if (saved) {
+      try {
+        const u = JSON.parse(saved);
+        return u.role === 'admin' || u.role === 'officer' || u.studentId?.toLowerCase().includes('admin');
+      } catch (e) { console.error(e); }
+    }
+    return false;
+  });
+
+  const [selectedScholarshipForDetail, setSelectedScholarshipForDetail] = useState<Scholarship | null>(null);
+  const [selectedScholarshipIdForApply, setSelectedScholarshipIdForApply] = useState<string | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
+  const [isWizardModalOpen, setIsWizardModalOpen] = useState<boolean>(false);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState<boolean>(false);
+  const [isCommitteeModalOpen, setIsCommitteeModalOpen] = useState<boolean>(false);
+  const [reviewingApplication, setReviewingApplication] = useState<Application | null>(null);
+  const [latestTrackingId, setLatestTrackingId] = useState<string>('6504062630012');
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [searchTrackingId, setSearchTrackingId] = useState<string>('6504062630012');
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState<boolean>(false);
+  const [isPreviewMode, setIsPreviewMode] = useState<boolean>(false);
+
+  const [announcements, setAnnouncements] = useState<Announcement[]>(() => {
+    const saved = localStorage.getItem(LOCAL_STORAGE_ANNOUNCEMENTS_KEY);
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+    }
+    return ANNOUNCEMENTS;
+  });
+
+  const [faqs, setFaqs] = useState<FaqItem[]>(() => {
+    const saved = localStorage.getItem(LOCAL_STORAGE_FAQS_KEY);
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+    }
+    return FAQ_LIST;
+  });
+
+  const [downloads, setDownloads] = useState<DownloadDoc[]>(() => {
+    const saved = localStorage.getItem(LOCAL_STORAGE_DOWNLOADS_KEY);
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+    }
+    return DOWNLOAD_FORMS;
+  });
+
+  const [siteSettings, setSiteSettings] = useState<SiteSettings>(() => {
+    const saved = localStorage.getItem(LOCAL_STORAGE_SETTINGS_KEY);
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+    }
+    return DEFAULT_SITE_SETTINGS;
+  });
 
   // Supabase Connection State
   const [supabaseStatus, setSupabaseStatus] = useState<SupabaseConnectionStatus>(
@@ -148,9 +221,10 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     setIsLoadingData(true);
     try {
-      const [schResult, appResult] = await Promise.all([
+      const [schResult, appResult, settingsResult] = await Promise.all([
         scholarshipService.getAllScholarships(),
         applicationService.getAllApplications(),
+        settingsService.getSiteSettings(),
       ]);
 
       if (schResult.source === 'supabase') {
@@ -158,6 +232,9 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
       }
       if (appResult.source === 'supabase') {
         setApplications(appResult.data);
+      }
+      if (settingsResult.source === 'supabase') {
+        setSiteSettings(settingsResult.data);
       }
 
       setSupabaseStatus('connected');
@@ -175,7 +252,7 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     if (!isSupabaseConfigured()) return;
 
-    // Realtime listener สำหรับ scholarship_applications table
+    // Realtime listener สำหรับ scholarship_applications และ site_settings table
     const channel = supabase
       .channel('schema-db-changes')
       .on(
@@ -185,6 +262,18 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
           console.log('Realtime change received from Supabase:', payload);
           // อัปเดตข้อมูลอัตโนมัติเมื่อมีการเปลี่ยนแปลงในฐานข้อมูล
           loadData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'site_settings' },
+        (payload) => {
+          console.log('Realtime site_settings change received from Supabase:', payload);
+          settingsService.getSiteSettings().then(res => {
+            if (res.source === 'supabase') {
+              setSiteSettings(res.data);
+            }
+          });
         }
       )
       .subscribe();
@@ -210,15 +299,66 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const openLoginModal = () => setIsLoginModalOpen(true);
   const closeLoginModal = () => setIsLoginModalOpen(false);
 
-  const login = (studentId: string, name?: string) => {
-    const user: UserProfile = {
-      studentId: studentId || '6604062610099',
-      name: name || 'นายสมคิด มุ่งมั่นวิทยา',
-      email: `${studentId || 's6604062610099'}@kmutnb.ac.th`,
-      faculty: 'คณะวิทยาศาสตร์ประยุกต์',
-      major: 'ภาควิชาคณิตศาสตร์ (คณิตศาสตร์ประยุกต์)'
+  const openLogoutModal = () => setIsLogoutModalOpen(true);
+  const closeLogoutModal = () => setIsLogoutModalOpen(false);
+
+  const updateCurrentUser = (updates: Partial<UserProfile>) => {
+    if (!currentUser) return;
+
+    const updatedUser: UserProfile = {
+      ...currentUser,
+      ...updates,
+      role: updates.role ?? currentUser.role ?? 'admin'
     };
+
+    setCurrentUser(updatedUser);
+    localStorage.setItem('KMUTNB_SCH_USER', JSON.stringify(updatedUser));
+    showToast('บันทึกข้อมูลส่วนตัวสำเร็จ', 'success');
+  };
+
+  const login = (identifier: string, customName?: string) => {
+    const cleanId = (identifier || '').trim();
+    const isAdmin = cleanId.toLowerCase() === 'admin' || cleanId.toLowerCase().includes('staff') || cleanId.toLowerCase().includes('officer');
+    
+    let resolvedName = customName;
+    let resolvedMajor = 'ภาควิชาคณิตศาสตร์ (คณิตศาสตร์ประยุกต์)';
+    let resolvedFaculty = 'คณะวิทยาศาสตร์ประยุกต์';
+    let resolvedEmail = cleanId.includes('@') ? cleanId : `${cleanId}@kmutnb.ac.th`;
+
+    if (isAdmin) {
+      resolvedName = resolvedName || 'เจ้าหน้าที่ธุรการ/กรรมการทุน ภาควิชาคณิตศาสตร์';
+      resolvedMajor = 'งานกิจการนักศึกษาและทุนการศึกษา';
+      resolvedEmail = 'math-scholarship@sci.kmutnb.ac.th';
+    } else {
+      // Check if matches an existing application in system
+      const matchedApp = applications.find(a => 
+        a.studentId.toLowerCase() === cleanId.toLowerCase() ||
+        a.fullName.toLowerCase().includes(cleanId.toLowerCase())
+      );
+      if (matchedApp) {
+        resolvedName = resolvedName || matchedApp.fullName;
+        resolvedMajor = matchedApp.major ? `ภาควิชาคณิตศาสตร์ (${matchedApp.major})` : resolvedMajor;
+        resolvedEmail = matchedApp.email || resolvedEmail;
+      } else if (!resolvedName) {
+        resolvedName = (cleanId === '6604062610099' || cleanId === 's6604062610099')
+          ? 'นายสมคิด มุ่งมั่นวิทยา' 
+          : `นักศึกษา (${cleanId})`;
+      }
+    }
+
+    const user: UserProfile = {
+      studentId: cleanId || '6604062610099',
+      name: resolvedName,
+      email: resolvedEmail,
+      faculty: resolvedFaculty,
+      major: resolvedMajor,
+      role: isAdmin ? 'admin' : 'student'
+    };
+
     setCurrentUser(user);
+    if (isAdmin) {
+      setIsAdminActive(true);
+    }
     localStorage.setItem('KMUTNB_SCH_USER', JSON.stringify(user));
     setIsLoginModalOpen(false);
     showToast(`เข้าสู่ระบบสำเร็จ: ยินดีต้อนรับ ${user.name}`, 'success');
@@ -226,7 +366,20 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const logout = () => {
     setCurrentUser(null);
+    setIsAdminActive(false);
+    setIsLogoutModalOpen(false);
+    setIsPreviewMode(false);
     localStorage.removeItem('KMUTNB_SCH_USER');
+
+    if (isSupabaseConfigured()) {
+      supabase.auth.signOut().catch(console.error);
+    }
+
+    if (window.location.hash === '#admin' || window.location.hash === '#login') {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     showToast('ออกจากระบบเรียบร้อยแล้ว', 'info');
   };
 
@@ -238,6 +391,95 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
   useEffect(() => {
     localStorage.setItem(LOCAL_STORAGE_SCH_KEY, JSON.stringify(scholarships));
   }, [scholarships]);
+
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_ANNOUNCEMENTS_KEY, JSON.stringify(announcements));
+  }, [announcements]);
+
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_FAQS_KEY, JSON.stringify(faqs));
+  }, [faqs]);
+
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_DOWNLOADS_KEY, JSON.stringify(downloads));
+  }, [downloads]);
+
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_SETTINGS_KEY, JSON.stringify(siteSettings));
+  }, [siteSettings]);
+
+  // Website CMS Actions
+  const addAnnouncement = (ann: Omit<Announcement, 'id'>) => {
+    const newAnn: Announcement = { ...ann, id: `ann-${Date.now()}` };
+    setAnnouncements(prev => [newAnn, ...prev]);
+    showToast('เพิ่มข่าวสาร/ประกาศสำเร็จ', 'success');
+  };
+
+  const updateAnnouncement = (id: string, updated: Partial<Announcement>) => {
+    setAnnouncements(prev => prev.map(a => a.id === id ? { ...a, ...updated } : a));
+    showToast('แก้ไขข่าวสาร/ประกาศสำเร็จ', 'success');
+  };
+
+  const deleteAnnouncement = (id: string) => {
+    setAnnouncements(prev => prev.filter(a => a.id !== id));
+    showToast('ลบข่าวสาร/ประกาศเรียบร้อยแล้ว', 'info');
+  };
+
+  const addFaq = (faq: FaqItem) => {
+    setFaqs(prev => [...prev, faq]);
+    showToast('เพิ่มคำถามที่พบบ่อยสำเร็จ', 'success');
+  };
+
+  const updateFaq = (index: number, updated: FaqItem) => {
+    setFaqs(prev => prev.map((f, i) => i === index ? updated : f));
+    showToast('แก้ไขคำถามที่พบบ่อยสำเร็จ', 'success');
+  };
+
+  const deleteFaq = (index: number) => {
+    setFaqs(prev => prev.filter((_, i) => i !== index));
+    showToast('ลบคำถามที่พบบ่อยเรียบร้อยแล้ว', 'info');
+  };
+
+  const addDownload = (doc: Omit<DownloadDoc, 'id'>) => {
+    const newDoc: DownloadDoc = { ...doc, id: `doc-${Date.now()}` };
+    setDownloads(prev => [...prev, newDoc]);
+    showToast('เพิ่มเอกสารดาวน์โหลดสำเร็จ', 'success');
+  };
+
+  const deleteDownload = (id: string) => {
+    setDownloads(prev => prev.filter(d => d.id !== id));
+    showToast('ลบเอกสารดาวน์โหลดเรียบร้อยแล้ว', 'info');
+  };
+
+  const updateScholarship = (id: string, data: Partial<Scholarship>) => {
+    setScholarships(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
+    showToast('อัปเดตข้อมูลทุนการศึกษาสำเร็จ', 'success');
+  };
+
+  const deleteScholarship = (id: string) => {
+    setScholarships(prev => prev.filter(s => s.id !== id));
+    showToast('ลบประกาศทุนการศึกษาเรียบร้อยแล้ว', 'info');
+  };
+
+  const updateSiteSettings = (settings: Partial<SiteSettings>) => {
+    setSiteSettings(prev => {
+      const updated = { ...prev, ...settings };
+      localStorage.setItem(LOCAL_STORAGE_SETTINGS_KEY, JSON.stringify(updated));
+      return updated;
+    });
+
+    if (isSupabaseConfigured()) {
+      settingsService.updateSiteSettings(settings).then(res => {
+        if (res.source === 'supabase' && res.success) {
+          showToast('บันทึกการตั้งค่าเว็บไซต์ลง Supabase สำเร็จ', 'success');
+        } else {
+          showToast('บันทึกการตั้งค่าเว็บไซต์ในเครื่องเรียบร้อยแล้ว', 'info');
+        }
+      });
+    } else {
+      showToast('บันทึกการตั้งค่าเว็บไซต์สำเร็จ', 'success');
+    }
+  };
 
   const scrollToSection = (id: string) => {
     if (id === 'adminSection' && !isAdminActive) {
@@ -524,7 +766,6 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
         scholarships,
         applications,
         isAdminActive,
-        activeCategory,
         selectedScholarshipForDetail,
         selectedScholarshipIdForApply,
         isDetailModalOpen,
@@ -537,8 +778,7 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
         searchTrackingId,
         currentUser,
         isLoginModalOpen,
-        activeScope,
-        setActiveScope,
+        isLogoutModalOpen,
         isSupabaseConnected: supabaseStatus === 'connected',
         supabaseStatus,
         isLoadingData,
@@ -546,9 +786,28 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
         checkConnection,
         openLoginModal,
         closeLoginModal,
+        openLogoutModal,
+        closeLogoutModal,
+        updateCurrentUser,
         login,
         logout,
-        setActiveCategory,
+        isPreviewMode,
+        setIsPreviewMode,
+        announcements,
+        faqs,
+        downloads,
+        siteSettings,
+        addAnnouncement,
+        updateAnnouncement,
+        deleteAnnouncement,
+        addFaq,
+        updateFaq,
+        deleteFaq,
+        addDownload,
+        deleteDownload,
+        updateScholarship,
+        deleteScholarship,
+        updateSiteSettings,
         openScholarshipDetail,
         closeScholarshipDetail,
         openApplicationModal,

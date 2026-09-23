@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { useScholarship } from '../../context/ScholarshipContext';
 
 export const HeroSection: React.FC = () => {
-  const { scholarships, applications, scrollToSection } = useScholarship();
+  const { scholarships, applications, scrollToSection, siteSettings } = useScholarship();
 
   const stats = useMemo(() => {
     const openCount = scholarships.filter(s => s.status === 'open' || s.status === 'closing_soon').length;
@@ -20,14 +20,13 @@ export const HeroSection: React.FC = () => {
               <svg width="14" height="14" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
               </svg>
-              ปีการศึกษา 2567 ภาคการศึกษาที่ 1
+              ปีการศึกษา {siteSettings.semester}/{siteSettings.academicYear}
             </div>
-            <h1 className="hero-title">
-              เปิดประตูสู่อนาคต<br />
-              <span>ทุนการศึกษาคณิตศาสตร์</span> มจพ.
+            <h1 className="hero-title" style={{ whiteSpace: 'pre-line' }}>
+              {siteSettings.heroTitle}
             </h1>
             <p className="hero-desc">
-              ภาควิชาคณิตศาสตร์ คณะวิทยาศาสตร์ประยุกต์ มุ่งมั่นสนับสนุนศักยภาพทางวิชาการและช่วยเหลือนักศึกษาทุกระดับชั้น ทั้งทุนเรียนดี ทุนขาดแคลน ทุนผู้ช่วยสอน (TA) และทุนสนับสนุนงานวิจัย
+              {siteSettings.heroSubtitle}
             </p>
             <div className="hero-actions">
               <button className="btn btn-primary" onClick={() => scrollToSection('scholarships')}>
@@ -56,7 +55,7 @@ export const HeroSection: React.FC = () => {
                     width: 64, 
                     height: 64, 
                     borderRadius: '50%', 
-                    background: 'white', 
+                    background: 'var(--surface-card)', 
                     padding: 2, 
                     boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
                     filter: 'drop-shadow(0 4px 12px rgba(11, 130, 53, 0.4))'

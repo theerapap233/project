@@ -6,20 +6,46 @@ const INITIAL_FORM: ApplicationFormData = {
   scholarshipId: '',
   studentId: '6604062610099',
   fullName: 'นายสมคิด มุ่งมั่นวิทยา',
+  nickname: 'คิด',
   major: 'คณิตศาสตร์ประยุกต์',
   year: 'ปี 2',
   gpax: 3.45,
   phone: '089-123-4567',
   email: 's6604062610099@kmutnb.ac.th',
+  address: '1518 ถ.ประชาราษฎร์ 1 แขวงวงศ์สว่าง เขตบางซื่อ กรุงเทพฯ 10800',
+  isIdCardAddress: true,
+  idCardProvince: 'กรุงเทพมหานคร',
+  
   fatherName: 'นายประสิทธิ์ มุ่งมั่นวิทยา',
+  fatherPhone: '081-999-8888',
   fatherJob: 'รับจ้างทั่วไป',
+  fatherIncome: 12000,
+  fatherAlive: 'alive',
+  
   motherName: 'นางมาลี มุ่งมั่นวิทยา',
+  motherPhone: '081-777-6666',
   motherJob: 'ค้าขาย',
+  motherIncome: 8000,
+  motherAlive: 'alive',
+  
+  parentsRelation: 'together',
   familyIncome: 240000,
   siblings: 2,
+  
+  sponsor: ['father', 'mother'],
+  sponsorOther: '',
   loanStatus: 'none',
+  loanAmount: 0,
+  
+  hasPartTimeJob: false,
+  partTimeJobLocation: '',
+  partTimeJobIncome: 0,
+  
+  hasActivities: true,
+  activities: 'ค่ายคณิตศาสตร์สัญจร มจพ.',
+  activityRole: 'สวัสดิการ',
   volunteerHours: 35,
-  activities: 'ค่ายคณิตศาสตร์สัญจร มจพ., อาสาสมัครจัดเตรียมงานสัปดาห์วิทยาศาสตร์',
+  
   reason: 'ครอบครัวมีภาระค่าใช้จ่ายสูง มีพี่น้องกำลังศึกษาอยู่ 2 คน ข้าพเจ้าต้องการนำเงินทุนการศึกษามาแบ่งเบาภาระค่าใช้จ่ายในการครองชีพ ค่าอุปกรณ์การเรียน และตั้งใจที่จะศึกษาต่อยอดเพื่อนำความรู้ด้านคณิตศาสตร์ไปประกอบอาชีพและช่วยเหลือสังคมต่อไป',
   consent: false
 };
@@ -36,7 +62,7 @@ export const ApplicationWizardModal: React.FC = () => {
 
   const [step, setStep] = useState<number>(1);
   const [formData, setFormData] = useState<ApplicationFormData>(INITIAL_FORM);
-  const [files, setFiles] = useState<UploadedFiles>({
+  const [files] = useState<UploadedFiles>({
     doc1: null,
     doc2: null,
     doc3: null
@@ -55,15 +81,7 @@ export const ApplicationWizardModal: React.FC = () => {
 
   if (!isWizardModalOpen) return null;
 
-  const simulateFileUpload = (key: keyof UploadedFiles) => {
-    const mockFiles: Record<keyof UploadedFiles, string> = {
-      doc1: 'Official_Transcript_Term1.pdf (1.2 MB)',
-      doc2: 'KMUTNB_StudentID_Card.pdf (850 KB)',
-      doc3: 'Income_Certification_Official.pdf (1.8 MB)'
-    };
-    setFiles(prev => ({ ...prev, [key]: mockFiles[key] }));
-    showToast(`อัปโหลดเอกสารสำเร็จ: ${mockFiles[key]}`, 'success');
-  };
+  // File upload simulation removed
 
   const validateStep = (currentStep: number): boolean => {
     if (currentStep === 1) {
@@ -87,29 +105,34 @@ export const ApplicationWizardModal: React.FC = () => {
         showToast('กรุณากรอกอีเมลให้ถูกต้อง', 'warning');
         return false;
       }
+      if (!formData.address.trim()) {
+        showToast('กรุณากรอกที่อยู่ปัจจุบัน', 'warning');
+        return false;
+      }
     }
 
     if (currentStep === 2) {
-      if (!formData.familyIncome || formData.familyIncome < 0) {
-        showToast('กรุณากรอกรายได้รวมครอบครัวต่อปี', 'warning');
+      if (formData.sponsor.length === 0) {
+        showToast('กรุณาเลือกผู้รับผิดชอบค่าใช้จ่ายในการศึกษาอย่างน้อย 1 ข้อ', 'warning');
+        return false;
+      }
+      if (formData.hasPartTimeJob && !formData.partTimeJobLocation.trim()) {
+        showToast('กรุณาระบุสถานที่ทำงานพิเศษ', 'warning');
         return false;
       }
     }
 
     if (currentStep === 3) {
-      if (!formData.reason || formData.reason.trim().length < 10) {
-        showToast('กรุณากรอกเรียงความแสดงเหตุผลความจำเป็นในการขอรับทุนอย่างน้อย 10 ตัวอักษร', 'warning');
+      if (formData.hasActivities && !formData.activities.trim()) {
+        showToast('กรุณาระบุชื่อกิจกรรม', 'warning');
         return false;
       }
     }
 
     if (currentStep === 4) {
-      // Auto-simulate if missing
-      if (!files.doc1) {
-        simulateFileUpload('doc1');
-      }
-      if (!files.doc2) {
-        simulateFileUpload('doc2');
+      if (!formData.reason || formData.reason.trim().length < 10) {
+        showToast('กรุณากรอกเหตุผลและความจำเป็นในการขอรับทุนอย่างน้อย 10 ตัวอักษร', 'warning');
+        return false;
       }
     }
 
@@ -155,9 +178,9 @@ export const ApplicationWizardModal: React.FC = () => {
           <div className="wizard-steps-indicator">
             {[
               { num: 1, label: 'ข้อมูลการศึกษา' },
-              { num: 2, label: 'ข้อมูลครอบครัว' },
-              { num: 3, label: 'กิจกรรม & เหตุผล' },
-              { num: 4, label: 'เอกสารแนบ' },
+              { num: 2, label: 'ครอบครัว & รายได้' },
+              { num: 3, label: 'กิจกรรม' },
+              { num: 4, label: 'เหตุผล' },
               { num: 5, label: 'ยืนยันการสมัคร' }
             ].map(s => {
               let cls = '';
@@ -182,17 +205,40 @@ export const ApplicationWizardModal: React.FC = () => {
                 </h4>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div className="form-group full-width">
-                    <label>เลือกประเภททุนการศึกษาที่ประสงค์จะสมัคร *</label>
+                    <label>เลือกประเภททุนการศึกษาที่ประสงค์จะสมัคร (ถ้ามี)</label>
                     <select 
                       className="form-input-light" 
                       value={formData.scholarshipId}
                       onChange={(e) => setFormData({ ...formData, scholarshipId: e.target.value })}
-                      required
                     >
+                      <option value="">(ไม่ระบุ / ขอรับการพิจารณาทุนทั่วไป)</option>
                       {scholarships.map(s => (
                         <option key={s.id} value={s.id}>{s.title} ({s.amount})</option>
                       ))}
                     </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label>ชื่อ-นามสกุล (พร้อมคำนำหน้า) *</label>
+                    <input 
+                      type="text" 
+                      className="form-input-light" 
+                      placeholder="เช่น นายสมคิด มุ่งมั่นวิทยา" 
+                      value={formData.fullName}
+                      onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                      required 
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>ชื่อเล่น</label>
+                    <input 
+                      type="text" 
+                      className="form-input-light" 
+                      placeholder="เช่น คิด" 
+                      value={formData.nickname}
+                      onChange={(e) => setFormData({ ...formData, nickname: e.target.value })}
+                    />
                   </div>
 
                   <div className="form-group">
@@ -209,18 +255,6 @@ export const ApplicationWizardModal: React.FC = () => {
                   </div>
 
                   <div className="form-group">
-                    <label>ชื่อ-นามสกุล (พร้อมคำนำหน้า) *</label>
-                    <input 
-                      type="text" 
-                      className="form-input-light" 
-                      placeholder="เช่น นายสมคิด มุ่งมั่นวิทยา" 
-                      value={formData.fullName}
-                      onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                      required 
-                    />
-                  </div>
-
-                  <div className="form-group">
                     <label>สาขาวิชา *</label>
                     <select 
                       className="form-input-light" 
@@ -228,10 +262,10 @@ export const ApplicationWizardModal: React.FC = () => {
                       onChange={(e) => setFormData({ ...formData, major: e.target.value })}
                       required
                     >
-                      <option value="คณิตศาสตร์ประยุกต์">คณิตศาสตร์ประยุกต์ (Applied Math)</option>
-                      <option value="สถิติประยุกต์และการวิเคราะห์ข้อมูล">สถิติประยุกต์และการวิเคราะห์ข้อมูล (Applied Statistics)</option>
-                      <option value="คณิตศาสตร์การเงิน">คณิตศาสตร์การเงิน (Financial Math)</option>
-                      <option value="บัณฑิตศึกษาคณิตศาสตร์">ระดับบัณฑิตศึกษา (ป.โท / ป.เอก)</option>
+                      <option value="MA โครงการปกติ">MA โครงการปกติ</option>
+                      <option value="MA โครงการสมทบ">MA โครงการสมทบ</option>
+                      <option value="MC โครงการปกติ">MC โครงการปกติ</option>
+                      <option value="MC โครงการสมทบ">MC โครงการสมทบ</option>
                     </select>
                   </div>
 
@@ -277,8 +311,8 @@ export const ApplicationWizardModal: React.FC = () => {
                     />
                   </div>
 
-                  <div className="form-group full-width">
-                    <label>อีเมลมหาวิทยาลัย (s...@kmutnb.ac.th) *</label>
+                  <div className="form-group">
+                    <label>อีเมลมหาวิทยาลัย (@kmutnb.ac.th) *</label>
                     <input 
                       type="email" 
                       className="form-input-light" 
@@ -288,6 +322,38 @@ export const ApplicationWizardModal: React.FC = () => {
                       required 
                     />
                   </div>
+
+                  <div className="form-group full-width">
+                    <label>ที่อยู่ปัจจุบัน *</label>
+                    <textarea 
+                      className="form-input-light" 
+                      rows={2}
+                      placeholder="บ้านเลขที่ หมู่ ซอย ถนน ตำบล อำเภอ จังหวัด รหัสไปรษณีย์" 
+                      value={formData.address}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                      required 
+                    />
+                    <div style={{ display: 'flex', gap: 16, marginTop: 8, alignItems: 'center' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', margin: 0, fontWeight: 400 }}>
+                        <input 
+                          type="checkbox" 
+                          checked={formData.isIdCardAddress}
+                          onChange={(e) => setFormData({ ...formData, isIdCardAddress: e.target.checked })}
+                        />
+                        เหมือนที่อยู่ตามบัตรประชาชน
+                      </label>
+                      {!formData.isIdCardAddress && (
+                        <input 
+                          type="text" 
+                          className="form-input-light" 
+                          placeholder="ที่อยู่ตามบัตรประชาชน อยู่จังหวัด..." 
+                          style={{ flex: 1 }}
+                          value={formData.idCardProvince}
+                          onChange={(e) => setFormData({ ...formData, idCardProvince: e.target.value })}
+                        />
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -296,154 +362,193 @@ export const ApplicationWizardModal: React.FC = () => {
             {step === 2 && (
               <div className="wizard-step-pane">
                 <h4 style={{ marginBottom: 16, fontSize: '1.1rem', color: 'var(--kmutnb-orange)' }}>
-                  ขั้นตอนที่ 2: ข้อมูลครอบครัวและสถานะทางการเงิน
+                  ขั้นตอนที่ 2: ข้อมูลครอบครัวและการกู้ยืม
                 </h4>
+                
+                <h5 style={{ margin: '16px 0 8px', color: 'var(--navy-800)' }}>ข้อมูลบิดา</h5>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div className="form-group">
                     <label>ชื่อ-นามสกุล บิดา</label>
-                    <input 
-                      type="text" 
-                      className="form-input-light" 
-                      value={formData.fatherName}
-                      onChange={(e) => setFormData({ ...formData, fatherName: e.target.value })}
-                    />
+                    <input type="text" className="form-input-light" value={formData.fatherName} onChange={(e) => setFormData({ ...formData, fatherName: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label>เบอร์โทรศัพท์บิดา</label>
+                    <input type="text" className="form-input-light" value={formData.fatherPhone} onChange={(e) => setFormData({ ...formData, fatherPhone: e.target.value })} />
                   </div>
                   <div className="form-group">
                     <label>อาชีพบิดา</label>
-                    <input 
-                      type="text" 
-                      className="form-input-light" 
-                      value={formData.fatherJob}
-                      onChange={(e) => setFormData({ ...formData, fatherJob: e.target.value })}
-                    />
+                    <input type="text" className="form-input-light" value={formData.fatherJob} onChange={(e) => setFormData({ ...formData, fatherJob: e.target.value })} />
                   </div>
                   <div className="form-group">
+                    <label>รายได้ต่อเดือน (บาท)</label>
+                    <input type="number" className="form-input-light" value={formData.fatherIncome || ''} onChange={(e) => setFormData({ ...formData, fatherIncome: parseFloat(e.target.value) || 0 })} />
+                  </div>
+                  <div className="form-group full-width" style={{ display: 'flex', gap: 16 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', margin: 0, fontWeight: 400 }}>
+                      <input type="radio" name="fatherAlive" checked={formData.fatherAlive === 'alive'} onChange={() => setFormData({ ...formData, fatherAlive: 'alive' })} /> ยังมีชีวิต
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', margin: 0, fontWeight: 400 }}>
+                      <input type="radio" name="fatherAlive" checked={formData.fatherAlive === 'deceased'} onChange={() => setFormData({ ...formData, fatherAlive: 'deceased' })} /> ถึงแก่กรรม
+                    </label>
+                  </div>
+                </div>
+
+                <h5 style={{ margin: '16px 0 8px', color: 'var(--navy-800)' }}>ข้อมูลมารดา</h5>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div className="form-group">
                     <label>ชื่อ-นามสกุล มารดา</label>
-                    <input 
-                      type="text" 
-                      className="form-input-light" 
-                      value={formData.motherName}
-                      onChange={(e) => setFormData({ ...formData, motherName: e.target.value })}
-                    />
+                    <input type="text" className="form-input-light" value={formData.motherName} onChange={(e) => setFormData({ ...formData, motherName: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label>เบอร์โทรศัพท์มารดา</label>
+                    <input type="text" className="form-input-light" value={formData.motherPhone} onChange={(e) => setFormData({ ...formData, motherPhone: e.target.value })} />
                   </div>
                   <div className="form-group">
                     <label>อาชีพมารดา</label>
-                    <input 
-                      type="text" 
-                      className="form-input-light" 
-                      value={formData.motherJob}
-                      onChange={(e) => setFormData({ ...formData, motherJob: e.target.value })}
-                    />
+                    <input type="text" className="form-input-light" value={formData.motherJob} onChange={(e) => setFormData({ ...formData, motherJob: e.target.value })} />
                   </div>
                   <div className="form-group">
-                    <label>รายได้รวมของครอบครัวต่อปี (บาท) *</label>
-                    <input 
-                      type="number" 
-                      className="form-input-light" 
-                      value={formData.familyIncome}
-                      onChange={(e) => setFormData({ ...formData, familyIncome: parseFloat(e.target.value) || 0 })}
-                      required 
-                    />
+                    <label>รายได้ต่อเดือน (บาท)</label>
+                    <input type="number" className="form-input-light" value={formData.motherIncome || ''} onChange={(e) => setFormData({ ...formData, motherIncome: parseFloat(e.target.value) || 0 })} />
                   </div>
+                  <div className="form-group full-width" style={{ display: 'flex', gap: 16 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', margin: 0, fontWeight: 400 }}>
+                      <input type="radio" name="motherAlive" checked={formData.motherAlive === 'alive'} onChange={() => setFormData({ ...formData, motherAlive: 'alive' })} /> ยังมีชีวิต
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', margin: 0, fontWeight: 400 }}>
+                      <input type="radio" name="motherAlive" checked={formData.motherAlive === 'deceased'} onChange={() => setFormData({ ...formData, motherAlive: 'deceased' })} /> ถึงแก่กรรม
+                    </label>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, marginTop: 16 }}>
                   <div className="form-group">
-                    <label>จำนวนพี่น้องร่วมบิดามารดา (คน)</label>
-                    <input 
-                      type="number" 
-                      className="form-input-light" 
-                      min="1" 
-                      value={formData.siblings}
-                      onChange={(e) => setFormData({ ...formData, siblings: parseInt(e.target.value, 10) || 1 })}
-                    />
+                    <label>ความสัมพันธ์ของครอบครัว (ปัจจุบันบิดามารดา)</label>
+                    <div style={{ display: 'flex', gap: 16 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 400 }}>
+                        <input type="radio" name="relation" checked={formData.parentsRelation === 'together'} onChange={() => setFormData({ ...formData, parentsRelation: 'together' })} /> อยู่ด้วยกัน
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 400 }}>
+                        <input type="radio" name="relation" checked={formData.parentsRelation === 'divorced'} onChange={() => setFormData({ ...formData, parentsRelation: 'divorced' })} /> หย่าร้าง
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 400 }}>
+                        <input type="radio" name="relation" checked={formData.parentsRelation === 'other'} onChange={() => setFormData({ ...formData, parentsRelation: 'other' })} /> อื่นๆ
+                      </label>
+                    </div>
                   </div>
-                  <div className="form-group full-width">
-                    <label>สถานะการกู้ยืมกองทุนเพื่อการศึกษา</label>
-                    <select 
-                      className="form-input-light"
-                      value={formData.loanStatus}
-                      onChange={(e) => setFormData({ ...formData, loanStatus: e.target.value as 'none' | 'กยศ' | 'กรอ' })}
-                    >
-                      <option value="none">ไม่ได้กู้ยืม กยศ. / กรอ.</option>
-                      <option value="กยศ">กู้ยืมกองทุน กยศ.</option>
-                      <option value="กรอ">กู้ยืมกองทุน กรอ.</option>
-                    </select>
+
+                  <div className="form-group">
+                    <label>ผู้รับผิดชอบค่าใช้จ่ายในการศึกษา (เลือกได้มากกว่า 1)</label>
+                    <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 400 }}>
+                        <input type="checkbox" checked={formData.sponsor.includes('father')} onChange={(e) => {
+                          const sponsor = e.target.checked ? [...formData.sponsor, 'father'] : formData.sponsor.filter(s => s !== 'father');
+                          setFormData({ ...formData, sponsor });
+                        }} /> บิดา
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 400 }}>
+                        <input type="checkbox" checked={formData.sponsor.includes('mother')} onChange={(e) => {
+                          const sponsor = e.target.checked ? [...formData.sponsor, 'mother'] : formData.sponsor.filter(s => s !== 'mother');
+                          setFormData({ ...formData, sponsor });
+                        }} /> มารดา
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 400 }}>
+                        <input type="checkbox" checked={formData.sponsor.includes('other')} onChange={(e) => {
+                          const sponsor = e.target.checked ? [...formData.sponsor, 'other'] : formData.sponsor.filter(s => s !== 'other');
+                          setFormData({ ...formData, sponsor });
+                        }} /> อื่นๆ ระบุ
+                      </label>
+                      {formData.sponsor.includes('other') && (
+                        <input type="text" className="form-input-light" style={{ flex: 1, padding: '4px 8px' }} placeholder="เช่น ญาติ พี่สาว กองทุน" value={formData.sponsorOther} onChange={(e) => setFormData({...formData, sponsorOther: e.target.value})} />
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label>ข้อมูลการกู้ยืมจากกองทุนการศึกษา</label>
+                    <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 400 }}>
+                        <input type="radio" name="loanStatus" checked={formData.loanStatus === 'none'} onChange={() => setFormData({ ...formData, loanStatus: 'none', loanAmount: 0 })} /> ไม่กู้
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 400 }}>
+                        <input type="radio" name="loanStatus" checked={formData.loanStatus === 'กยศ'} onChange={() => setFormData({ ...formData, loanStatus: 'กยศ' })} /> กู้ กยศ.
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 400 }}>
+                        <input type="radio" name="loanStatus" checked={formData.loanStatus === 'กรอ'} onChange={() => setFormData({ ...formData, loanStatus: 'กรอ' })} /> กู้ กรอ.
+                      </label>
+                      {formData.loanStatus !== 'none' && (
+                        <input type="number" className="form-input-light" style={{ width: 150 }} placeholder="บาท / ปี" value={formData.loanAmount || ''} onChange={(e) => setFormData({...formData, loanAmount: parseFloat(e.target.value) || 0})} />
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label>ข้อมูลการทำงานพิเศษของนักศึกษา</label>
+                    <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 400 }}>
+                        <input type="radio" checked={!formData.hasPartTimeJob} onChange={() => setFormData({ ...formData, hasPartTimeJob: false, partTimeJobLocation: '', partTimeJobIncome: 0 })} /> ไม่ทำงานพิเศษ
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 400 }}>
+                        <input type="radio" checked={formData.hasPartTimeJob} onChange={() => setFormData({ ...formData, hasPartTimeJob: true })} /> ทำงานพิเศษ
+                      </label>
+                    </div>
+                    {formData.hasPartTimeJob && (
+                      <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+                        <input type="text" className="form-input-light" placeholder="สถานที่ทำงาน" style={{ flex: 2 }} value={formData.partTimeJobLocation} onChange={(e) => setFormData({...formData, partTimeJobLocation: e.target.value})} />
+                        <input type="number" className="form-input-light" placeholder="รายได้ (บาท/เดือน)" style={{ flex: 1 }} value={formData.partTimeJobIncome || ''} onChange={(e) => setFormData({...formData, partTimeJobIncome: parseFloat(e.target.value) || 0})} />
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Step 3: Activities & Statement */}
+            {/* Step 3: Activities */}
             {step === 3 && (
               <div className="wizard-step-pane">
                 <h4 style={{ marginBottom: 16, fontSize: '1.1rem', color: 'var(--kmutnb-orange)' }}>
-                  ขั้นตอนที่ 3: กิจกรรมจิตสาธารณะ และเหตุผลการขอรับทุน
+                  ขั้นตอนที่ 3: ข้อมูลกิจกรรม
                 </h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
                   <div className="form-group">
-                    <label>ชั่วโมงกิจกรรม / จิตอาสาสะสม (ชั่วโมง)</label>
-                    <input 
-                      type="number" 
-                      className="form-input-light" 
-                      min="0" 
-                      value={formData.volunteerHours}
-                      onChange={(e) => setFormData({ ...formData, volunteerHours: parseInt(e.target.value, 10) || 0 })}
-                    />
+                    <label>ประสบการณ์/กิจกรรมเพื่อสังคมส่วนรวม หรือกิจกรรมของภาควิชา</label>
+                    <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 400 }}>
+                        <input type="radio" checked={!formData.hasActivities} onChange={() => setFormData({ ...formData, hasActivities: false, activities: '', activityRole: '' })} /> ไม่มี
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 400 }}>
+                        <input type="radio" checked={formData.hasActivities} onChange={() => setFormData({ ...formData, hasActivities: true })} /> มี (ระบุ)
+                      </label>
+                    </div>
+                    {formData.hasActivities && (
+                      <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+                        <input type="text" className="form-input-light" placeholder="ชื่อกิจกรรม" style={{ flex: 2 }} value={formData.activities} onChange={(e) => setFormData({...formData, activities: e.target.value})} />
+                        <input type="text" className="form-input-light" placeholder="หน้าที่/รับผิดชอบ" style={{ flex: 1 }} value={formData.activityRole} onChange={(e) => setFormData({...formData, activityRole: e.target.value})} />
+                      </div>
+                    )}
                   </div>
-                  <div className="form-group">
-                    <label>กิจกรรมเด่นหรือผลงานทางวิชาการที่เคยเข้าร่วม</label>
-                    <textarea 
-                      className="form-input-light" 
-                      rows={3} 
-                      value={formData.activities}
-                      onChange={(e) => setFormData({ ...formData, activities: e.target.value })}
-                    />
-                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Step 4: Statement of Need */}
+            {step === 4 && (
+              <div className="wizard-step-pane">
+                <h4 style={{ marginBottom: 16, fontSize: '1.1rem', color: 'var(--kmutnb-orange)' }}>
+                  ขั้นตอนที่ 4: เหตุผลและความจำเป็น
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <div className="form-group">
                     <label>เรียงความแสดงเหตุผลและความจำเป็นในการขอรับทุนการศึกษา (Statement of Need) *</label>
                     <textarea 
                       className="form-input-light" 
-                      rows={5} 
+                      rows={8} 
                       value={formData.reason}
                       onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+                      placeholder="อธิบายถึงความจำเป็นที่ต้องขอรับทุนการศึกษา..."
                       required 
                     />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Step 4: Documents Upload Simulation */}
-            {step === 4 && (
-              <div className="wizard-step-pane">
-                <h4 style={{ marginBottom: 16, fontSize: '1.1rem', color: 'var(--kmutnb-orange)' }}>
-                  ขั้นตอนที่ 4: อัปโหลดเอกสารประกอบการสมัคร
-                </h4>
-                <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: 16 }}>
-                  กรุณาแนบไฟล์เอกสารในรูปแบบ PDF หรือรูปภาพ (PNG/JPG) ขนาดไม่เกิน 5 MB ต่อไฟล์
-                </p>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <div className="file-upload-zone" onClick={() => simulateFileUpload('doc1')}>
-                    <div style={{ fontSize: 24, marginBottom: 6 }}>📄</div>
-                    <strong>1. สำเนาใบแสดงผลการเรียน (Transcript) *</strong>
-                    <div style={{ fontSize: '0.8rem', color: files.doc1 ? 'var(--success)' : 'var(--text-muted)', marginTop: 4 }}>
-                      {files.doc1 ? `✓ แนบไฟล์สำเร็จ: ${files.doc1}` : 'คลิกเพื่อจำลองการเลือกไฟล์'}
-                    </div>
-                  </div>
-
-                  <div className="file-upload-zone" onClick={() => simulateFileUpload('doc2')}>
-                    <div style={{ fontSize: 24, marginBottom: 6 }}>🪪</div>
-                    <strong>2. สำเนาบัตรประจำตัวนักศึกษา และบัตรประชาชน *</strong>
-                    <div style={{ fontSize: '0.8rem', color: files.doc2 ? 'var(--success)' : 'var(--text-muted)', marginTop: 4 }}>
-                      {files.doc2 ? `✓ แนบไฟล์สำเร็จ: ${files.doc2}` : 'คลิกเพื่อจำลองการเลือกไฟล์'}
-                    </div>
-                  </div>
-
-                  <div className="file-upload-zone" onClick={() => simulateFileUpload('doc3')}>
-                    <div style={{ fontSize: 24, marginBottom: 6 }}>📑</div>
-                    <strong>3. หนังสือรับรองรายได้ครอบครัว / หลักฐานผลงาน (ถ้ามี)</strong>
-                    <div style={{ fontSize: '0.8rem', color: files.doc3 ? 'var(--success)' : 'var(--text-muted)', marginTop: 4 }}>
-                      {files.doc3 ? `✓ แนบไฟล์สำเร็จ: ${files.doc3}` : 'คลิกเพื่อจำลองการเลือกไฟล์'}
-                    </div>
                   </div>
                 </div>
               </div>
@@ -488,7 +593,7 @@ export const ApplicationWizardModal: React.FC = () => {
                   </div>
                   <div>
                     <span className="detail-item-label">เหตุผลความจำเป็น</span>
-                    <p style={{ fontSize: '0.88rem', color: 'var(--navy-800)', marginTop: 4, background: 'white', padding: 10, borderRadius: 'var(--radius-sm)' }}>
+                    <p style={{ fontSize: '0.88rem', color: 'var(--navy-800)', marginTop: 4, background: 'var(--surface-alt)', padding: 10, borderRadius: 'var(--radius-sm)' }}>
                       {formData.reason}
                     </p>
                   </div>

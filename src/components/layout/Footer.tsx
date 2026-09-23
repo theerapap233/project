@@ -1,6 +1,8 @@
 import React from 'react';
+import { useScholarship } from '../../context/ScholarshipContext';
 
 export const Footer: React.FC = () => {
+  const { openLoginModal, currentUser } = useScholarship();
   return (
     <footer className="site-footer">
       <div className="container">
@@ -10,7 +12,7 @@ export const Footer: React.FC = () => {
               <img
                 src="/logo.png"
                 alt="Mathematics KMUTNB"
-                style={{ width: 52, height: 52, borderRadius: '50%', background: 'white', padding: 2, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}
+                style={{ width: 52, height: 52, borderRadius: '50%', background: 'var(--surface-card)', padding: 2, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}
               />
               <div>
                 <h4 style={{ margin: 0, fontSize: '1.2rem', color: 'white' }}>ภาควิชาคณิตศาสตร์ มจพ.</h4>
@@ -32,6 +34,17 @@ export const Footer: React.FC = () => {
             <ul>
               <li><a href="https://kmutnb.ac.th" target="_blank" rel="noopener noreferrer">เว็บไซต์ มหาวิทยาลัย มจพ.</a></li>
               <li><a href="https://reg.kmutnb.ac.th" target="_blank" rel="noopener noreferrer">เว็บไซต์ ทะเบียนนักศึกษา</a></li>
+              {!currentUser && (
+                <li>
+                  <a
+                    href="#"
+                    onClick={(e) => { e.preventDefault(); openLoginModal(); }}
+                    title="เข้าสู่ระบบสำหรับเจ้าหน้าที่ (Ctrl+Shift+A)"
+                  >
+                    เว็บไซต์ ระบบจัดการสำหรับเจ้าหน้าที่
+                  </a>
+                </li>
+              )}
             </ul>
           </div>
 
@@ -39,13 +52,15 @@ export const Footer: React.FC = () => {
             <h5>หลักสูตรภาควิชา</h5>
             <ul>
               <li>หลักสูตร วท.บ. คณิตศาสตร์ประยุกต์</li>
-
             </ul>
           </div>
         </div>
 
-        <div className="footer-bottom">
-          &copy; {new Date().getFullYear()} ภาควิชาคณิตศาสตร์ คณะวิทยาศาสตร์ประยุกต์ มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ. All Rights Reserved.
+        <div className="footer-bottom" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+          <div style={{ textAlign: 'center', width: '100%' }}>
+            &copy; {new Date().getFullYear()} ภาควิชาคณิตศาสตร์ คณะวิทยาศาสตร์ประยุกต์ มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ. All Rights Reserved.
+          </div>
+
         </div>
       </div>
     </footer>

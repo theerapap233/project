@@ -444,3 +444,45 @@ INSERT INTO public.staff_roles (id, role_name, role_title) VALUES
   ('f0000000-0000-0000-0000-000000000001', 'admin', 'ผู้ดูแลระบบสูงสุด'),
   ('f0000000-0000-0000-0000-000000000002', 'committee', 'กรรมการพิจารณาทุนภาควิชา')
 ON CONFLICT (id) DO UPDATE SET role_name = EXCLUDED.role_name, role_title = EXCLUDED.role_title;
+
+-- ===================================================================
+-- หมวดที่ 8: การตั้งค่าเว็บไซต์ (Site Settings)
+-- ===================================================================
+CREATE TABLE IF NOT EXISTS public.site_settings (
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  setting_key CHARACTER VARYING NOT NULL UNIQUE,
+  academic_year CHARACTER VARYING NOT NULL,
+  semester CHARACTER VARYING NOT NULL,
+  hero_title TEXT NOT NULL,
+  hero_subtitle TEXT NOT NULL,
+  contact_phone CHARACTER VARYING NOT NULL,
+  contact_email CHARACTER VARYING NOT NULL,
+  contact_address TEXT NOT NULL,
+  ticker_text TEXT NOT NULL,
+  facebook_url CHARACTER VARYING,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  CONSTRAINT site_settings_pkey PRIMARY KEY (id)
+);
+
+ALTER TABLE public.site_settings ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public read access on site_settings" ON public.site_settings FOR SELECT USING (true);
+CREATE POLICY "Allow authenticated full access on site_settings" ON public.site_settings FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+INSERT INTO public.site_settings (
+  id, setting_key, academic_year, semester, hero_title, hero_subtitle, contact_phone, contact_email, contact_address, ticker_text, facebook_url
+) VALUES (
+  '123e4567-e89b-12d3-a456-426614174000',
+  'general',
+  '2567',
+  '1',
+  'เปิดประตูสู่อนาคต
+ทุนการศึกษาคณิตศาสตร์ มจพ.',
+  'ภาควิชาคณิตศาสตร์ คณะวิทยาศาสตร์ประยุกต์ มุ่งมั่นสนับสนุนศักยภาพทางวิชาการและช่วยเหลือนักศึกษาทุกระดับชั้น ทั้งทุนเรียนดี ทุนขาดแคลน ทุนผู้ช่วยสอน (TA) และทุนสนับสนุนงานวิจัย',
+  '02-555-2000 ต่อ 4601-4602',
+  'math@sci.kmutnb.ac.th',
+  '1518 ถนนประชาราษฎร์ 1 แขวงวงศ์สว่าง เขตบางซื่อ กรุงเทพฯ 10800',
+  '📢 เปิดรับสมัครทุนการศึกษาภาควิชาคณิตศาสตร์ ประจำภาคการศึกษาที่ 1/2567 ยื่นใบสมัครออนไลน์ได้ตั้งแต่วันนี้',
+  'https://facebook.com/kmutnb.math'
+) ON CONFLICT (setting_key) DO NOTHING;

@@ -1,25 +1,87 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useScholarship } from '../../context/ScholarshipContext';
 
 export const LoginModal: React.FC = () => {
-  const { isLoginModalOpen, closeLoginModal, login, showToast } = useScholarship();
-  const [username, setUsername] = useState('s6604062610099');
+  const { isLoginModalOpen, openLoginModal, closeLoginModal, login, showToast } = useScholarship();
+  const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('••••••••••••');
   const [rememberMe, setRememberMe] = useState(true);
+  const [warningMsg, setWarningMsg] = useState<string | null>(null);
+
+  // รองรับการเปิดด้วยคีย์ลัด Ctrl+Shift+A หรือ Alt+A และ URL Hash #admin หรือ #login
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+Shift+A หรือ Alt+A
+      if (((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) ||
+          (e.altKey && (e.key === 'A' || e.key === 'a'))) {
+        e.preventDefault();
+        openLoginModal();
+      }
+    };
+
+    const handleHashCheck = () => {
+      if (window.location.hash === '#admin' || window.location.hash === '#login') {
+        openLoginModal();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('hashchange', handleHashCheck);
+    handleHashCheck();
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('hashchange', handleHashCheck);
+    };
+  }, [openLoginModal]);
 
   if (!isLoginModalOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim()) {
-      showToast('กรุณากรอกรหัสนักศึกษา หรือบัญชีผู้ใช้ ICIT', 'warning');
+    setWarningMsg(null);
+    const cleanUser = username.trim();
+
+    if (!cleanUser) {
+      showToast('กรุณากรอกชื่อผู้ใช้เจ้าหน้าที่', 'warning');
       return;
     }
-    login(username.trim());
+
+    // ตรวจสอบหากเป็นรหัสนักศึกษา (ขึ้นต้นด้วย 6 หรือ s6 และตามด้วยตัวเลข)
+    const isStudentFormat = /^s?[0-9]{10,13}$/i.test(cleanUser);
+    if (isStudentFormat) {
+      const msg = 'ระบบเข้าสู่ระบบนี้สำหรับเจ้าหน้าที่และคณะกรรมการพิจารณาทุนเท่านั้น นักศึกษาสามารถสมัครทุนและตรวจสอบสถานะได้โดยตรงโดยไม่ต้องเข้าสู่ระบบ';
+      setWarningMsg(msg);
+      showToast(msg, 'warning');
+      return;
+    }
+
+    // อนุญาตเฉพาะบัญชีเจ้าหน้าที่/แอดมิน
+    const isAdminAccount = cleanUser.toLowerCase() === 'admin' || 
+                           cleanUser.toLowerCase().includes('staff') || 
+                           cleanUser.toLowerCase().includes('officer') ||
+                           cleanUser.toLowerCase().includes('committee') ||
+                           cleanUser.toLowerCase().includes('math');
+
+    if (!isAdminAccount) {
+      const msg = 'ไม่พบบัญชีเจ้าหน้าที่นี้ในระบบ กรุณาใช้ชื่อผู้ใช้ "admin" หรือติดต่อผู้ดูแลระบบภาควิชา';
+      setWarningMsg(msg);
+      showToast(msg, 'error');
+      return;
+    }
+
+    login(cleanUser, 'เจ้าหน้าที่ธุรการ/กรรมการทุน ภาควิชาคณิตศาสตร์');
   };
 
-  const handleGoogleLogin = () => {
-    login('s6604062610099', 'นายสมคิด มุ่งมั่นวิทยา');
+  const handleForgotPassword = (e: React.MouseEvent) => {
+    e.preventDefault();
+    showToast('หากลืมรหัสผ่าน กรุณาติดต่อธุรการภาควิชาคณิตศาสตร์ อาคาร 78 หรือโทร. 02-555-2000 ต่อ 4601-4602', 'info');
+  };
+
+  const selectAdminAccount = () => {
+    setUsername('admin');
+    setPassword('••••••••••••');
+    setWarningMsg(null);
   };
 
   return (
@@ -27,33 +89,67 @@ export const LoginModal: React.FC = () => {
       <div className="modal-card" style={{ maxWidth: 460 }}>
         <div className="modal-header" style={{ borderBottom: 'none', paddingBottom: 0 }}>
           <div style={{ textAlign: 'center', width: '100%' }}>
-            <img 
-              src="/logo.png" 
-              alt="KMUTNB Mathematics" 
-              style={{ width: 68, height: 68, borderRadius: '50%', background: 'white', padding: 2, margin: '0 auto 12px', display: 'block', boxShadow: '0 4px 16px rgba(7, 123, 56, 0.25)' }} 
-            />
+            <div style={{ 
+              width: 58, 
+              height: 58, 
+              borderRadius: '50%', 
+              background: 'linear-gradient(135deg, #077b38, #045a27)', 
+              color: 'white',
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              margin: '0 auto 12px',
+              boxShadow: '0 4px 16px rgba(7, 123, 56, 0.3)' 
+            }}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
+            </div>
             <h3 style={{ fontSize: '1.35rem', color: 'var(--navy-900)', marginBottom: 4 }}>
-              เข้าสู่ระบบสารสนเทศทุน
+              เข้าสู่ระบบสำหรับเจ้าหน้าที่
             </h3>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              ภาควิชาคณิตศาสตร์ คณะวิทยาศาสตร์ประยุกต์ มจพ.
+            <p style={{ fontSize: '0.82rem', color: 'var(--kmutnb-orange, #e65100)', fontWeight: 500, margin: '0 0 4px' }}>
+              เฉพาะเจ้าหน้าที่และคณะกรรมการพิจารณาทุนเท่านั้น
+            </p>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>
+              (นักศึกษาสามารถสมัครทุนและตรวจสถานะได้โดยไม่ต้องเข้าสู่ระบบ)
             </p>
           </div>
           <button className="modal-close-btn" onClick={closeLoginModal}>&times;</button>
         </div>
 
         <div className="modal-body" style={{ paddingTop: 16 }}>
+          {warningMsg && (
+            <div style={{
+              background: '#FEF2F2',
+              border: '1px solid #FCA5A5',
+              borderRadius: '8px',
+              padding: '10px 14px',
+              fontSize: '0.82rem',
+              color: '#991B1B',
+              marginBottom: 16,
+              lineHeight: 1.5
+            }}>
+              ⚠️ {warningMsg}
+            </div>
+          )}
+
+
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="form-group">
               <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
-                บัญชีผู้ใช้เครือข่าย มจพ. (ICIT Account)
+                ชื่อผู้ใช้เจ้าหน้าที่ (Staff Username)
               </label>
               <input 
                 type="text" 
                 className="form-input-light" 
-                placeholder="เช่น s6604062610099 หรือชื่อผู้ใช้"
+                placeholder="กรอกชื่อผู้ใช้ เช่น admin หรือ staff"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => {
+                  setUsername(e.target.value);
+                  if (warningMsg) setWarningMsg(null);
+                }}
                 required
               />
             </div>
@@ -64,10 +160,9 @@ export const LoginModal: React.FC = () => {
                   รหัสผ่าน (Password)
                 </label>
                 <a 
-                  href="https://account.kmutnb.ac.th" 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  style={{ fontSize: '0.8rem', color: 'var(--math-green)' }}
+                  href="#forgot-password"
+                  onClick={handleForgotPassword}
+                  style={{ fontSize: '0.8rem', color: 'var(--math-green)', textDecoration: 'none', cursor: 'pointer' }}
                 >
                   ลืมรหัสผ่าน?
                 </a>
@@ -75,7 +170,7 @@ export const LoginModal: React.FC = () => {
               <input 
                 type="password" 
                 className="form-input-light" 
-                placeholder="กรอกรหัสผ่าน ICIT"
+                placeholder="กรอกรหัสผ่านของคุณ"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -92,42 +187,22 @@ export const LoginModal: React.FC = () => {
                 จดจำการเข้าสู่ระบบ
               </label>
               <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                สำหรับนักศึกษาและบุคลากร
+                คีย์ลัด: Ctrl+Shift+A
               </span>
             </div>
 
-            <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: 8 }}>
-              เข้าสู่ระบบด้วย ICIT Account
-            </button>
-
-            <div style={{ display: 'flex', alignItems: 'center', margin: '8px 0', gap: 12 }}>
-              <div style={{ flex: 1, height: 1, background: 'var(--border-light)' }} />
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>หรือ</span>
-              <div style={{ flex: 1, height: 1, background: 'var(--border-light)' }} />
-            </div>
-
-            <button 
-              type="button" 
-              className="btn btn-secondary" 
-              onClick={handleGoogleLogin}
-              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
-                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.36 24 12 24z"/>
-                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
-                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.36 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+            <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                <polyline points="10 17 15 12 10 7"></polyline>
+                <line x1="15" y1="12" x2="3" y2="12"></line>
               </svg>
-              เข้าสู่ระบบด้วย Google KMUTNB
+              เข้าสู่ระบบเจ้าหน้าที่
             </button>
           </form>
         </div>
 
-        <div className="modal-footer" style={{ justifyContent: 'center', background: 'var(--surface-ground)', borderTop: '1px solid var(--border-light)' }}>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center', margin: 0 }}>
-            หากพบปัญหาการเข้าสู่ระบบ ติดต่อสำนักคอมพิวเตอร์ ICIT โทร. 02-555-2000 ต่อ 2222
-          </p>
-        </div>
+
       </div>
     </div>
   );

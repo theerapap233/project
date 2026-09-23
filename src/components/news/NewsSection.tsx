@@ -1,25 +1,10 @@
-import React, { useState, useMemo } from 'react';
-import { ANNOUNCEMENTS } from '../../data/staticContent';
+import React, { useState } from 'react';
 import { Announcement } from '../../types/common';
 import { useScholarship } from '../../context/ScholarshipContext';
 
 export const NewsSection: React.FC = () => {
-  const { showToast } = useScholarship();
-  const [activeFilter, setActiveFilter] = useState<string>('all');
+  const { announcements, showToast } = useScholarship();
   const [selectedNews, setSelectedNews] = useState<Announcement | null>(null);
-
-  const filterCategories = [
-    { key: 'all', label: 'ทั้งหมด' },
-    { key: 'ประกาศสำคัญ', label: 'ประกาศสำคัญ' },
-    { key: 'นัดสัมภาษณ์', label: 'นัดสัมภาษณ์' },
-    { key: 'ผลการพิจารณา', label: 'ผลการพิจารณา' },
-    { key: 'ข่าวกิจกรรม', label: 'ข่าวกิจกรรม' }
-  ];
-
-  const filteredNews = useMemo(() => {
-    if (activeFilter === 'all') return ANNOUNCEMENTS;
-    return ANNOUNCEMENTS.filter(item => item.tag === activeFilter);
-  }, [activeFilter]);
 
   const handleOpenNews = (news: Announcement) => {
     setSelectedNews(news);
@@ -35,7 +20,7 @@ export const NewsSection: React.FC = () => {
 
   return (
     <section className="section" id="news" style={{ background: 'var(--surface-alt)' }}>
-      <div className="container">
+      <div className="container" style={{ maxWidth: '1024px' }}>
         <div className="section-header">
           <span className="section-tag">News & Announcements</span>
           <h2 className="section-title">ข่าวสารและประกาศทุนการศึกษา</h2>
@@ -44,18 +29,6 @@ export const NewsSection: React.FC = () => {
           </p>
         </div>
 
-        {/* Filter Pills */}
-        <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 36 }}>
-          {filterCategories.map(cat => (
-            <button
-              key={cat.key}
-              className={`filter-btn ${activeFilter === cat.key ? 'active' : ''}`}
-              onClick={() => setActiveFilter(cat.key)}
-            >
-              {cat.label}
-            </button>
-          ))}
-        </div>
 
         {/* News Grid */}
         <div style={{
@@ -63,7 +36,7 @@ export const NewsSection: React.FC = () => {
           gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
           gap: 24
         }}>
-          {filteredNews.map(item => {
+          {announcements.map(item => {
             let badgeBg = 'var(--math-green-soft)';
             let badgeColor = 'var(--math-green-dark)';
             let badgeBorder = 'var(--math-green-border)';

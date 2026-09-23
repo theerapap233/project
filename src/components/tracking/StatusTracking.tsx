@@ -20,7 +20,7 @@ export const StatusTracking: React.FC = () => {
     if (e) e.preventDefault();
     const clean = query.trim().toLowerCase();
     if (!clean) {
-      showToast('กรุณากรอกรหัสติดตาม หรือรหัสนักศึกษา', 'warning');
+      showToast('กรุณากรอกรหัสนักศึกษา 13 หลัก', 'warning');
       return;
     }
 
@@ -102,7 +102,7 @@ export const StatusTracking: React.FC = () => {
 
   return (
     <section className="section" id="tracking">
-      <div className="container">
+      <div className="container" style={{ maxWidth: '1024px' }}>
         <div className="section-header">
           <span className="section-tag">Status Tracking</span>
           <h2 className="section-title">ตรวจสอบสถานะการสมัครขอรับทุน</h2>
@@ -114,7 +114,7 @@ export const StatusTracking: React.FC = () => {
             <input 
               type="text" 
               className="tracking-search-input" 
-              placeholder="กรอกรหัสติดตาม (เช่น KMUTNB-SCH-670101) หรือรหัสนักศึกษา 13 หลัก" 
+              placeholder="กรอกรหัสนักศึกษา 13 หลัก (เช่น 6504062630012)" 
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -131,7 +131,7 @@ export const StatusTracking: React.FC = () => {
               <div style={{ fontSize: 36, marginBottom: 8 }}>🔍</div>
               <h4 style={{ color: 'var(--navy-900)', marginBottom: 6 }}>ไม่พบข้อมูลใบสมัครสำหรับ: "{query}"</h4>
               <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', maxWidth: 480, margin: '0 auto' }}>
-                กรุณาตรวจสอบรหัสติดตาม (เช่น KMUTNB-SCH-670101) หรือรหัสนักศึกษา 13 หลักของท่านอีกครั้ง หรือติดต่อห้องธุรการภาควิชาคณิตศาสตร์
+                กรุณาตรวจสอบรหัสนักศึกษา 13 หลักของท่านอีกครั้ง หรือติดต่อห้องธุรการภาควิชาคณิตศาสตร์
               </p>
             </div>
           )}
@@ -167,10 +167,10 @@ export const StatusTracking: React.FC = () => {
                 }}>
                   <div>
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                      รหัสติดตาม (Tracking ID)
+                      รหัสนักศึกษา (Student ID)
                     </span>
                     <h3 style={{ fontFamily: 'var(--font-mono)', color: 'var(--kmutnb-orange)', fontSize: '1.5rem' }}>
-                      {searchedApp.trackingId}
+                      {searchedApp.studentId}
                     </h3>
                   </div>
                   <div>{statusBadge}</div>
@@ -179,7 +179,11 @@ export const StatusTracking: React.FC = () => {
                 <div className="detail-row-grid">
                   <div>
                     <span className="detail-item-label">ชื่อผู้สมัคร</span>
-                    <span className="detail-item-value">{searchedApp.fullName} (รหัส: {searchedApp.studentId})</span>
+                    <span className="detail-item-value">{searchedApp.fullName}</span>
+                  </div>
+                  <div>
+                    <span className="detail-item-label">รหัสอ้างอิงใบสมัคร</span>
+                    <span className="detail-item-value">{searchedApp.trackingId}</span>
                   </div>
                   <div>
                     <span className="detail-item-label">สาขาวิชา / ชั้นปี</span>

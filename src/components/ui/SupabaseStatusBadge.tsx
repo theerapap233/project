@@ -87,7 +87,7 @@ export const SupabaseStatusBadge: React.FC = () => {
         >
           <div 
             style={{
-              background: 'white',
+              background: 'var(--surface-card)',
               borderRadius: 16,
               maxWidth: 580,
               width: '100%',
