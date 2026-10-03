@@ -58,32 +58,18 @@ export const StatusTracking: React.FC = () => {
       currentStep = 1;
       statusBadge = (
         <span className="status-badge" style={{ background: 'var(--info-bg)', color: 'var(--info)', border: '1px solid var(--info-border)' }}>
-          ยื่นใบสมัครแล้ว รอตรวจสอบเอกสาร
-        </span>
-      );
-    } else if (searchedApp.status === 'doc_verified') {
-      currentStep = 2;
-      statusBadge = (
-        <span className="status-badge" style={{ background: 'var(--warning-bg)', color: 'var(--warning)', border: '1px solid var(--warning-border)' }}>
-          เอกสารผ่านการตรวจสอบแล้ว
-        </span>
-      );
-    } else if (searchedApp.status === 'interview_scheduled') {
-      currentStep = 3;
-      statusBadge = (
-        <span className="status-badge" style={{ background: 'var(--purple-bg)', color: 'var(--purple)', border: '1px solid var(--purple-border)' }}>
-          นัดหมายสัมภาษณ์
+          ยื่นใบสมัครแล้ว รอพิจารณา
         </span>
       );
     } else if (searchedApp.status === 'approved') {
-      currentStep = 5;
+      currentStep = 3;
       statusBadge = (
         <span className="status-badge" style={{ background: 'var(--success-bg)', color: 'var(--success)', border: '1px solid var(--success-border)' }}>
           อนุมัติทุนการศึกษาเรียบร้อย
         </span>
       );
     } else if (searchedApp.status === 'rejected') {
-      currentStep = 2;
+      currentStep = 1;
       statusBadge = (
         <span className="status-badge" style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid var(--danger-border)' }}>
           ไม่ผ่านการคัดเลือก
@@ -94,10 +80,8 @@ export const StatusTracking: React.FC = () => {
 
   const stepsDef = searchedApp ? [
     { num: 1, title: 'ยื่นใบสมัคร', desc: formatThaiDate(searchedApp.submissionDate) },
-    { num: 2, title: 'ตรวจสอบเอกสาร', desc: currentStep >= 2 ? 'เอกสารครบถ้วน' : 'รอดำเนินการ' },
-    { num: 3, title: 'การสัมภาษณ์', desc: searchedApp.interviewDate || 'รอประกาศ' },
-    { num: 4, title: 'ประกาศผลอนุมัติ', desc: searchedApp.status === 'approved' ? 'อนุมัติ' : 'รอพิจารณา' },
-    { num: 5, title: 'ทำสัญญา & รับทุน', desc: searchedApp.status === 'approved' ? 'นัดหมายทำสัญญา' : '-' }
+    { num: 2, title: 'พิจารณาใบสมัคร', desc: searchedApp.status === 'approved' ? 'ผ่านการพิจารณา' : 'รอพิจารณา' },
+    { num: 3, title: 'ทำสัญญา & รับทุน', desc: searchedApp.status === 'approved' ? 'นัดหมายทำสัญญา' : '-' }
   ] : [];
 
   return (

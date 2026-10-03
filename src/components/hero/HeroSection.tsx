@@ -1,8 +1,8 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { useScholarship } from '../../context/ScholarshipContext';
 
 export const HeroSection: React.FC = () => {
-  const { scholarships, applications, scrollToSection, siteSettings } = useScholarship();
+  const { scrollToSection, siteSettings } = useScholarship();
 
 
 

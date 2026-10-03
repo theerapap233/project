@@ -1,7 +1,5 @@
 export type ApplicationStatus = 
   | 'submitted'
-  | 'doc_verified'
-  | 'interview_scheduled'
   | 'approved'
   | 'rejected';
 
@@ -43,10 +41,12 @@ export interface ApplicationFormData {
   scholarshipId: string;
   studentId: string;
   fullName: string;
+  firstName: string;
+  lastName: string;
   nickname: string;
   major: string;
   year: string;
-  gpax: number;
+  gpax: number | string;
   phone: string;
   email: string;
   address: Address;
@@ -57,29 +57,29 @@ export interface ApplicationFormData {
   fatherName: string;
   fatherPhone: string;
   fatherJob: string;
-  fatherIncome: number;
+  fatherIncome: number | string;
   fatherAlive: 'alive' | 'deceased';
   
   motherName: string;
   motherPhone: string;
   motherJob: string;
-  motherIncome: number;
+  motherIncome: number | string;
   motherAlive: 'alive' | 'deceased';
   
   parentsRelation: 'together' | 'divorced' | 'other';
-  familyIncome: number; // Keep for backward compatibility/summary
-  siblings: number;
+  familyIncome: number | string; // Keep for backward compatibility/summary
+  siblings: number | string;
 
   // 3. Sponsors & Loan
   sponsor: string[]; // e.g., ['father', 'mother', 'other']
   sponsorOther: string;
   loanStatus: 'none' | 'กยศ' | 'กรอ';
-  loanAmount: number;
+  loanAmount: number | string;
 
   // 4. Job & Activities
   hasPartTimeJob: boolean;
   partTimeJobLocation: string;
-  partTimeJobIncome: number;
+  partTimeJobIncome: number | string;
   
   hasActivities: boolean;
   activities: string; // Used as summary or combined string
@@ -91,6 +91,8 @@ export interface ApplicationFormData {
   reason: string;
   reasonsList?: string[];
   consent: boolean;
+  systemRating: number; // 1-5 star rating for satisfaction
+  systemComment: string; // User feedback comment
 }
 
 export interface UploadedFiles {

@@ -6,6 +6,8 @@ import { PROVINCES } from '../../data/provinces';
 const INITIAL_FORM: ApplicationFormData = {
   scholarshipId: '',
   studentId: '6604062610099',
+  firstName: 'นายสมคิด',
+  lastName: 'มุ่งมั่นวิทยา',
   fullName: 'นายสมคิด มุ่งมั่นวิทยา',
   nickname: 'คิด',
   major: 'MA โครงการปกติ',
@@ -74,7 +76,9 @@ const INITIAL_FORM: ApplicationFormData = {
     'มีพี่น้องกำลังศึกษาอยู่ 2 คน',
     'ต้องการนำเงินมาแบ่งเบาภาระค่าใช้จ่ายในการครองชีพ และค่าอุปกรณ์การเรียน'
   ],
-  consent: false
+  consent: false,
+  systemRating: 0,
+  systemComment: ''
 };
 
 export const ApplicationWizardModal: React.FC = () => {
@@ -88,7 +92,9 @@ export const ApplicationWizardModal: React.FC = () => {
   } = useScholarship();
 
   const [step, setStep] = useState<number>(1);
+  const [isRatingModalOpen, setIsRatingModalOpen] = useState<boolean>(false);
   const [formData, setFormData] = useState<ApplicationFormData>(INITIAL_FORM);
+  const [hasSiblings, setHasSiblings] = useState<boolean>(Number(INITIAL_FORM.siblings) > 0);
   const [files, setFiles] = useState<UploadedFiles>({
     doc1: null,
     doc2: null,
@@ -99,6 +105,8 @@ export const ApplicationWizardModal: React.FC = () => {
   useEffect(() => {
     if (isWizardModalOpen) {
       setStep(1);
+      setIsRatingModalOpen(false);
+      setHasSiblings(Number(INITIAL_FORM.siblings) > 0);
       if (selectedScholarshipIdForApply) {
         setFormData(prev => ({ ...prev, scholarshipId: selectedScholarshipIdForApply }));
       } else if (scholarships.length > 0) {
@@ -115,11 +123,8 @@ export const ApplicationWizardModal: React.FC = () => {
         showToast('กรุณากรอกรหัสนักศึกษาให้ถูกต้อง', 'warning');
         return false;
       }
-      if (!formData.fullName.trim()) {
-        showToast('กรุณาระบุชื่อ-นามสกุลนักศึกษา', 'warning');
-        return false;
-      }
-      if (isNaN(formData.gpax) || formData.gpax < 0 || formData.gpax > 4) {
+      const gpaxNum = Number(formData.gpax);
+      if (isNaN(gpaxNum) || gpaxNum < 0 || gpaxNum > 4) {
         showToast('กรุณากรอกเกรดเฉลี่ยสะสม (GPAX) ระหว่าง 0.00 - 4.00', 'warning');
         return false;
       }
@@ -150,8 +155,12 @@ export const ApplicationWizardModal: React.FC = () => {
         showToast('กรุณาเลือกผู้รับผิดชอบค่าใช้จ่ายในการศึกษาอย่างน้อย 1 ข้อ', 'warning');
         return false;
       }
+      if (hasSiblings && (!formData.siblings || Number(formData.siblings) <= 0)) {
+        showToast('กรุณาระบุจำนวนพี่น้องให้ถูกต้อง', 'warning');
+        return false;
+      }
       if (formData.hasPartTimeJob && !formData.partTimeJobLocation.trim()) {
-        showToast('กรุณาระบุสถานที่ทำงานพิเศษ', 'warning');
+        showToast('กรุณาระบุอาชีพงานพิเศษ', 'warning');
         return false;
       }
     }
@@ -185,10 +194,54 @@ export const ApplicationWizardModal: React.FC = () => {
       showToast('กรุณากดติ๊กยอมรับการรับรองข้อมูลก่อนส่งใบสมัคร', 'warning');
       return;
     }
-    submitApplication(formData, files);
+    
+    // Open rating modal instead of direct submit
+    setIsRatingModalOpen(true);
+  };
+
+  const handleNumberChange = (field: keyof ApplicationFormData, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleNumberBlur = (field: keyof ApplicationFormData, defaultValue: number = 0) => {
+    setFormData(prev => {
+      const current = prev[field];
+      if (current === '' || current === undefined || current === null || isNaN(Number(current))) {
+        return { ...prev, [field]: defaultValue };
+      }
+      return { ...prev, [field]: Number(current) };
+    });
+  };
+
+  const handleFinalSubmit = () => {
+    if (formData.systemRating === 0) {
+      showToast('กรุณาให้คะแนนความพึงพอใจการใช้งานก่อนส่งใบสมัคร', 'warning');
+      return;
+    }
+    setIsRatingModalOpen(false);
+    const sanitizedData: ApplicationFormData = {
+      ...formData,
+      gpax: Number(formData.gpax) || 0,
+      fatherIncome: Number(formData.fatherIncome) || 0,
+      motherIncome: Number(formData.motherIncome) || 0,
+      familyIncome: Number(formData.familyIncome) || 0,
+      siblings: Number(formData.siblings) || 0,
+      loanAmount: Number(formData.loanAmount) || 0,
+      partTimeJobIncome: Number(formData.partTimeJobIncome) || 0,
+    };
+    submitApplication(sanitizedData, files);
   };
 
   const selectedScholarship = scholarships.find(s => s.id === formData.scholarshipId);
+  const currentScope = selectedScholarship?.scope 
+    || scholarships.find(s => s.id === selectedScholarshipIdForApply)?.scope;
+
+  const availableScholarships = currentScope
+    ? scholarships.filter(s => s.scope === currentScope)
+    : scholarships;
 
   const renderAddressGrid = (fieldPrefix: 'idCardAddress' | 'address') => {
     const addr = formData[fieldPrefix];
@@ -207,7 +260,7 @@ export const ApplicationWizardModal: React.FC = () => {
     };
 
     return (
-      <div className="address-form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
+      <div className="address-form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
         <div className="form-group-sm">
           <label className="sub-label">บ้านเลขที่ *</label>
           <input type="text" className="form-input-light" placeholder="ระบุบ้านเลขที่" value={addr.houseNo} onChange={e => updateAddr('houseNo', e.target.value)} required />
@@ -248,47 +301,87 @@ export const ApplicationWizardModal: React.FC = () => {
   };
 
   return (
-    <div style={{
-      paddingTop: '60px',
-      paddingBottom: '80px',
-      minHeight: '100vh',
-      background: '#f8fafc',
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'flex-start'
-    }}>
-      <div style={{
-        width: '95%',
-        maxWidth: 960,
-        background: 'rgba(255, 255, 255, 0.75)',
-        backdropFilter: 'blur(24px)',
-        WebkitBackdropFilter: 'blur(24px)',
-        borderRadius: '28px',
-        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.1), 0 0 0 1px rgba(255,255,255,0.5) inset',
-        overflow: 'hidden',
-        border: '1px solid rgba(255,255,255,0.6)'
-      }}>
+    <div
+      className="modal-backdrop open"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(15, 23, 42, 0.65)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        zIndex: 1100,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px',
+        overflowY: 'auto'
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          closeApplicationModal();
+        }
+      }}
+    >
+      <div
+        className="modal-card"
+        style={{
+          width: '100%',
+          maxWidth: '740px',
+          maxHeight: '90vh',
+          background: '#ffffff',
+          borderRadius: '20px',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'relative',
+          border: '1px solid rgba(226, 232, 240, 0.9)'
+        }}
+      >
         <div style={{
-          padding: '36px 48px',
-          background: 'rgba(255,255,255,0.9)',
-          borderBottom: '1px solid rgba(187, 247, 208, 0.9)',
+          padding: '18px 24px',
+          background: '#ffffff',
+          borderBottom: '1px solid #e2e8f0',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          position: 'relative'
+          position: 'relative',
+          flexShrink: 0
         }}>
-          <div style={{ position: 'absolute', top: 0, left: 0, width: '6px', height: '100%', background: '#22c55e' }}></div>
+          <div style={{ position: 'absolute', top: 0, left: 0, width: '5px', height: '100%', background: '#1F4F2C' }}></div>
           <div>
-            <h3 style={{ fontSize: '1.8rem', fontWeight: 700, color: '#0f172a', margin: '0 0 8px', letterSpacing: '-0.02em' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', margin: '0 0 2px', letterSpacing: '-0.01em' }}>
               ใบสมัครขอรับทุนการศึกษา
             </h3>
-            <p style={{ margin: 0, color: '#475569', fontSize: '0.95rem' }}>
+            <p style={{ margin: 0, color: '#64748b', fontSize: '0.82rem' }}>
               กรอกข้อมูลให้ครบถ้วนเพื่อยืนยันการสมัคร
             </p>
           </div>
+          <button
+            type="button"
+            className="modal-close-btn"
+            onClick={closeApplicationModal}
+            aria-label="Close"
+            style={{
+              background: '#f1f5f9',
+              border: 'none',
+              borderRadius: '50%',
+              width: '32px',
+              height: '32px',
+              fontSize: '18px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#475569',
+              transition: 'background 0.2s, color 0.2s'
+            }}
+          >
+            ✕
+          </button>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ padding: 'clamp(18px, 3vw, 32px)' }}>
+        <form onSubmit={handleSubmit} style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
           {step === 1 && (
             <div className="wizard-step-pane">
               <h4 className="wizard-step-title">
@@ -296,18 +389,32 @@ export const ApplicationWizardModal: React.FC = () => {
                 ข้อมูลนักศึกษาและการเลือกทุน
               </h4>
 
-              <div className="wizard-hero-row" style={{ display: 'grid', gridTemplateColumns: '180px minmax(0, 1fr)', gap: '24px', alignItems: 'center' }}>
-                <div className="wizard-photo-upload">
+              <div className="wizard-hero-row" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+                <div className="wizard-photo-upload" style={{ width: '150px' }}>
                   <label className="wizard-photo-label" style={{ display: 'block', cursor: 'pointer' }}>
                     {files.profilePhoto ? (
                       <>
-                        <img src={files.profilePhoto} alt="Profile Preview" className="wizard-photo-img" style={{ width: '100%', height: '180px', objectFit: 'cover', borderRadius: '18px' }} />
-                        <div className="wizard-photo-overlay" style={{ textAlign: 'center', marginTop: 8, color: '#0f172a', fontSize: '0.8rem' }}>เปลี่ยนรูป</div>
+                        <img src={files.profilePhoto} alt="Profile Preview" className="wizard-photo-img" style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '16px' }} />
+                        <div className="wizard-photo-overlay" style={{ textAlign: 'center', marginTop: 6, color: '#0f172a', fontSize: '0.8rem' }}>เปลี่ยนรูป</div>
                       </>
                     ) : (
-                      <div className="wizard-photo-placeholder" style={{ width: '100%', height: '180px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: '2px dashed #cbd5e1', borderRadius: '18px', background: '#f8fafc', color: '#475569' }}>
-                        <span className="wizard-photo-icon" style={{ fontSize: '2rem' }}>📷</span>
-                        <span>คลิกเพื่อเลือกรูป</span>
+                      <div className="wizard-photo-placeholder" style={{ width: '100%', height: '150px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: '2px dashed #cbd5e1', borderRadius: '16px', background: '#f8fafc', color: '#475569' }}>
+                        <svg
+                          width="48"
+                          height="48"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#94a3b8"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeDasharray="3 3"
+                          style={{ marginBottom: '6px' }}
+                        >
+                          <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                          <circle cx="12" cy="7" r="4" />
+                        </svg>
+                        <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 500 }}>คลิกเพื่อเลือกรูป</span>
                       </div>
                     )}
                     <input
@@ -328,36 +435,26 @@ export const ApplicationWizardModal: React.FC = () => {
                       }}
                     />
                   </label>
-                  <span className="wizard-photo-caption" style={{ display: 'block', textAlign: 'center', marginTop: 10, color: '#64748b', fontSize: '0.8rem' }}>รูปถ่ายหน้าตรง</span>
+                  <span className="wizard-photo-caption" style={{ display: 'block', textAlign: 'center', marginTop: 10, color: '#64748b', fontSize: '0.82rem' }}>รูปถ่ายปัจจุบัน (หน้าตรง)</span>
                 </div>
 
-                <div className="wizard-hero-fields">
-                  <div className="form-group">
-                    <label>เลือกประเภททุนการศึกษาที่ประสงค์จะสมัคร *</label>
+                <div className="wizard-hero-fields" style={{ width: '100%' }}>
+                  <div className="form-group" style={{ marginBottom: '16px' }}>
+                    <label>
+                      เลือกประเภททุนการศึกษาที่ประสงค์จะสมัคร {currentScope === 'external' ? '(ทุนภายนอก)' : currentScope === 'internal' ? '(ทุนภายใน)' : ''} *
+                    </label>
                     <select
                       className="form-input-light"
                       value={formData.scholarshipId}
                       onChange={(e) => setFormData({ ...formData, scholarshipId: e.target.value })}
                     >
-                      {scholarships.map(s => (
+                      {availableScholarships.map(s => (
                         <option key={s.id} value={s.id}>{s.title} ({s.amount})</option>
                       ))}
                     </select>
                   </div>
 
-                  <div className="wizard-form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
-                    <div className="form-group">
-                      <label>ชื่อ-นามสกุล (พร้อมคำนำหน้า) *</label>
-                      <input
-                        type="text"
-                        className="form-input-light"
-                        placeholder="เช่น นายสมคิด มุ่งมั่นวิทยา"
-                        value={formData.fullName}
-                        onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                        required
-                      />
-                    </div>
-
+                  <div className="wizard-form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
                     <div className="form-group">
                       <label>รหัสนักศึกษา (13 หลัก) *</label>
                       <input
@@ -370,18 +467,51 @@ export const ApplicationWizardModal: React.FC = () => {
                         required
                       />
                     </div>
+
+                    <div className="form-group">
+                      <label>ชื่อเล่น</label>
+                      <input
+                        type="text"
+                        className="form-input-light"
+                        placeholder="เช่น คิด"
+                        value={formData.nickname}
+                        onChange={(e) => setFormData({ ...formData, nickname: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>ชื่อ (พร้อมคำนำหน้า)</label>
+                      <input
+                        type="text"
+                        className="form-input-light"
+                        placeholder="เช่น นายสมคิด"
+                        value={formData.firstName || ''}
+                        onChange={(e) => setFormData({ ...formData, firstName: e.target.value, fullName: `${e.target.value} ${formData.lastName || ''}`.trim() })}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>นามสกุล</label>
+                      <input
+                        type="text"
+                        className="form-input-light"
+                        placeholder="เช่น มุ่งมั่นวิทยา"
+                        value={formData.lastName || ''}
+                        onChange={(e) => setFormData({ ...formData, lastName: e.target.value, fullName: `${formData.firstName || ''} ${e.target.value}`.trim() })}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="wizard-form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginTop: '24px' }}>
-                <div className="form-group">
-                  <label>ชื่อเล่น</label>
-                  <input type="text" className="form-input-light" placeholder="เช่น คิด" value={formData.nickname} onChange={(e) => setFormData({ ...formData, nickname: e.target.value })} />
-                </div>
+              <div className="wizard-form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', marginTop: '24px' }}>
                 <div className="form-group">
                   <label>เบอร์โทรศัพท์ติดต่อ *</label>
                   <input type="tel" className="form-input-light" placeholder="เช่น 089-123-4567" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} required />
+                </div>
+                <div className="form-group">
+                  <label>อีเมลมหาวิทยาลัย (@email.kmutnb.ac.th) *</label>
+                  <input type="email" className="form-input-light" placeholder="s6604062610099@email.kmutnb.ac.th" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required />
                 </div>
                 <div className="form-group">
                   <label>สาขาวิชา *</label>
@@ -404,11 +534,18 @@ export const ApplicationWizardModal: React.FC = () => {
                 </div>
                 <div className="form-group">
                   <label>เกรดเฉลี่ยสะสม (GPAX) *</label>
-                  <input type="number" className="form-input-light" step="0.01" min="0" max="4.00" value={formData.gpax} onChange={(e) => setFormData({ ...formData, gpax: parseFloat(e.target.value) || 0 })} required />
-                </div>
-                <div className="form-group">
-                  <label>อีเมลมหาวิทยาลัย (@email.kmutnb.ac.th) *</label>
-                  <input type="email" className="form-input-light" placeholder="s6604062610099@email.kmutnb.ac.th" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required />
+                  <input
+                    type="number"
+                    className="form-input-light"
+                    step="0.01"
+                    min="0"
+                    max="4.00"
+                    placeholder="0.00"
+                    value={formData.gpax}
+                    onChange={(e) => handleNumberChange('gpax', e.target.value)}
+                    onBlur={() => handleNumberBlur('gpax', 0)}
+                    required
+                  />
                 </div>
               </div>
 
@@ -466,7 +603,14 @@ export const ApplicationWizardModal: React.FC = () => {
                     </div>
                     <div className="form-group">
                       <label>รายได้ต่อเดือน (บาท)</label>
-                      <input type="number" className="form-input-light" value={formData.fatherIncome || ''} onChange={(e) => setFormData({ ...formData, fatherIncome: parseFloat(e.target.value) || 0 })} />
+                      <input
+                        type="number"
+                        className="form-input-light"
+                        placeholder="0"
+                        value={formData.fatherIncome}
+                        onChange={(e) => handleNumberChange('fatherIncome', e.target.value)}
+                        onBlur={() => handleNumberBlur('fatherIncome', 0)}
+                      />
                     </div>
                     <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                       <label>สถานภาพบิดา</label>
@@ -495,7 +639,14 @@ export const ApplicationWizardModal: React.FC = () => {
                     </div>
                     <div className="form-group">
                       <label>รายได้ต่อเดือน (บาท)</label>
-                      <input type="number" className="form-input-light" value={formData.motherIncome || ''} onChange={(e) => setFormData({ ...formData, motherIncome: parseFloat(e.target.value) || 0 })} />
+                      <input
+                        type="number"
+                        className="form-input-light"
+                        placeholder="0"
+                        value={formData.motherIncome}
+                        onChange={(e) => handleNumberChange('motherIncome', e.target.value)}
+                        onBlur={() => handleNumberBlur('motherIncome', 0)}
+                      />
                     </div>
                     <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                       <label>สถานภาพมารดา</label>
@@ -520,12 +671,45 @@ export const ApplicationWizardModal: React.FC = () => {
                     </div>
                     <div className="form-group">
                       <label>รายได้ครอบครัวต่อปี (บาท)</label>
-                      <input type="number" className="form-input-light" value={formData.familyIncome || ''} onChange={(e) => setFormData({ ...formData, familyIncome: parseFloat(e.target.value) || 0 })} />
+                      <input
+                        type="number"
+                        className="form-input-light"
+                        placeholder="0"
+                        value={formData.familyIncome}
+                        onChange={(e) => handleNumberChange('familyIncome', e.target.value)}
+                        onBlur={() => handleNumberBlur('familyIncome', 0)}
+                      />
                     </div>
                     <div className="form-group">
-                      <label>จำนวนพี่น้อง</label>
-                      <input type="number" className="form-input-light" value={formData.siblings || ''} onChange={(e) => setFormData({ ...formData, siblings: parseInt(e.target.value, 10) || 0 })} />
+                      <label>พี่น้อง</label>
+                      <select
+                        className="form-input-light"
+                        value={hasSiblings ? 'yes' : 'no'}
+                        onChange={(e) => {
+                          const has = e.target.value === 'yes';
+                          setHasSiblings(has);
+                          setFormData({ ...formData, siblings: has ? (Number(formData.siblings) > 0 ? formData.siblings : 1) : 0 });
+                        }}
+                      >
+                        <option value="no">ไม่มี</option>
+                        <option value="yes">มี</option>
+                      </select>
                     </div>
+                    {hasSiblings && (
+                      <div className="form-group">
+                        <label>จำนวนพี่น้อง (คน) *</label>
+                        <input
+                          type="number"
+                          min="1"
+                          className="form-input-light"
+                          placeholder="ระบุจำนวนพี่น้อง เช่น 1"
+                          value={formData.siblings}
+                          onChange={(e) => handleNumberChange('siblings', e.target.value)}
+                          onBlur={() => handleNumberBlur('siblings', 1)}
+                          required
+                        />
+                      </div>
+                    )}
                     <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                       <label>ผู้รับผิดชอบค่าใช้จ่ายในการศึกษา</label>
                       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', padding: '12px 14px', border: '1px solid rgba(148,163,184,0.35)', borderRadius: 14, background: 'rgba(255,255,255,0.75)' }}>
@@ -555,18 +739,24 @@ export const ApplicationWizardModal: React.FC = () => {
                     <div className="form-group">
                       <label>ข้อมูลการกู้ยืมจากกองทุนการศึกษา</label>
                       <select className="form-input-light" value={formData.loanStatus} onChange={(e) => {
-                        const val = e.target.value as 'none' | 'กยศ' | 'กรอ';
+                        const val = e.target.value as 'none' | 'กยศ';
                         setFormData({ ...formData, loanStatus: val, ...(val === 'none' ? { loanAmount: 0 } : {}) });
                       }}>
                         <option value="none">ไม่กู้</option>
                         <option value="กยศ">กู้ กยศ.</option>
-                        <option value="กรอ">กู้ กรอ.</option>
                       </select>
                     </div>
                     {formData.loanStatus !== 'none' && (
                       <div className="form-group">
                         <label>จำนวนเงินกู้ (บาท / ปี)</label>
-                        <input type="number" className="form-input-light" placeholder="ระบุจำนวนเงิน" value={formData.loanAmount || ''} onChange={(e) => setFormData({ ...formData, loanAmount: parseFloat(e.target.value) || 0 })} />
+                        <input
+                          type="number"
+                          className="form-input-light"
+                          placeholder="ระบุจำนวนเงิน"
+                          value={formData.loanAmount}
+                          onChange={(e) => handleNumberChange('loanAmount', e.target.value)}
+                          onBlur={() => handleNumberBlur('loanAmount', 0)}
+                        />
                       </div>
                     )}
                     <div className="form-group">
@@ -582,12 +772,19 @@ export const ApplicationWizardModal: React.FC = () => {
                     {formData.hasPartTimeJob && (
                       <>
                         <div className="form-group">
-                          <label>สถานที่ทำงาน</label>
-                          <input type="text" className="form-input-light" placeholder="ระบุสถานที่ทำงาน" value={formData.partTimeJobLocation} onChange={(e) => setFormData({ ...formData, partTimeJobLocation: e.target.value })} />
+                          <label>อาชีพ</label>
+                          <input type="text" className="form-input-light" placeholder="เช่น ติวเตอร์, พนักงานพาร์ตไทม์, ค้าขาย" value={formData.partTimeJobLocation} onChange={(e) => setFormData({ ...formData, partTimeJobLocation: e.target.value })} />
                         </div>
                         <div className="form-group">
                           <label>รายได้ต่อเดือน (บาท)</label>
-                          <input type="number" className="form-input-light" placeholder="ระบุรายได้" value={formData.partTimeJobIncome || ''} onChange={(e) => setFormData({ ...formData, partTimeJobIncome: parseFloat(e.target.value) || 0 })} />
+                          <input
+                            type="number"
+                            className="form-input-light"
+                            placeholder="ระบุรายได้"
+                            value={formData.partTimeJobIncome}
+                            onChange={(e) => handleNumberChange('partTimeJobIncome', e.target.value)}
+                            onBlur={() => handleNumberBlur('partTimeJobIncome', 0)}
+                          />
                         </div>
                       </>
                     )}
@@ -785,11 +982,11 @@ export const ApplicationWizardModal: React.FC = () => {
                   </div>
                   <div>
                     <span className="detail-item-label">เกรดเฉลี่ยสะสม (GPAX)</span>
-                    <span className="detail-item-value" style={{ display: 'block', marginTop: 4 }}>{formData.gpax.toFixed(2)}</span>
+                    <span className="detail-item-value" style={{ display: 'block', marginTop: 4 }}>{Number(formData.gpax).toFixed(2)}</span>
                   </div>
                   <div>
                     <span className="detail-item-label">รายได้ครอบครัวต่อปี</span>
-                    <span className="detail-item-value" style={{ display: 'block', marginTop: 4 }}>{formData.familyIncome.toLocaleString()} บาท</span>
+                    <span className="detail-item-value" style={{ display: 'block', marginTop: 4 }}>{Number(formData.familyIncome).toLocaleString()} บาท</span>
                   </div>
                   <div>
                     <span className="detail-item-label">เอกสารประกอบที่แนบ</span>
@@ -807,7 +1004,7 @@ export const ApplicationWizardModal: React.FC = () => {
                 </div>
               </div>
 
-              <div style={{ marginTop: 16, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+              <div style={{ marginTop: 24, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                 <input
                   type="checkbox"
                   id="consentCheck"
@@ -846,6 +1043,98 @@ export const ApplicationWizardModal: React.FC = () => {
           </div>
         </form>
       </div>
+      
+      {/* Rating & Feedback Modal */}
+      {isRatingModalOpen && (
+        <div
+          className="modal-overlay"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100vw',
+            height: '100vh',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            background: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(6px)',
+            WebkitBackdropFilter: 'blur(6px)',
+            zIndex: 99999,
+            padding: '20px'
+          }}
+        >
+          <div
+            className="modal-content"
+            style={{
+              maxWidth: '500px',
+              width: '100%',
+              padding: '32px',
+              borderRadius: '24px',
+              background: '#fff',
+              textAlign: 'center',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+              position: 'relative'
+            }}
+          >
+            <h3 style={{ margin: '0 0 8px 0', fontSize: '1.5rem', color: '#0f172a' }}>ช่วยประเมินการใช้งานให้เราหน่อย 😊</h3>
+            <p style={{ margin: '0 0 24px 0', color: '#64748b', fontSize: '0.95rem' }}>ความคิดเห็นของคุณจะช่วยให้เราพัฒนาระบบให้ดียิ่งขึ้น</p>
+            
+            <div style={{ marginBottom: '24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
+                {[1, 2, 3, 4, 5].map(star => (
+                  <button
+                    key={star}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, systemRating: star })}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '3.5rem',
+                      lineHeight: 1,
+                      color: formData.systemRating >= star ? '#eab308' : '#e2e8f0',
+                      transition: 'all 0.2s ease',
+                      transform: formData.systemRating >= star ? 'scale(1.1)' : 'scale(1)'
+                    }}
+                  >
+                    ★
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            <div style={{ marginBottom: '24px', textAlign: 'left' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, color: '#334155', fontSize: '0.9rem' }}>ข้อเสนอแนะเพิ่มเติม (ถ้ามี)</label>
+              <textarea
+                value={formData.systemComment}
+                onChange={(e) => setFormData({ ...formData, systemComment: e.target.value })}
+                placeholder="มีส่วนไหนที่ใช้งานยาก หรืออยากให้เราปรับปรุงเพิ่มเติมไหม?"
+                style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1px solid #cbd5e1', minHeight: '100px', fontSize: '0.95rem', fontFamily: 'inherit', resize: 'vertical' }}
+              />
+            </div>
+            
+            <div style={{ display: 'flex', gap: '16px' }}>
+              <button 
+                type="button" 
+                onClick={() => setIsRatingModalOpen(false)}
+                style={{ flex: 1, padding: '14px', borderRadius: '12px', background: '#f1f5f9', color: '#475569', fontWeight: 600, border: 'none', cursor: 'pointer', fontSize: '1rem' }}
+              >
+                ยกเลิก
+              </button>
+              <button 
+                type="button" 
+                onClick={handleFinalSubmit}
+                style={{ flex: 1, padding: '14px', borderRadius: '12px', background: 'var(--math-green, #1F4F2C)', color: '#fff', fontWeight: 600, border: 'none', cursor: 'pointer', fontSize: '1rem' }}
+              >
+                ส่งใบสมัคร
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

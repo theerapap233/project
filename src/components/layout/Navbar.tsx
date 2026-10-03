@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useScholarship } from '../../context/ScholarshipContext';
-import { useTheme } from '../../context/ThemeContext';
-import { AtSign, BriefcaseBusiness, Camera, Mail, Moon, Sun, Trash2, UserRound, X } from 'lucide-react';
+import { AtSign, BriefcaseBusiness, Camera, Mail, Trash2, UserRound, X } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const {
@@ -16,8 +15,6 @@ export const Navbar: React.FC = () => {
     changeStaffCredentials,
     showToast
   } = useScholarship();
-  
-  const { theme, setTheme } = useTheme();
 
   const isStaffMode = Boolean(currentUser && isAdminActive);
   const staffNamePart = currentUser?.name.trim().split(/\s+/)[0] || 'Staff';

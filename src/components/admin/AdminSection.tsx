@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ChevronDown, 
   Pencil, 
@@ -9,7 +9,6 @@ import {
   HelpCircle, 
   Settings, 
   Clock, 
-  Mic, 
   CheckCircle2, 
   Search,
   Calendar,
@@ -17,7 +16,9 @@ import {
   Eye,
   Check,
   Printer,
-  X
+  RotateCcw,
+  X,
+  XCircle
 } from 'lucide-react';
 import { useScholarship } from '../../context/ScholarshipContext';
 import { Application, ApplicationStatus, ApplicationFormData } from '../../types/application';
@@ -47,6 +48,7 @@ export const AdminSection: React.FC = () => {
     deleteFaq,
     updateSiteSettings,
     updateApplicationDetails,
+    updateApplicationReview,
     deleteApplication,
     showToast
   } = useScholarship();
@@ -57,7 +59,7 @@ export const AdminSection: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
-  const [filterYear, setFilterYear] = useState<string>('all');
+  const [filterScope, setFilterScope] = useState<'all' | 'internal' | 'external'>('all');
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -124,27 +126,20 @@ export const AdminSection: React.FC = () => {
 
   // Statistics
   const totalApps = applications.length;
-  const pendingDocs = applications.filter(a => a.status === 'submitted' || a.status === 'doc_verified').length;
-  const interviewScheduled = applications.filter(a => a.status === 'interview_scheduled').length;
+  const submittedCount = applications.filter(a => a.status === 'submitted').length;
   const approvedCount = applications.filter(a => a.status === 'approved').length;
+  const rejectedCount = applications.filter(a => a.status === 'rejected').length;
 
   // Helper to find matching scholarship info
   const getAppScholarshipInfo = (app: Application) => {
     return scholarships.find(s => 
       s.id === app.scholarshipId || 
-      s.code === app.scholarshipId || 
+      (s.code && s.code === app.scholarshipId) || 
       s.title === app.scholarshipName || 
       app.scholarshipName.includes(s.title) ||
+      s.title.includes(app.scholarshipName) ||
       (s.code && app.scholarshipName.includes(s.code))
     );
-  };
-
-  const getAppYear = (app: Application) => {
-    const sch = getAppScholarshipInfo(app);
-    if (sch?.academicYear) return sch.academicYear;
-    const match = app.scholarshipName.match(/25\d{2}/);
-    if (match) return match[0];
-    return '2567';
   };
 
   const checkAppMatchesType = (app: Application, typeVal: string) => {
@@ -156,6 +151,16 @@ export const AdminSection: React.FC = () => {
     if (typeVal === 'external') {
       return sch ? sch.scope === 'external' : app.scholarshipName.includes('ศิษย์เก่า');
     }
+
+    // Direct match by scholarship ID, code, or title
+    if (sch) {
+      if (sch.id === typeVal || sch.code === typeVal || sch.title === typeVal) return true;
+    }
+    if (app.scholarshipId === typeVal || app.scholarshipName === typeVal || app.scholarshipName.includes(typeVal)) {
+      return true;
+    }
+
+    // Fallbacks for categories
     if (typeVal === 'academic') {
       return (sch?.category === 'academic') || app.scholarshipName.includes('เรียนดี') || app.scholarshipName.includes('MATH-EXC');
     }
@@ -165,12 +170,58 @@ export const AdminSection: React.FC = () => {
     if (typeVal === 'work') {
       return (sch?.category === 'work') || app.scholarshipName.includes('ผู้ช่วยสอน') || app.scholarshipName.includes('TA') || app.scholarshipName.includes('MATH-TA');
     }
-    return true;
+    if (typeVal === 'alumni') {
+      return (sch?.category === 'alumni') || app.scholarshipName.includes('ศิษย์เก่า') || app.scholarshipName.includes('MATH-ALUMNI');
+    }
+    if (typeVal === 'activity') {
+      return (sch?.category === 'activity') || app.scholarshipName.includes('จิตสาธารณะ') || app.scholarshipName.includes('MATH-VOLUNTEER');
+    }
+
+    return false;
   };
 
-  const checkAppMatchesYear = (app: Application, yearVal: string) => {
-    if (yearVal === 'all') return true;
-    return getAppYear(app) === yearVal;
+  const getFilterTypeLabel = (typeVal: string) => {
+    if (typeVal === 'all') return 'ทุนการศึกษาทั้งหมด';
+    if (typeVal === 'internal') return 'ทุนภายใน';
+    if (typeVal === 'external') return 'ทุนภายนอก';
+    const sch = scholarships.find(s => s.id === typeVal || s.code === typeVal || s.title === typeVal);
+    if (sch) return sch.title;
+    return typeVal;
+  };
+
+  const checkAppMatchesScope = (app: Application, scopeVal: string) => {
+    if (scopeVal === 'all') return true;
+    const sch = getAppScholarshipInfo(app);
+    const appScope = sch ? sch.scope : (app.scholarshipName.includes('ศิษย์เก่า') ? 'external' : 'internal');
+    return appScope === scopeVal;
+  };
+
+  const internalAppsCount = useMemo(() => {
+    return applications.filter(a => checkAppMatchesScope(a, 'internal')).length;
+  }, [applications]);
+
+  const externalAppsCount = useMemo(() => {
+    return applications.filter(a => checkAppMatchesScope(a, 'external')).length;
+  }, [applications]);
+
+  const filteredScholarshipsForSelect = useMemo(() => {
+    if (filterScope === 'internal') {
+      return scholarships.filter(s => s.scope === 'internal');
+    }
+    if (filterScope === 'external') {
+      return scholarships.filter(s => s.scope === 'external');
+    }
+    return scholarships;
+  }, [scholarships, filterScope]);
+
+  const handleScopeChange = (newScope: 'all' | 'internal' | 'external') => {
+    setFilterScope(newScope);
+    if (newScope !== 'all' && filterType !== 'all') {
+      const selectedSch = scholarships.find(s => s.id === filterType);
+      if (selectedSch && selectedSch.scope !== newScope) {
+        setFilterType('all');
+      }
+    }
   };
 
   // Filtered Applications
@@ -182,10 +233,10 @@ export const AdminSection: React.FC = () => {
       app.scholarshipName.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = filterStatus === 'all' || app.status === filterStatus;
+    const matchesScope = checkAppMatchesScope(app, filterScope);
     const matchesType = checkAppMatchesType(app, filterType);
-    const matchesYear = checkAppMatchesYear(app, filterYear);
 
-    return matchesSearch && matchesStatus && matchesType && matchesYear;
+    return matchesSearch && matchesStatus && matchesScope && matchesType;
   });
 
   // Multi-select state
@@ -363,7 +414,7 @@ export const AdminSection: React.FC = () => {
       gpax: Number(appEditData.gpax),
       phone: appEditData.phone,
       email: appEditData.email,
-      familyIncome: appEditData.familyIncome || (appEditData.fatherIncome + appEditData.motherIncome) * 12,
+      familyIncome: Number(appEditData.familyIncome) || ((Number(appEditData.fatherIncome || 0) + Number(appEditData.motherIncome || 0)) * 12),
       status: reviewStatus,
       score: selectedApp.score ?? null,
       interviewDate: selectedApp.interviewDate || '',
@@ -386,6 +437,21 @@ export const AdminSection: React.FC = () => {
     if (window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบใบสมัครของ "${selectedApp.fullName}" (${selectedApp.trackingId}) ออกจากระบบ?`)) {
       deleteApplication(selectedApp.trackingId);
       setIsReviewModalOpen(false);
+    }
+  };
+
+  const handleRevertStatus = (trackingId: string) => {
+    const target = applications.find(a => a.trackingId === trackingId);
+    if (!target || target.status !== 'approved') return;
+
+    if (window.confirm(`ยืนยันการย้อนกลับสถานะของ "${target.fullName}" จาก "อนุมัติทุนแล้ว" เป็น "ยื่นใบสมัครแล้ว (รอพิจารณา)" ใช่หรือไม่?`)) {
+      updateApplicationReview(
+        trackingId,
+        'submitted',
+        null,
+        '',
+        'ย้อนกลับสถานะจากอนุมัติทุนแล้วเป็นยื่นใบสมัครแล้ว (รอพิจารณา)'
+      );
     }
   };
 
@@ -555,6 +621,17 @@ export const AdminSection: React.FC = () => {
     return text;
   };
 
+  const formatMajorFullName = (major: string): string => {
+    if (!major) return 'คณิตศาสตร์ประยุกต์ (MA)';
+    const text = major.trim();
+    if (text.includes('MC') || text.includes('คอมพิวเตอร์')) return 'คณิตศาสตร์เชิงคำนวณ (MC)';
+    if (text.includes('AS') || text.includes('สถิติ')) return 'สถิติประยุกต์และการวิเคราะห์ข้อมูล (AS)';
+    if (text.includes('FM') || text.includes('การเงิน')) return 'คณิตศาสตร์การเงิน (FM)';
+    if (text.includes('MA') || text.includes('ประยุกต์')) return 'คณิตศาสตร์ประยุกต์ (MA)';
+    return text;
+  };
+
+
   const getStatusBadge = (status: ApplicationStatus) => {
     switch (status) {
       case 'submitted':
@@ -576,48 +653,6 @@ export const AdminSection: React.FC = () => {
           >
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#2563eb' }} />
             ยื่นใบสมัครแล้ว
-          </span>
-        );
-      case 'doc_verified':
-        return (
-          <span 
-            className="status-badge" 
-            style={{ 
-              background: '#fffbeb', 
-              color: '#b45309', 
-              border: '1px solid #fde68a', 
-              fontWeight: 600, 
-              padding: '4px 12px', 
-              borderRadius: '20px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              boxShadow: '0 1px 3px rgba(245, 158, 11, 0.08)'
-            }}
-          >
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f59e0b' }} />
-            ผ่านคุณสมบัติแล้ว
-          </span>
-        );
-      case 'interview_scheduled':
-        return (
-          <span 
-            className="status-badge" 
-            style={{ 
-              background: '#faf5ff', 
-              color: '#7c3aed', 
-              border: '1px solid #e9d5ff', 
-              fontWeight: 600, 
-              padding: '4px 12px', 
-              borderRadius: '20px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              boxShadow: '0 1px 3px rgba(124, 58, 237, 0.08)'
-            }}
-          >
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#a855f7' }} />
-            นัดสัมภาษณ์
           </span>
         );
       case 'approved':
@@ -864,7 +899,22 @@ export const AdminSection: React.FC = () => {
           <div>
             {/* KPI Grid */}
             <div className="admin-kpi-grid">
-              <div className="kpi-card" style={{ border: '1px solid var(--border-light)', borderTop: '3px solid var(--info)', borderRadius: '6px', background: '#ffffff', padding: '16px 20px', boxShadow: 'var(--shadow-sm)' }}>
+              {/* Card 1: ใบสมัครทั้งหมด */}
+              <div 
+                className="kpi-card" 
+                onClick={() => setFilterStatus('all')}
+                style={{ 
+                  border: '1px solid var(--border-light)', 
+                  borderTop: '3px solid var(--info)', 
+                  borderRadius: '8px', 
+                  background: filterStatus === 'all' ? '#f0f9ff' : '#ffffff', 
+                  padding: '16px 20px', 
+                  boxShadow: filterStatus === 'all' ? '0 0 0 2px #38bdf8, var(--shadow-sm)' : 'var(--shadow-sm)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+                title="คลิกเพื่อกรอง: ใบสมัครทั้งหมด"
+              >
                 <div className="kpi-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.86rem', color: '#1e3a8a', fontWeight: 600 }}>ใบสมัครทั้งหมด</span>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: '8px', background: '#dbeafe', border: '1px solid #93c5fd', color: '#1d4ed8' }}>
@@ -875,29 +925,49 @@ export const AdminSection: React.FC = () => {
                 <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 4 }}>จากทุกประกาศทุน</div>
               </div>
 
-              <div className="kpi-card" style={{ border: '1px solid var(--border-light)', borderTop: '3px solid var(--warning)', borderRadius: '6px', background: '#ffffff', padding: '16px 20px', boxShadow: 'var(--shadow-sm)' }}>
+              {/* Card 2: รอตรวจสอบคุณสมบัติ */}
+              <div 
+                className="kpi-card" 
+                onClick={() => setFilterStatus('submitted')}
+                style={{ 
+                  border: '1px solid var(--border-light)', 
+                  borderTop: '3px solid #3b82f6', 
+                  borderRadius: '8px', 
+                  background: filterStatus === 'submitted' ? '#eff6ff' : '#ffffff', 
+                  padding: '16px 20px', 
+                  boxShadow: filterStatus === 'submitted' ? '0 0 0 2px #60a5fa, var(--shadow-sm)' : 'var(--shadow-sm)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+                title="คลิกเพื่อกรอง: รอตรวจสอบคุณสมบัติ (ยื่นแล้ว)"
+              >
                 <div className="kpi-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.86rem', color: '#78350f', fontWeight: 600 }}>รอตรวจสอบคุณสมบัติ</span>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: '8px', background: '#fef3c7', border: '1px solid #fcd34d', color: '#d97706' }}>
+                  <span style={{ fontSize: '0.86rem', color: '#1e40af', fontWeight: 600 }}>รอตรวจสอบคุณสมบัติ</span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: '8px', background: '#eff6ff', border: '1px solid #bfdbfe', color: '#2563eb' }}>
                     <Clock size={17} strokeWidth={2} />
                   </div>
                 </div>
-                <div className="kpi-value" style={{ fontSize: '1.75rem', fontWeight: 800, color: '#b45309', marginTop: 8 }}>{pendingDocs}</div>
-                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 4 }}>ต้องตรวจสอบคุณสมบัติ</div>
+                <div className="kpi-value" style={{ fontSize: '1.75rem', fontWeight: 800, color: '#2563eb', marginTop: 8 }}>{submittedCount}</div>
+                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 4 }}>ยื่นใบสมัครแล้ว</div>
               </div>
 
-              <div className="kpi-card" style={{ border: '1px solid var(--border-light)', borderTop: '3px solid var(--purple)', borderRadius: '6px', background: '#ffffff', padding: '16px 20px', boxShadow: 'var(--shadow-sm)' }}>
-                <div className="kpi-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.86rem', color: '#581c87', fontWeight: 600 }}>นัดหมายสัมภาษณ์</span>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: '8px', background: '#f3e8ff', border: '1px solid #d8b4fe', color: '#7c3aed' }}>
-                    <Mic size={17} strokeWidth={2} />
-                  </div>
-                </div>
-                <div className="kpi-value" style={{ fontSize: '1.75rem', fontWeight: 800, color: '#6d28d9', marginTop: 8 }}>{interviewScheduled}</div>
-                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 4 }}>รอผลการสัมภาษณ์</div>
-              </div>
 
-              <div className="kpi-card" style={{ border: '1px solid var(--border-light)', borderTop: '3px solid var(--success)', borderRadius: '6px', background: '#ffffff', padding: '16px 20px', boxShadow: 'var(--shadow-sm)' }}>
+              {/* Card 3: อนุมัติทุนแล้ว */}
+              <div 
+                className="kpi-card" 
+                onClick={() => setFilterStatus('approved')}
+                style={{ 
+                  border: '1px solid var(--border-light)', 
+                  borderTop: '3px solid var(--success)', 
+                  borderRadius: '8px', 
+                  background: filterStatus === 'approved' ? '#f0fdf4' : '#ffffff', 
+                  padding: '16px 20px', 
+                  boxShadow: filterStatus === 'approved' ? '0 0 0 2px #4ade80, var(--shadow-sm)' : 'var(--shadow-sm)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+                title="คลิกเพื่อกรอง: อนุมัติทุนแล้ว"
+              >
                 <div className="kpi-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.86rem', color: '#064e3b', fontWeight: 600 }}>อนุมัติทุนแล้ว</span>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: '8px', background: '#dcfce7', border: '1px solid #86efac', color: '#059669' }}>
@@ -906,6 +976,32 @@ export const AdminSection: React.FC = () => {
                 </div>
                 <div className="kpi-value" style={{ fontSize: '1.75rem', fontWeight: 800, color: '#047857', marginTop: 8 }}>{approvedCount}</div>
                 <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 4 }}>พร้อมทำสัญญารับทุน</div>
+              </div>
+
+              {/* Card 4: ไม่ผ่านการพิจารณา */}
+              <div 
+                className="kpi-card" 
+                onClick={() => setFilterStatus('rejected')}
+                style={{ 
+                  border: '1px solid var(--border-light)', 
+                  borderTop: '3px solid #dc2626', 
+                  borderRadius: '8px', 
+                  background: filterStatus === 'rejected' ? '#fef2f2' : '#ffffff', 
+                  padding: '16px 20px', 
+                  boxShadow: filterStatus === 'rejected' ? '0 0 0 2px #f87171, var(--shadow-sm)' : 'var(--shadow-sm)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+                title="คลิกเพื่อกรอง: ไม่ผ่านการพิจารณา"
+              >
+                <div className="kpi-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.86rem', color: '#991b1b', fontWeight: 600 }}>ไม่ผ่านการพิจารณา</span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: '8px', background: '#fee2e2', border: '1px solid #fca5a5', color: '#dc2626' }}>
+                    <XCircle size={17} strokeWidth={2} />
+                  </div>
+                </div>
+                <div className="kpi-value" style={{ fontSize: '1.75rem', fontWeight: 800, color: '#dc2626', marginTop: 8 }}>{rejectedCount}</div>
+                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 4 }}>ไม่ผ่านการคัดเลือก</div>
               </div>
             </div>
 
@@ -934,20 +1030,20 @@ export const AdminSection: React.FC = () => {
                 />
               </div>
 
-              {/* Combobox: ปีการศึกษา */}
-              <div style={{ position: 'relative', minWidth: 160 }}>
+              {/* Combobox: ประเภททุน (ทุนภายใน / ทุนภายนอก) */}
+              <div style={{ position: 'relative', minWidth: 165 }}>
                 <select
-                  value={filterYear}
-                  onChange={(e) => setFilterYear(e.target.value)}
+                  value={filterScope}
+                  onChange={(e) => handleScopeChange(e.target.value as any)}
                   className="form-input-light"
                   style={{
                     height: '42px',
                     borderRadius: '8px',
                     fontSize: '0.86rem',
-                    fontWeight: 500,
-                    color: filterYear !== 'all' ? '#4338ca' : 'var(--navy-800, #1e293b)',
-                    background: filterYear !== 'all' ? '#eef2ff' : 'var(--surface-ground, #f8fafc)',
-                    borderColor: filterYear !== 'all' ? '#818cf8' : 'var(--border-light, #e2e8f0)',
+                    fontWeight: 600,
+                    color: filterScope !== 'all' ? (filterScope === 'internal' ? 'var(--math-green, #077b38)' : '#ea580c') : 'var(--navy-800, #1e293b)',
+                    background: filterScope !== 'all' ? (filterScope === 'internal' ? '#ecfdf5' : '#fff7ed') : 'var(--surface-ground, #f8fafc)',
+                    borderColor: filterScope !== 'all' ? (filterScope === 'internal' ? '#a7f3d0' : '#fed7aa') : 'var(--border-light, #e2e8f0)',
                     paddingLeft: 12,
                     paddingRight: 28,
                     cursor: 'pointer',
@@ -956,15 +1052,14 @@ export const AdminSection: React.FC = () => {
                     outline: 'none'
                   }}
                 >
-                  <option value="all">ปีการศึกษา: ทั้งหมด</option>
-                  <option value="2568">ปีการศึกษา 2568</option>
-                  <option value="2567">ปีการศึกษา 2567</option>
-                  <option value="2566">ปีการศึกษา 2566</option>
+                  <option value="all">ประเภททุน: ทั้งหมด</option>
+                  <option value="internal">ทุนภายใน ({internalAppsCount})</option>
+                  <option value="external">ทุนภายนอก ({externalAppsCount})</option>
                 </select>
               </div>
 
-              {/* Combobox: ชนิดทุน */}
-              <div style={{ position: 'relative', minWidth: 170 }}>
+              {/* Combobox: ชื่อข้อมูลทุน (เชื่อมโยงตามประเภททุนที่เลือก) */}
+              <div style={{ position: 'relative', minWidth: 190, maxWidth: 320 }}>
                 <select
                   value={filterType}
                   onChange={(e) => setFilterType(e.target.value)}
@@ -985,22 +1080,31 @@ export const AdminSection: React.FC = () => {
                     outline: 'none'
                   }}
                 >
-                  <option value="all">ชนิดทุน: ทั้งหมด</option>
-                  <option value="internal">ทุนภายใน ({applications.filter(a => checkAppMatchesType(a, 'internal')).length})</option>
-                  <option value="external">ทุนภายนอก ({applications.filter(a => checkAppMatchesType(a, 'external')).length})</option>
-                  <option value="academic">ทุนเรียนดี ({applications.filter(a => checkAppMatchesType(a, 'academic')).length})</option>
-                  <option value="need">ทุนขาดแคลน ({applications.filter(a => checkAppMatchesType(a, 'need')).length})</option>
-                  <option value="work">ทุนทำงาน/TA ({applications.filter(a => checkAppMatchesType(a, 'work')).length})</option>
+                  <option value="all">
+                    {filterScope === 'internal' 
+                      ? 'ชื่อข้อมูลทุน: ทุนภายในทั้งหมด' 
+                      : filterScope === 'external' 
+                        ? 'ชื่อข้อมูลทุน: ทุนภายนอกทั้งหมด' 
+                        : 'ชื่อข้อมูลทุน: ทั้งหมด'}
+                  </option>
+                  {filteredScholarshipsForSelect.map(sch => {
+                    const count = applications.filter(a => checkAppMatchesType(a, sch.id)).length;
+                    return (
+                      <option key={sch.id} value={sch.id}>
+                        {sch.title} ({count})
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
-              {/* Reset filter button if any active (เฉพาะปีการศึกษาและชนิดทุน) */}
-              {(filterType !== 'all' || filterYear !== 'all') && (
+              {/* Reset filter button if any active (เฉพาะประเภททุนและชื่อข้อมูลทุน) */}
+              {(filterType !== 'all' || filterScope !== 'all') && (
                 <button
                   type="button"
                   onClick={() => {
                     setFilterType('all');
-                    setFilterYear('all');
+                    setFilterScope('all');
                   }}
                   style={{
                     height: '42px',
@@ -1018,7 +1122,7 @@ export const AdminSection: React.FC = () => {
                     whiteSpace: 'nowrap',
                     transition: 'all 0.15s ease'
                   }}
-                  title="ล้างค่าตัวกรองปีการศึกษาและชนิดทุน"
+                  title="ล้างค่าตัวกรองประเภททุนและข้อมูลทุน"
                 >
                   ล้างตัวกรอง
                 </button>
@@ -1072,38 +1176,6 @@ export const AdminSection: React.FC = () => {
                     activeBadgeBg: 'rgba(255,255,255,0.28)',
                     activeBadgeText: '#ffffff',
                     shadow: '0 2px 8px rgba(37, 99, 235, 0.35)'
-                  },
-                  { 
-                    value: 'doc_verified', 
-                    label: 'ผ่านคุณสมบัติแล้ว', 
-                    count: applications.filter(a => a.status === 'doc_verified').length,
-                    activeBg: '#d97706',
-                    activeBorder: '#d97706',
-                    activeColor: '#ffffff',
-                    inactiveBg: '#fffbeb',
-                    inactiveBorder: '#fde68a',
-                    inactiveColor: '#b45309',
-                    badgeBg: '#fef3c7',
-                    badgeText: '#92400e',
-                    activeBadgeBg: 'rgba(255,255,255,0.28)',
-                    activeBadgeText: '#ffffff',
-                    shadow: '0 2px 8px rgba(217, 119, 6, 0.35)'
-                  },
-                  { 
-                    value: 'interview_scheduled', 
-                    label: 'นัดสัมภาษณ์', 
-                    count: applications.filter(a => a.status === 'interview_scheduled').length,
-                    activeBg: '#7c3aed',
-                    activeBorder: '#7c3aed',
-                    activeColor: '#ffffff',
-                    inactiveBg: '#faf5ff',
-                    inactiveBorder: '#e9d5ff',
-                    inactiveColor: '#6d28d9',
-                    badgeBg: '#f3e8ff',
-                    badgeText: '#7c3aed',
-                    activeBadgeBg: 'rgba(255,255,255,0.28)',
-                    activeBadgeText: '#ffffff',
-                    shadow: '0 2px 8px rgba(124, 58, 237, 0.35)'
                   },
                   { 
                     value: 'approved', 
@@ -1417,34 +1489,7 @@ export const AdminSection: React.FC = () => {
                               >
                                 <Eye size={15} strokeWidth={1.8} />
                               </button>
-                              <button 
-                                type="button"
-                                onClick={() => handlePrintApplications(app.trackingId)}
-                                style={{ 
-                                  width: '32px', 
-                                  height: '32px', 
-                                  display: 'inline-flex', 
-                                  alignItems: 'center', 
-                                  justifyContent: 'center', 
-                                  borderRadius: '6px', 
-                                  border: '1px solid var(--border-light, #e2e8f0)', 
-                                  background: 'var(--surface-card, #ffffff)', 
-                                  color: 'var(--navy-800, #1e293b)', 
-                                  cursor: 'pointer',
-                                  transition: 'all 0.15s ease'
-                                }}
-                                title="พิมพ์ใบสมัครของรายนี้"
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.background = '#f1f5f9';
-                                  e.currentTarget.style.borderColor = '#cbd5e1';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.background = 'var(--surface-card, #ffffff)';
-                                  e.currentTarget.style.borderColor = 'var(--border-light, #e2e8f0)';
-                                }}
-                              >
-                                <Printer size={14} strokeWidth={1.8} />
-                              </button>
+                              {/* ปุ่มลบใบสมัคร */}
                               <button 
                                 type="button"
                                 onClick={() => {
@@ -1477,6 +1522,8 @@ export const AdminSection: React.FC = () => {
                               >
                                 <Trash2 size={14} strokeWidth={1.8} />
                               </button>
+
+                              {/* ปุ่มอนุมัติทุนทันที (ย้ายมาไว้ขวา เมื่อยังไม่อนุมัติ) */}
                               {app.status !== 'approved' && (
                                 <button 
                                   type="button"
@@ -1507,6 +1554,38 @@ export const AdminSection: React.FC = () => {
                                   <Check size={15} strokeWidth={2.2} />
                                 </button>
                               )}
+
+                              {/* ปุ่มย้อนกลับ (ขวาสุด - แสดงเฉพาะเมื่อสถานะเป็นอนุมัติทุนแล้ว) */}
+                              {app.status === 'approved' && (
+                                <button 
+                                  type="button"
+                                  onClick={() => handleRevertStatus(app.trackingId)}
+                                  style={{ 
+                                    width: '32px', 
+                                    height: '32px', 
+                                    display: 'inline-flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center', 
+                                    borderRadius: '6px', 
+                                    border: '1px solid #fed7aa', 
+                                    background: '#fff7ed', 
+                                    color: '#ea580c', 
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  title="ย้อนกลับสถานะเป็นรอพิจารณา"
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = '#ffedd5';
+                                    e.currentTarget.style.borderColor = '#fb923c';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = '#fff7ed';
+                                    e.currentTarget.style.borderColor = '#fed7aa';
+                                  }}
+                                >
+                                  <RotateCcw size={14} strokeWidth={2} />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1520,195 +1599,261 @@ export const AdminSection: React.FC = () => {
         )}
 
         {/* TAB 2: SCHOLARSHIPS CMS */}
-        {activeTab === 'scholarships' && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--navy-900)', fontWeight: 700 }}>
-                  รายการประกาศทุนการศึกษาทั้งหมด ({scholarships.length} ทุน)
-                </h3>
-                <p style={{ margin: '4px 0 0', fontSize: '0.88rem', color: 'var(--text-muted)' }}>
-                  จัดการรายละเอียดทุน จำนวนที่เปิดรับ วันปิดรับสมัคร และเงื่อนไขทุนการศึกษา
-                </p>
-              </div>
+        {activeTab === 'scholarships' && (() => {
+          const internalSchs = scholarships.filter(s => s.scope === 'internal');
+          const externalSchs = scholarships.filter(s => s.scope === 'external');
 
-              <button 
-                className="btn btn-primary btn-sm"
-                onClick={handleOpenNewSch}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, height: 36, padding: '0 14px' }}
+          const renderSchCard = (sch: Scholarship) => {
+            let statusBg = '#DCFCE7';
+            let statusColor = '#166534';
+            let statusText = 'เปิดรับสมัคร';
+            if (sch.status === 'closing_soon') {
+              statusBg = '#FEF3C7';
+              statusColor = '#B45309';
+              statusText = 'ใกล้ปิดรับ';
+            } else if (sch.status === 'closed') {
+              statusBg = '#F1F5F9';
+              statusColor = '#64748B';
+              statusText = 'ปิดรับแล้ว';
+            }
+
+            return (
+              <div 
+                key={sch.id}
+                className="admin-sch-box"
+                style={{
+                  background: 'var(--surface-card)',
+                  borderRadius: '16px',
+                  border: '1px solid var(--border-light)',
+                  boxShadow: 'var(--shadow-xs)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden',
+                  transition: 'all 0.2s ease',
+                  position: 'relative'
+                }}
               >
-                <span>+</span> เพิ่มประกาศทุนใหม่
-              </button>
-            </div>
+                {/* Top Accent Strip */}
+                <div style={{
+                  height: 5,
+                  background: sch.scope === 'internal' 
+                    ? 'var(--math-green)' 
+                    : 'var(--kmutnb-orange)'
+                }} />
 
-            <div className="admin-cards-grid">
-                {scholarships.map((sch) => {
-                  let statusBg = '#DCFCE7';
-                  let statusColor = '#166534';
-                  let statusText = 'เปิดรับสมัคร';
-                  if (sch.status === 'closing_soon') {
-                    statusBg = '#FEF3C7';
-                    statusColor = '#B45309';
-                    statusText = 'ใกล้ปิดรับ';
-                  } else if (sch.status === 'closed') {
-                    statusBg = '#F1F5F9';
-                    statusColor = '#64748B';
-                    statusText = 'ปิดรับแล้ว';
-                  }
+                <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', flex: 1 }}>
+                  {/* Header Badges */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 8 }}>
+                    <span style={{ 
+                      fontSize: '0.75rem', 
+                      background: sch.scope === 'internal' ? 'var(--math-green-soft)' : 'var(--kmutnb-orange-glow)', 
+                      color: sch.scope === 'internal' ? 'var(--math-green)' : 'var(--kmutnb-orange)',
+                      padding: '3px 8px',
+                      borderRadius: '4px',
+                      fontWeight: 600
+                    }}>
+                      {sch.scope === 'internal' ? 'ทุนภายในภาควิชา' : 'ทุนภายนอก/เครือข่าย'}
+                    </span>
 
-                  return (
-                    <div 
-                      key={sch.id}
-                      className="admin-sch-box"
-                      style={{
-                        background: 'var(--surface-card)',
-                        borderRadius: '16px',
-                        border: '1px solid var(--border-light)',
-                        boxShadow: 'var(--shadow-xs)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        overflow: 'hidden',
-                        transition: 'all 0.2s ease',
-                        position: 'relative'
-                      }}
-                    >
-                      {/* Top Accent Strip */}
-                      <div style={{
-                        height: 5,
-                        background: sch.scope === 'internal' 
-                          ? 'var(--math-green)' 
-                          : 'var(--kmutnb-orange)'
-                      }} />
+                    <span style={{
+                      fontSize: '0.72rem',
+                      padding: '3px 8px',
+                      borderRadius: '6px',
+                      fontWeight: 600,
+                      background: statusBg,
+                      color: statusColor
+                    }}>
+                      {statusText}
+                    </span>
+                  </div>
 
-                      <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', flex: 1 }}>
-                        {/* Header Badges */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 8 }}>
-                          <span style={{ 
-                            fontSize: '0.75rem', 
-                            background: sch.scope === 'internal' ? 'var(--math-green-soft)' : 'var(--kmutnb-orange-glow)', 
-                            color: sch.scope === 'internal' ? 'var(--math-green)' : 'var(--kmutnb-orange)',
-                            padding: '3px 8px',
-                            borderRadius: '4px',
-                            fontWeight: 600
-                          }}>
-                            {sch.scope === 'internal' ? 'ทุนภายในภาควิชา' : 'ทุนภายนอก/เครือข่าย'}
-                          </span>
+                  {/* Title */}
+                  <h4 style={{ 
+                    margin: '0 0 8px 0', 
+                    fontSize: '1.05rem', 
+                    fontWeight: 700, 
+                    color: 'var(--navy-900)',
+                    lineHeight: 1.4,
+                    minHeight: '2.8rem',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden'
+                  }}>
+                    {sch.title}
+                  </h4>
 
-                          <span style={{
-                            fontSize: '0.72rem',
-                            padding: '3px 8px',
-                            borderRadius: '6px',
-                            fontWeight: 600,
-                            background: statusBg,
-                            color: statusColor
-                          }}>
-                            {statusText}
-                          </span>
-                        </div>
+                  {/* Description */}
+                  <p style={{ 
+                    margin: '0 0 16px 0', 
+                    fontSize: '0.85rem', 
+                    color: 'var(--text-muted)',
+                    lineHeight: 1.5,
+                    minHeight: '2.5rem',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden'
+                  }}>
+                    {sch.description}
+                  </p>
 
-                        {/* Title */}
-                        <h4 style={{ 
-                          margin: '0 0 8px 0', 
-                          fontSize: '1.05rem', 
-                          fontWeight: 700, 
-                          color: 'var(--navy-900)',
-                          lineHeight: 1.4,
-                          minHeight: '2.8rem',
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden'
-                        }}>
-                          {sch.title}
-                        </h4>
-
-                        {/* Description */}
-                        <p style={{ 
-                          margin: '0 0 16px 0', 
-                          fontSize: '0.85rem', 
-                          color: 'var(--text-muted)',
-                          lineHeight: 1.5,
-                          minHeight: '2.5rem',
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden'
-                        }}>
-                          {sch.description}
-                        </p>
-
-                        {/* Details Info Box */}
-                        <div style={{
-                          background: 'var(--surface-ground)',
-                          borderRadius: '10px',
-                          padding: '12px 14px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 8,
-                          marginBottom: 16,
-                          border: '1px solid var(--border-light)'
-                        }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>มูลค่าทุน:</span>
-                            <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--kmutnb-orange-dark, #c2410c)' }}>
-                              {sch.amount}
-                            </span>
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>จำนวนโควตา:</span>
-                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--navy-800)' }}>
-                              {sch.totalSlots} ทุน (เหลือ {sch.remainingSlots})
-                            </span>
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>ปิดรับสมัคร:</span>
-                            <span style={{ fontSize: '0.82rem', color: 'var(--navy-700)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                              <Calendar size={13} strokeWidth={1.8} style={{ color: 'var(--text-muted)' }} />
-                              {sch.deadline}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Actions at bottom */}
-                        <div style={{ 
-                          display: 'flex', 
-                          gap: 8, 
-                          marginTop: 'auto', 
-                          paddingTop: 12, 
-                          borderTop: '1px solid var(--border-light)' 
-                        }}>
-                          <button 
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => handleOpenEditSch(sch)}
-                            style={{ flex: 1, padding: '7px 0', fontSize: '0.82rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 5 }}
-                          >
-                            <Pencil size={13} /> แก้ไข
-                          </button>
-                          <button 
-                            className="btn btn-sm"
-                            onClick={() => handleDeleteSch(sch.id, sch.title)}
-                            style={{ 
-                              padding: '7px 12px', 
-                              fontSize: '0.82rem', 
-                              color: '#dc2626', 
-                              borderColor: '#fca5a5', 
-                              background: 'var(--danger-bg)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 5
-                            }}
-                            title="ลบทุนนี้"
-                          >
-                            <Trash2 size={13} /> ลบ
-                          </button>
-                        </div>
-                      </div>
+                  {/* Details Info Box */}
+                  <div style={{
+                    background: 'var(--surface-ground)',
+                    borderRadius: '10px',
+                    padding: '12px 14px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
+                    marginBottom: 16,
+                    border: '1px solid var(--border-light)'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>มูลค่าทุน:</span>
+                      <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--kmutnb-orange-dark, #c2410c)' }}>
+                        {sch.amount}
+                      </span>
                     </div>
-                  );
-                })}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>จำนวนโควตา:</span>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--navy-800)' }}>
+                        {sch.totalSlots} ทุน (เหลือ {sch.remainingSlots})
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>ปิดรับสมัคร:</span>
+                      <span style={{ fontSize: '0.82rem', color: 'var(--navy-700)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                        <Calendar size={13} strokeWidth={1.8} style={{ color: 'var(--text-muted)' }} />
+                        {sch.deadline}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Actions at bottom */}
+                  <div style={{ 
+                    display: 'flex', 
+                    gap: 8, 
+                    marginTop: 'auto', 
+                    paddingTop: 12, 
+                    borderTop: '1px solid var(--border-light)' 
+                  }}>
+                    <button 
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => handleOpenEditSch(sch)}
+                      style={{ flex: 1, padding: '7px 0', fontSize: '0.82rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 5 }}
+                    >
+                      <Pencil size={13} /> แก้ไข
+                    </button>
+                    <button 
+                      className="btn btn-sm"
+                      onClick={() => handleDeleteSch(sch.id, sch.title)}
+                      style={{ 
+                        padding: '7px 12px', 
+                        fontSize: '0.82rem', 
+                        color: '#dc2626', 
+                        borderColor: '#fca5a5', 
+                        background: 'var(--danger-bg)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 5
+                      }}
+                      title="ลบทุนนี้"
+                    >
+                      <Trash2 size={13} /> ลบ
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          };
+
+          return (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--navy-900)', fontWeight: 700 }}>
+                    รายการประกาศทุนการศึกษาทั้งหมด ({scholarships.length} ทุน)
+                  </h3>
+                  <p style={{ margin: '4px 0 0', fontSize: '0.88rem', color: 'var(--text-muted)' }}>
+                    จำแนกออกเป็น 2 ส่วนชัดเจน: ทุนการศึกษาภายใน และ ทุนการศึกษาภายนอก
+                  </p>
+                </div>
+
+                <button 
+                  className="btn btn-primary btn-sm"
+                  onClick={handleOpenNewSch}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, height: 36, padding: '0 14px' }}
+                >
+                  <span>+</span> เพิ่มประกาศทุนใหม่
+                </button>
+              </div>
+
+              {/* 2 Layers of Scholarships like Main Page */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+                {/* ส่วนที่ 1: ทุนการศึกษาภายใน (Internal Scholarships) */}
+                <div className="scope-block internal">
+                  <div className="scope-block-header">
+                    <div className="scope-block-title-area">
+                      <span className="scope-block-badge internal">🏛️ ทุนภายใน</span>
+                      <h3 className="scope-block-title">
+                        ส่วนที่ 1: ทุนการศึกษาภายใน ({internalSchs.length} ทุน)
+                      </h3>
+                      <p className="scope-block-desc">
+                        ทุนสนับสนุนโดยตรงจากมหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ (มจพ.), คณะวิทยาศาสตร์ประยุกต์ และกองทุนพัฒนาภาควิชาคณิตศาสตร์
+                      </p>
+                    </div>
+
+                    <div className="scope-block-stat internal">
+                      <span className="scope-block-stat-num">{internalSchs.length}</span>
+                      <span className="scope-block-stat-label">ทุนภายใน</span>
+                    </div>
+                  </div>
+
+                  <div className="admin-cards-grid">
+                    {internalSchs.length > 0 ? (
+                      internalSchs.map(sch => renderSchCard(sch))
+                    ) : (
+                      <div style={{ gridColumn: '1 / -1', padding: '32px', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--surface-ground)', borderRadius: '12px' }}>
+                        ยังไม่มีประกาศทุนภายใน
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ส่วนที่ 2: ทุนการศึกษาภายนอก (External Scholarships) */}
+                <div className="scope-block external">
+                  <div className="scope-block-header">
+                    <div className="scope-block-title-area">
+                      <span className="scope-block-badge external">🌐 ทุนภายนอก</span>
+                      <h3 className="scope-block-title">
+                        ส่วนที่ 2: ทุนการศึกษาภายนอก ({externalSchs.length} ทุน)
+                      </h3>
+                      <p className="scope-block-desc">
+                        ทุนสนับสนุนจากหน่วยงานภายนอก มูลนิธิเพื่อการศึกษา องค์กรพันธมิตรภาคอุตสาหกรรม และชมรมศิษย์เก่าภาควิชาคณิตศาสตร์ มจพ.
+                      </p>
+                    </div>
+
+                    <div className="scope-block-stat external">
+                      <span className="scope-block-stat-num">{externalSchs.length}</span>
+                      <span className="scope-block-stat-label">ทุนภายนอก</span>
+                    </div>
+                  </div>
+
+                  <div className="admin-cards-grid">
+                    {externalSchs.length > 0 ? (
+                      externalSchs.map(sch => renderSchCard(sch))
+                    ) : (
+                      <div style={{ gridColumn: '1 / -1', padding: '32px', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--surface-ground)', borderRadius: '12px' }}>
+                        ยังไม่มีประกาศทุนภายนอก
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
-        )}
+          );
+        })()}
 
         {/* TAB 3: NEWS & ANNOUNCEMENTS CMS */}
         {activeTab === 'news' && (
@@ -2234,41 +2379,43 @@ export const AdminSection: React.FC = () => {
                   <span style={{ fontSize: '0.8rem', padding: '2px 8px', borderRadius: '6px', background: '#f1f5f9', color: '#475569', fontWeight: 600, fontFamily: 'monospace' }}>
                     #{selectedApp.trackingId}
                   </span>
-                  {isEditMode ? (
-                    <select
-                      value={reviewStatus}
-                      onChange={(e) => setReviewStatus(e.target.value as ApplicationStatus)}
-                      style={{
-                        fontSize: '0.78rem',
-                        padding: '3px 10px',
-                        borderRadius: '8px',
-                        border: '1px solid #cbd5e1',
-                        background: reviewStatus === 'approved' ? '#dcfce7' : reviewStatus === 'rejected' ? '#fef2f2' : '#eff6ff',
-                        color: reviewStatus === 'approved' ? '#15803d' : reviewStatus === 'rejected' ? '#b91c1c' : '#1d4ed8',
-                        fontWeight: 600,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <option value="submitted">ยื่นใบสมัครแล้ว (รอพิจารณา)</option>
-                      <option value="approved">อนุมัติทุนการศึกษา</option>
-                      <option value="rejected">ไม่ผ่านการพิจารณา</option>
-                    </select>
-                  ) : (
-                    <span style={{ 
-                      fontSize: '0.78rem', 
-                      padding: '3px 10px', 
-                      borderRadius: '12px', 
-                      background: reviewStatus === 'approved' ? '#dcfce7' : reviewStatus === 'rejected' ? '#fef2f2' : '#eff6ff', 
-                      color: reviewStatus === 'approved' ? '#15803d' : reviewStatus === 'rejected' ? '#b91c1c' : '#1d4ed8', 
-                      fontWeight: 600 
-                    }}>
-                      {reviewStatus === 'submitted' ? 'ยื่นใบสมัครแล้ว' : reviewStatus === 'approved' ? 'อนุมัติทุนแล้ว' : reviewStatus === 'rejected' ? 'ไม่ผ่านการพิจารณา' : reviewStatus}
+                  <select
+                    value={reviewStatus}
+                    onChange={(e) => setReviewStatus(e.target.value as ApplicationStatus)}
+                    style={{
+                      fontSize: '0.8rem',
+                      padding: '4px 10px',
+                      borderRadius: '8px',
+                      border: '1px solid',
+                      borderColor: reviewStatus === 'approved' ? '#86efac' : reviewStatus === 'rejected' ? '#fca5a5' : '#93c5fd',
+                      background: reviewStatus === 'approved' ? '#f0fdf4' : reviewStatus === 'rejected' ? '#fef2f2' : '#eff6ff',
+                      color: reviewStatus === 'approved' ? '#047857' : reviewStatus === 'rejected' ? '#b91c1c' : '#1d4ed8',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      outline: 'none'
+                    }}
+                    title="คลิกเพื่อเปลี่ยนสถานะใบสมัคร"
+                  >
+                    <option value="submitted">ยื่นใบสมัครแล้ว (รอพิจารณา)</option>
+                    <option value="approved">อนุมัติทุนการศึกษา</option>
+                    <option value="rejected">ไม่ผ่านการพิจารณา</option>
+                  </select>
+                </div>
+                <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: 4, display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span>{appEditData.fullName} • รหัส {appEditData.studentId} • ทุน: {selectedApp.scholarshipName}</span>
+                  {appEditData.systemRating > 0 && (
+                    <span style={{ color: '#eab308', display: 'inline-flex', alignItems: 'center', gap: '2px', background: '#fffbeb', padding: '2px 8px', borderRadius: '12px', border: '1px solid #fef08a', fontSize: '0.75rem' }} title={`คะแนนความพึงพอใจ: ${appEditData.systemRating}/5`}>
+                      {[...Array(5)].map((_, i) => (
+                        <span key={i} style={{ color: i < appEditData.systemRating ? '#eab308' : '#cbd5e1', fontSize: '1rem', lineHeight: 1 }}>★</span>
+                      ))}
                     </span>
                   )}
                 </div>
-                <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: 4 }}>
-                  {appEditData.fullName} • รหัส {appEditData.studentId} • ทุน: {selectedApp.scholarshipName}
-                </div>
+                {appEditData.systemComment && (
+                  <div style={{ fontSize: '0.82rem', color: '#475569', marginTop: 8, background: '#f8fafc', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <strong>ข้อเสนอแนะ:</strong> {appEditData.systemComment}
+                  </div>
+                )}
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2967,11 +3114,10 @@ export const AdminSection: React.FC = () => {
                         <select
                           className="form-input-light"
                           value={appEditData.loanStatus}
-                          onChange={(e) => setAppEditData({ ...appEditData, loanStatus: e.target.value as 'none' | 'กยศ' | 'กรอ' })}
+                          onChange={(e) => setAppEditData({ ...appEditData, loanStatus: e.target.value as 'none' | 'กยศ' })}
                         >
                           <option value="none">ไม่ได้กู้ยืมเงิน</option>
                           <option value="กยศ">กู้ยืมกองทุน กยศ.</option>
-                          <option value="กรอ">กู้ยืมกองทุน กรอ.</option>
                         </select>
                       </div>
 
@@ -3012,7 +3158,7 @@ export const AdminSection: React.FC = () => {
                       {appEditData.hasPartTimeJob && (
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                           <div>
-                            <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>สถานที่ทำงานพิเศษ</label>
+                            <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>อาชีพงานพิเศษ</label>
                             <input
                               type="text"
                               className="form-input-light"
@@ -3714,7 +3860,7 @@ export const AdminSection: React.FC = () => {
                   {/* Summary Box */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, fontSize: '0.86rem', color: '#334155', background: '#f8fafc', padding: '10px 16px', borderRadius: 6, border: '1px solid #e2e8f0' }}>
                     <div>
-                      <strong>เงื่อนไข:</strong> {selectedAppIds.size > 0 ? `เลือกเฉพาะรายชื่อ (${printListApps.length} คน)` : (filterType !== 'all' ? `ชนิดทุน: ${filterType}` : 'ทุนการศึกษาทั้งหมด')} | {filterStatus !== 'all' ? `สถานะ: ${filterStatus}` : 'ทุกสถานะ'}
+                      <strong>เงื่อนไข:</strong> {selectedAppIds.size > 0 ? `เลือกเฉพาะรายชื่อ (${printListApps.length} คน)` : `${filterScope !== 'all' ? `ประเภท: ${filterScope === 'internal' ? 'ทุนภายใน' : 'ทุนภายนอก'} | ` : ''}${filterType !== 'all' ? `ทุนการศึกษา: ${getFilterTypeLabel(filterType)}` : 'ทุนการศึกษาทั้งหมด'}`} | {filterStatus !== 'all' ? `สถานะ: ${filterStatus}` : 'ทุกสถานะ'}
                     </div>
                     <div>
                       <strong>จำนวนผู้สมัคร:</strong> {printListApps.length} คน | <strong>วันที่ออกรายงาน:</strong> {new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}
@@ -3753,7 +3899,7 @@ export const AdminSection: React.FC = () => {
                             <td style={{ border: '1px solid #cbd5e1', padding: '7px 6px', textAlign: 'center', fontWeight: 700 }}>{app.gpax.toFixed(2)}</td>
                             <td style={{ border: '1px solid #cbd5e1', padding: '7px 8px', textAlign: 'center', fontSize: '0.8rem' }}>{formatThaiDate(app.submissionDate)}</td>
                             <td style={{ border: '1px solid #cbd5e1', padding: '7px 8px', textAlign: 'center', fontSize: '0.8rem' }}>
-                              {app.status === 'submitted' ? 'ยื่นใบสมัครแล้ว' : app.status === 'approved' ? 'อนุมัติทุนแล้ว' : app.status === 'rejected' ? 'ไม่ผ่านการคัดเลือก' : app.status === 'doc_verified' ? 'ผ่านคุณสมบัติแล้ว' : app.status === 'interview_scheduled' ? 'นัดสัมภาษณ์' : app.status}
+                              {app.status === 'submitted' ? 'ยื่นใบสมัครแล้ว' : app.status === 'approved' ? 'อนุมัติทุนแล้ว' : app.status === 'rejected' ? 'ไม่ผ่านการคัดเลือก' : app.status}
                             </td>
                           </tr>
                         ))
@@ -3795,137 +3941,289 @@ export const AdminSection: React.FC = () => {
                     const fullIdCardAddr = fd.isIdCardAddress ? fullCurrAddr : getFullAddressText(fd.idCardAddress);
 
                     return (
-                      <div key={app.trackingId} className={appIdx > 0 ? 'page-break' : ''} style={{ paddingTop: appIdx > 0 ? 30 : 0, marginBottom: appIdx > 0 ? 40 : 0 }}>
-                        {/* Header */}
-                        <div style={{ textAlign: 'center', borderBottom: '2px solid #0f172a', paddingBottom: 12, marginBottom: 18 }}>
-                          <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#0f172a' }}>
-                            ใบสมัครขอรับทุนการศึกษา
-                          </h2>
-                          <h3 style={{ margin: '3px 0 0', fontSize: '1.05rem', fontWeight: 600, color: '#334155' }}>
-                            ภาควิชาคณิตศาสตร์ คณะวิทยาศาสตร์ประยุกต์ มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ
-                          </h3>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: '0.84rem', color: '#475569' }}>
-                            <span><strong>เลขที่ใบสมัคร:</strong> #{app.trackingId}</span>
-                            <span><strong>วันที่ยื่นสมัคร:</strong> {formatThaiDate(app.submissionDate)}</span>
-                          </div>
-                        </div>
-
-                        {/* Top banner: Scholarship title & Photo */}
-                        <div style={{ display: 'flex', gap: 20, marginBottom: 18, alignItems: 'flex-start', background: '#f8fafc', padding: 14, borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: '0.82rem', color: '#64748b' }}>ทุนการศึกษาที่ขอรับ:</div>
-                            <div style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--math-green, #077b38)', marginTop: 2 }}>
-                              {app.scholarshipName}
+                      <div 
+                        key={app.trackingId} 
+                        className={appIdx > 0 ? 'page-break' : ''} 
+                        style={{ 
+                          fontFamily: "'Sarabun', 'TH Sarabun New', sans-serif",
+                          color: '#000000',
+                          background: '#ffffff',
+                          lineHeight: 1.5,
+                          fontSize: '9pt',
+                          paddingTop: appIdx > 0 ? 20 : 0,
+                          marginBottom: appIdx > 0 ? 30 : 0
+                        }}
+                      >
+                        {/* ======================================================== */}
+                        {/* FORMAL OFFICIAL SCHOLARSHIP APPLICATION FORM             */}
+                        {/* ======================================================== */}
+                        <div>
+                          {/* FORMAL HEADER */}
+                          <div style={{ textAlign: 'center', marginBottom: 12 }}>
+                            <div style={{ fontSize: '14pt', fontWeight: 800, color: '#000000' }}>
+                              ใบสมัครขอรับทุนการศึกษา
                             </div>
-                            <div style={{ marginTop: 8, fontSize: '0.86rem', color: '#334155' }}>
-                              <strong>สถานะการพิจารณา:</strong> {app.status === 'submitted' ? 'ยื่นใบสมัครแล้ว (รอพิจารณา)' : app.status === 'approved' ? 'อนุมัติทุนการศึกษา' : app.status === 'rejected' ? 'ไม่ผ่านการพิจารณา' : app.status}
+                            <div style={{ fontSize: '10.5pt', fontWeight: 700, color: '#1f2937', marginTop: 2 }}>
+                              ภาควิชาคณิตศาสตร์ คณะวิทยาศาสตร์ประยุกต์ มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ
                             </div>
-                          </div>
-                          <div style={{ width: 90, height: 115, border: '1px dashed #94a3b8', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', fontSize: '0.75rem', color: '#94a3b8', background: '#ffffff', overflow: 'hidden' }}>
-                            {app.profilePhoto ? (
-                              <img src={app.profilePhoto} alt="รูปถ่าย" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            ) : (
-                              'ติดรูปถ่าย 1 - 1.5 นิ้ว'
-                            )}
-                          </div>
-                        </div>
-
-                        {/* SECTION 1: Personal & Education */}
-                        <div style={{ marginBottom: 16 }}>
-                          <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a', borderBottom: '1px solid #cbd5e1', paddingBottom: 4, marginBottom: 8 }}>
-                            1. ข้อมูลส่วนบุคคลและการศึกษา
-                          </div>
-                          <table style={{ width: '100%', fontSize: '0.86rem', borderCollapse: 'collapse' }}>
-                            <tbody>
-                              <tr>
-                                <td style={{ padding: '4px 0', width: '50%' }}><strong>ชื่อ-นามสกุล:</strong> {app.fullName}</td>
-                                <td style={{ padding: '4px 0', width: '25%' }}><strong>ชื่อเล่น:</strong> {fd.nickname || '-'}</td>
-                                <td style={{ padding: '4px 0', width: '25%' }}><strong>รหัสนักศึกษา:</strong> {app.studentId}</td>
-                              </tr>
-                              <tr>
-                                <td style={{ padding: '4px 0' }}><strong>สาขาวิชา:</strong> {app.major}</td>
-                                <td style={{ padding: '4px 0' }}><strong>ชั้นปีที่:</strong> {app.year}</td>
-                                <td style={{ padding: '4px 0' }}><strong>เกรดเฉลี่ยสะสม (GPAX):</strong> {app.gpax.toFixed(2)}</td>
-                              </tr>
-                              <tr>
-                                <td style={{ padding: '4px 0' }}><strong>เบอร์โทรศัพท์:</strong> {app.phone}</td>
-                                <td colSpan={2} style={{ padding: '4px 0' }}><strong>อีเมล:</strong> {app.email}</td>
-                              </tr>
-                              <tr>
-                                <td colSpan={3} style={{ padding: '4px 0' }}><strong>ที่อยู่ปัจจุบัน:</strong> {fullCurrAddr}</td>
-                              </tr>
-                              <tr>
-                                <td colSpan={3} style={{ padding: '4px 0' }}><strong>ที่อยู่ตามบัตรประชาชน:</strong> {fullIdCardAddr}</td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-
-                        {/* SECTION 2: Family & Financial */}
-                        <div style={{ marginBottom: 16 }}>
-                          <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a', borderBottom: '1px solid #cbd5e1', paddingBottom: 4, marginBottom: 8 }}>
-                            2. ข้อมูลครอบครัวและภาระทางการเงิน
-                          </div>
-                          <table style={{ width: '100%', fontSize: '0.86rem', borderCollapse: 'collapse' }}>
-                            <tbody>
-                              <tr>
-                                <td style={{ padding: '4px 0', width: '50%' }}>
-                                  <strong>ชื่อบิดา:</strong> {fd.fatherName || '-'} ({fd.fatherAlive === 'deceased' ? 'ถึงแก่กรรม' : 'ยังมีชีวิต'})
-                                </td>
-                                <td style={{ padding: '4px 0', width: '25%' }}><strong>อาชีพ:</strong> {fd.fatherJob || '-'}</td>
-                                <td style={{ padding: '4px 0', width: '25%' }}><strong>รายได้:</strong> {fd.fatherIncome ? `${fd.fatherIncome.toLocaleString()} บ./ด.` : '-'}</td>
-                              </tr>
-                              <tr>
-                                <td style={{ padding: '4px 0' }}>
-                                  <strong>ชื่อมารดา:</strong> {fd.motherName || '-'} ({fd.motherAlive === 'deceased' ? 'ถึงแก่กรรม' : 'ยังมีชีวิต'})
-                                </td>
-                                <td style={{ padding: '4px 0' }}><strong>อาชีพ:</strong> {fd.motherJob || '-'}</td>
-                                <td style={{ padding: '4px 0' }}><strong>รายได้:</strong> {fd.motherIncome ? `${fd.motherIncome.toLocaleString()} บ./ด.` : '-'}</td>
-                              </tr>
-                              <tr>
-                                <td style={{ padding: '4px 0' }}>
-                                  <strong>รายได้ครอบครัวรวม:</strong> {app.familyIncome ? `${app.familyIncome.toLocaleString()} บาท/เดือน` : '-'}
-                                </td>
-                                <td style={{ padding: '4px 0' }}><strong>จำนวนพี่น้อง:</strong> {fd.siblings || '-'} คน</td>
-                                <td style={{ padding: '4px 0' }}>
-                                  <strong>กู้ยืม กยศ./กรอ.:</strong> {fd.loanStatus === 'none' ? 'ไม่ได้กู้ยืม' : 'กู้ยืม กยศ./กรอ.'}
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-
-                        {/* SECTION 3: Activities & Reasons */}
-                        <div style={{ marginBottom: 16 }}>
-                          <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a', borderBottom: '1px solid #cbd5e1', paddingBottom: 4, marginBottom: 8 }}>
-                            3. ประวัติกิจกรรมและเหตุผลความจำเป็น
-                          </div>
-                          <div style={{ fontSize: '0.86rem', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                            <div><strong>กิจกรรมที่เคยปฏิบัติ:</strong> {fd.activities || '-'}</div>
-                            <div><strong>ชั่วโมงจิตอาสา:</strong> {fd.volunteerHours || '-'} ชั่วโมง</div>
-                            <div><strong>เหตุผลความจำเป็นในการขอรับทุนการศึกษา:</strong></div>
-                            <div style={{ background: '#f8fafc', padding: '8px 12px', borderRadius: 4, border: '1px solid #e2e8f0', whiteSpace: 'pre-wrap', lineHeight: 1.5, fontSize: '0.84rem' }}>
-                              {fd.reason || 'ไม่มีข้อมูลเหตุผล'}
+                            <div style={{ fontSize: '9pt', color: '#374151', marginTop: 2 }}>
+                              ประจำปีการศึกษา {siteSettings.academicYear || '2567'} ภาคการศึกษาที่ {siteSettings.semester || '1'}
                             </div>
                           </div>
-                        </div>
 
-                        {/* SECTION 4: Signatures */}
-                        <div style={{ borderTop: '1px solid #cbd5e1', paddingTop: 14, marginTop: 18 }}>
-                          <div style={{ fontSize: '0.84rem', fontStyle: 'italic', marginBottom: 24, textAlign: 'center' }}>
-                            "ข้าพเจ้าขอรับรองว่า ข้อความดังกล่าวข้างต้นเป็นความจริงทุกประการ หากปรากฏว่าเป็นเท็จ ข้าพเจ้ายินยอมให้ยกเลิกสิทธิ์ในการรับทุนการศึกษา"
+                          {/* TOP META ROW: General info on left and photo on right */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, gap: 16 }}>
+                            {/* Left: General Scholarship & Application Info */}
+                            <div style={{ flex: 1, fontSize: '9.2pt', lineHeight: 1.8 }}>
+                              <div>
+                                <strong>ทุนการศึกษาที่สมัคร:</strong>{' '}
+                                <span style={{ fontWeight: 700, fontSize: '9.8pt' }}>{app.scholarshipName}</span>
+                              </div>
+                              <div style={{ marginTop: 2 }}>
+                                <strong>คณะ:</strong> วิทยาศาสตร์ประยุกต์ &nbsp;&nbsp;&nbsp;&nbsp;
+                                <strong>ภาควิชา:</strong> คณิตศาสตร์ &nbsp;&nbsp;&nbsp;&nbsp;
+                                <strong>ระดับการศึกษา:</strong> [ ] ปวช. &nbsp;[✓] ปริญญาตรี 4 ปี &nbsp;[ ] ปริญญาโท
+                              </div>
+                              <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginTop: 2, fontSize: '8.8pt', color: '#1e293b' }}>
+                                <span><strong>เลขที่ใบสมัคร:</strong> #{app.trackingId}</span>
+                                <span><strong>วันที่ยื่นสมัคร:</strong> {formatThaiDate(app.submissionDate)}</span>
+                                <span>
+                                  <strong>สถานะ:</strong>{' '}
+                                  {app.status === 'approved' ? 'อนุมัติทุนแล้ว' : app.status === 'rejected' ? 'ไม่ผ่านการพิจารณา' : 'รอการพิจารณา'}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Right: Photo Box */}
+                            <div style={{
+                              border: '1px dashed #94a3b8',
+                              width: '105px',
+                              height: '130px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              textAlign: 'center',
+                              fontSize: '8.5pt',
+                              color: '#64748b',
+                              background: '#f8fafc',
+                              overflow: 'hidden',
+                              boxSizing: 'border-box',
+                              flexShrink: 0
+                            }}>
+                              {app.profilePhoto ? (
+                                <img src={app.profilePhoto} alt="รูปถ่ายนักศึกษา" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : (
+                                <div>
+                                  ติดรูปถ่าย<br />1 - 1.5 นิ้ว
+                                </div>
+                              )}
+                            </div>
                           </div>
 
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, textAlign: 'center', fontSize: '0.88rem' }}>
-                            <div>
-                              <div style={{ marginBottom: 36 }}>ลงชื่อ ................................................................ ผู้สมัคร</div>
-                              <div>( {app.fullName} )</div>
-                              <div style={{ color: '#64748b', fontSize: '0.82rem', marginTop: 2 }}>วันที่ ......... / ......... / ...............</div>
+                          {/* SECTION ๑: ข้อมูลส่วนบุคคลและการศึกษา */}
+                          <div style={{ marginBottom: 12 }}>
+                            <div style={{
+                              fontWeight: 800,
+                              fontSize: '9.8pt',
+                              color: '#0f172a',
+                              marginBottom: 4
+                            }}>
+                              ๑. ข้อมูลส่วนบุคคลและข้อมูลการศึกษา
                             </div>
-                            <div>
-                              <div style={{ marginBottom: 36 }}>ลงชื่อ ................................................................ อาจารย์ที่ปรึกษา</div>
-                              <div>( ................................................................ )</div>
-                              <div style={{ color: '#64748b', fontSize: '0.82rem', marginTop: 2 }}>วันที่ ......... / ......... / ...............</div>
+                            <div style={{ paddingLeft: '8px', fontSize: '9.2pt', lineHeight: 1.8 }}>
+                              <div>
+                                <strong>ชื่อ-นามสกุล:</strong>{' '}
+                                <span style={{ borderBottom: '1px dotted #475569', display: 'inline-block', minWidth: '190px', fontWeight: 600, padding: '0 4px' }}>
+                                  {app.fullName}
+                                </span>
+                                {' '}<strong>ชื่อเล่น:</strong>{' '}
+                                <span style={{ borderBottom: '1px dotted #475569', display: 'inline-block', minWidth: '60px', textAlign: 'center', padding: '0 4px' }}>
+                                  {fd.nickname || '-'}
+                                </span>
+                                {' '}<strong>รหัสประจำตัวนักศึกษา:</strong>{' '}
+                                <span style={{ borderBottom: '1px dotted #475569', display: 'inline-block', minWidth: '130px', fontWeight: 600, padding: '0 4px' }}>
+                                  {app.studentId}
+                                </span>
+                              </div>
+
+                              <div>
+                                <strong>สาขาวิชา:</strong>{' '}
+                                <span style={{ borderBottom: '1px dotted #475569', display: 'inline-block', minWidth: '190px', fontWeight: 600, padding: '0 4px' }}>
+                                  {formatMajorFullName(app.major)}
+                                </span>
+                                {' '}<strong>ชั้นปีที่:</strong>{' '}
+                                <span style={{ borderBottom: '1px dotted #475569', display: 'inline-block', minWidth: '40px', textAlign: 'center', fontWeight: 600, padding: '0 4px' }}>
+                                  {app.year}
+                                </span>
+                                {' '}<strong>เกรดเฉลี่ยสะสม (GPAX):</strong>{' '}
+                                <span style={{ borderBottom: '1px dotted #475569', display: 'inline-block', minWidth: '50px', textAlign: 'center', fontWeight: 700, padding: '0 4px' }}>
+                                  {app.gpax.toFixed(2)}
+                                </span>
+                              </div>
+
+                              <div>
+                                <strong>เบอร์โทรศัพท์:</strong>{' '}
+                                <span style={{ borderBottom: '1px dotted #475569', display: 'inline-block', minWidth: '130px', padding: '0 4px' }}>
+                                  {app.phone}
+                                </span>
+                                {' '}<strong>อีเมล:</strong>{' '}
+                                <span style={{ borderBottom: '1px dotted #475569', display: 'inline-block', minWidth: '230px', padding: '0 4px' }}>
+                                  {app.email}
+                                </span>
+                              </div>
+
+                              <div>
+                                <strong>ที่อยู่ปัจจุบัน:</strong>{' '}
+                                <span style={{ borderBottom: '1px dotted #475569', display: 'inline-block', minWidth: '450px', padding: '0 4px' }}>
+                                  {fullCurrAddr}
+                                </span>
+                              </div>
+
+                              <div>
+                                <strong>ที่อยู่ตามภูมิลำเนา (ทะเบียนบ้าน):</strong>{' '}
+                                <span style={{ borderBottom: '1px dotted #475569', display: 'inline-block', minWidth: '390px', padding: '0 4px' }}>
+                                  {fullIdCardAddr}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* SECTION ๒: ข้อมูลครอบครัวและภาระทางการเงิน */}
+                          <div style={{ marginBottom: 12 }}>
+                            <div style={{
+                              fontWeight: 800,
+                              fontSize: '9.8pt',
+                              color: '#0f172a',
+                              marginBottom: 4
+                            }}>
+                              ๒. ข้อมูลครอบครัวและภาระทางการเงิน
+                            </div>
+                            <div style={{ paddingLeft: '8px', fontSize: '9.2pt', lineHeight: 1.8 }}>
+                              <div>
+                                <strong>ข้อมูลบิดา:</strong>{' '}
+                                <span style={{ borderBottom: '1px dotted #475569', display: 'inline-block', minWidth: '150px', fontWeight: 600, padding: '0 4px' }}>
+                                  {fd.fatherName || '-'}
+                                </span>
+                                {' '}<strong>อาชีพ:</strong>{' '}
+                                <span style={{ borderBottom: '1px dotted #475569', display: 'inline-block', minWidth: '110px', padding: '0 4px' }}>
+                                  {fd.fatherJob || '-'}
+                                </span>
+                                {' '}<strong>รายได้:</strong>{' '}
+                                <span style={{ borderBottom: '1px dotted #475569', display: 'inline-block', minWidth: '95px', textAlign: 'right', padding: '0 4px' }}>
+                                  {fd.fatherIncome ? `${Number(fd.fatherIncome).toLocaleString()} บาท/ด.` : '-'}
+                                </span>
+                                {' '}<strong>สถานภาพ:</strong>{' '}
+                                [{fd.fatherAlive !== 'deceased' ? '✓' : ' '}] มีชีวิต{' '}
+                                [{fd.fatherAlive === 'deceased' ? '✓' : ' '}] ถึงแก่กรรม
+                              </div>
+
+                              <div>
+                                <strong>ข้อมูลมารดา:</strong>{' '}
+                                <span style={{ borderBottom: '1px dotted #475569', display: 'inline-block', minWidth: '150px', fontWeight: 600, padding: '0 4px' }}>
+                                  {fd.motherName || '-'}
+                                </span>
+                                {' '}<strong>อาชีพ:</strong>{' '}
+                                <span style={{ borderBottom: '1px dotted #475569', display: 'inline-block', minWidth: '110px', padding: '0 4px' }}>
+                                  {fd.motherJob || '-'}
+                                </span>
+                                {' '}<strong>รายได้:</strong>{' '}
+                                <span style={{ borderBottom: '1px dotted #475569', display: 'inline-block', minWidth: '95px', textAlign: 'right', padding: '0 4px' }}>
+                                  {fd.motherIncome ? `${Number(fd.motherIncome).toLocaleString()} บาท/ด.` : '-'}
+                                </span>
+                                {' '}<strong>สถานภาพ:</strong>{' '}
+                                [{fd.motherAlive !== 'deceased' ? '✓' : ' '}] มีชีวิต{' '}
+                                [{fd.motherAlive === 'deceased' ? '✓' : ' '}] ถึงแก่กรรม
+                              </div>
+
+                              <div>
+                                <strong>สถานภาพสมรสของบิดา-มารดา:</strong>{' '}
+                                [{fd.parentsRelation === 'together' ? '✓' : ' '}] อยู่ด้วยกัน{' '}
+                                [{fd.parentsRelation === 'divorced' ? '✓' : ' '}] แยกกันอยู่/หย่าร้าง{' '}
+                                [{fd.parentsRelation === 'other' ? '✓' : ' '}] อื่นๆ
+                              </div>
+
+                              <div>
+                                <strong>จำนวนพี่น้องร่วมบิดามารดา:</strong>{' '}
+                                <span style={{ borderBottom: '1px dotted #475569', display: 'inline-block', minWidth: '40px', textAlign: 'center', fontWeight: 600, padding: '0 4px' }}>
+                                  {fd.siblings || '0'}
+                                </span>{' '}คน
+                                {' '}<strong>สถานะการกู้ยืมเงินเพื่อการศึกษา:</strong>{' '}
+                                [{fd.loanStatus !== 'none' ? '✓' : ' '}] กู้ยืม กยศ.{' '}
+                                [{fd.loanStatus === 'none' ? '✓' : ' '}] ไม่ได้กู้ยืม
+                              </div>
+
+                              <div>
+                                <strong>รายได้รวมของครอบครัวโดยประมาณ:</strong>{' '}
+                                <span style={{ borderBottom: '1px dotted #475569', display: 'inline-block', minWidth: '150px', textAlign: 'right', fontWeight: 700, padding: '0 4px' }}>
+                                  {app.familyIncome ? `${Number(app.familyIncome).toLocaleString()} บาท/เดือน` : '-'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* SECTION ๓: ประวัติกิจกรรมและเหตุผลความจำเป็นในการขอรับทุน */}
+                          <div style={{ marginBottom: 12 }}>
+                            <div style={{
+                              fontWeight: 800,
+                              fontSize: '9.8pt',
+                              color: '#0f172a',
+                              marginBottom: 4
+                            }}>
+                              ๓. ประวัติกิจกรรมและเหตุผลความจำเป็นในการขอรับทุนการศึกษา
+                            </div>
+                            <div style={{ paddingLeft: '8px', fontSize: '9.2pt', lineHeight: 1.75 }}>
+                              <div>
+                                <strong>กิจกรรมที่เคยปฏิบัติ / กิจกรรมจิตอาสา:</strong>{' '}
+                                <span>{fd.activities || 'ไม่มีกิจกรรมระบุ'}</span>
+                                {fd.volunteerHours > 0 && (
+                                  <span style={{ marginLeft: 10 }}>
+                                    (จำนวนชั่วโมงจิตอาสา: <strong>{fd.volunteerHours}</strong> ชั่วโมง)
+                                  </span>
+                                )}
+                              </div>
+
+                              <div style={{ marginTop: 4 }}>
+                                <strong>เหตุผลความจำเป็นในการขอรับทุนการศึกษา:</strong>
+                              </div>
+                              <div style={{
+                                marginTop: 2,
+                                textIndent: '20px',
+                                lineHeight: 1.7,
+                                color: '#1e293b'
+                              }}>
+                                {fd.reasonsList && fd.reasonsList.length > 0 ? (
+                                  fd.reasonsList.map((r, i) => (
+                                    <div key={i}>{i + 1}. {r}</div>
+                                  ))
+                                ) : (
+                                  fd.reason || 'มีความจำเป็นต้องใช้ทุนการศึกษาเพื่อแบ่งเบาภาระค่าใช้จ่ายของครอบครัวในการศึกษาเล่าเรียน'
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* SECTION ๔: คำรับรองและการลงนาม (เฉพาะผู้สมัคร) */}
+                          <div style={{ marginTop: 14 }}>
+                            <div style={{
+                              fontWeight: 800,
+                              fontSize: '9.8pt',
+                              color: '#0f172a',
+                              marginBottom: 6
+                            }}>
+                              ๔. คำรับรองความถูกต้องและการลงนาม
+                            </div>
+                            <div style={{ paddingLeft: '8px' }}>
+                              <div style={{ fontSize: '9pt', textIndent: '28px', textAlign: 'justify', lineHeight: 1.75, marginBottom: 18 }}>
+                                "ข้าพเจ้าขอรับรองว่า ข้อความและเอกสารหลักฐานทั้งหมดที่ระบุไว้ในใบสมัครนี้เป็นความจริงทุกประการ หากปรากฏว่าเป็นเท็จ ข้าพเจ้ายินยอมให้ยกเลิกสิทธิ์ในการรับทุนการศึกษาทันที"
+                              </div>
+
+                              <div style={{ display: 'flex', justifyContent: 'flex-end', paddingRight: 40, marginTop: 14 }}>
+                                <div style={{ textAlign: 'center', fontSize: '9.2pt', lineHeight: 1.85 }}>
+                                  <div>ลงชื่อ ................................................................ ผู้สมัคร</div>
+                                  <div style={{ marginTop: 4 }}>( {app.fullName} )</div>
+                                  <div style={{ marginTop: 3, color: '#475569' }}>วันที่ {formatThaiDate(app.submissionDate)}</div>
+                                </div>
+                              </div>
                             </div>
                           </div>
                         </div>

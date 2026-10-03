@@ -38,7 +38,7 @@ interface DbScholarshipApplicationRow {
 const mapDbStatusToAppStatus = (dbStatus: string, subStatus?: string): ApplicationStatus => {
   if (dbStatus === 'approved') return 'approved';
   if (dbStatus === 'rejected') return 'rejected';
-  if (subStatus && ['submitted', 'doc_verified', 'interview_scheduled'].includes(subStatus)) {
+  if (subStatus && ['submitted'].includes(subStatus)) {
     return subStatus as ApplicationStatus;
   }
   return 'submitted';
@@ -303,7 +303,7 @@ export const applicationService = {
           relation: 'บิดา',
           name: formData.fatherName,
           occupation: formData.fatherJob || 'ทั่วไป',
-          income: Math.floor(formData.familyIncome / 2),
+          income: Math.floor(Number(formData.familyIncome || 0) / 2),
         });
       }
       if (formData.motherName) {
@@ -312,7 +312,7 @@ export const applicationService = {
           relation: 'มารดา',
           name: formData.motherName,
           occupation: formData.motherJob || 'ทั่วไป',
-          income: Math.floor(formData.familyIncome / 2),
+          income: Math.floor(Number(formData.familyIncome || 0) / 2),
         });
       }
       if (guardiansToInsert.length > 0) {
