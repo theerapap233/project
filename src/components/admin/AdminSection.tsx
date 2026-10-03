@@ -29,6 +29,16 @@ import { PROVINCES } from '../../data/provinces';
 
 type AdminTab = 'applications' | 'scholarships' | 'news' | 'faq' | 'settings';
 
+const SCHOLARSHIP_YEAR_PRESETS = [
+  { value: 'all', label: 'ทุกชั้นปี', years: ['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4', 'บัณฑิตศึกษา'] },
+  { value: 'undergraduate', label: 'ปริญญาตรี (ปี 1-4)', years: ['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4'] },
+  { value: 'year-1', label: 'ปี 1', years: ['ปี 1'] },
+  { value: 'year-2', label: 'ปี 2', years: ['ปี 2'] },
+  { value: 'year-3', label: 'ปี 3', years: ['ปี 3'] },
+  { value: 'year-4', label: 'ปี 4', years: ['ปี 4'] },
+  { value: 'graduate', label: 'บัณฑิตศึกษา', years: ['บัณฑิตศึกษา'] }
+];
+
 export const AdminSection: React.FC = () => {
   const { 
     applications, 
@@ -97,7 +107,9 @@ export const AdminSection: React.FC = () => {
   const [schTitle, setSchTitle] = useState('');
   const [schAmount, setSchAmount] = useState('25,000 บาท/ภาคการศึกษา');
   const [schSlots, setSchSlots] = useState(5);
-  const [schDeadline, setSchDeadline] = useState('31 ตุลาคม 2567');
+  const [schMinGPAX, setSchMinGPAX] = useState(2.75);
+  const [schTargetYears, setSchTargetYears] = useState<string[]>(['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4']);
+  const [schDeadline, setSchDeadline] = useState('2026-10-31');
   const [schScope, setSchScope] = useState<'internal' | 'external'>('internal');
   const [schStatus, setSchStatus] = useState<'open' | 'closed' | 'closing_soon'>('open');
   const [schDesc, setSchDesc] = useState('');
@@ -461,7 +473,9 @@ export const AdminSection: React.FC = () => {
     setSchTitle('');
     setSchAmount('20,000 บาท/คน');
     setSchSlots(5);
-    setSchDeadline('31 ตุลาคม 2567');
+    setSchMinGPAX(2.75);
+    setSchTargetYears(['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4']);
+    setSchDeadline('2026-10-31');
     setSchScope('internal');
     setSchStatus('open');
     setSchDesc('ทุนการศึกษาสำหรับนักศึกษาภาควิชาคณิตศาสตร์ คณะวิทยาศาสตร์ประยุกต์ มจพ.');
@@ -473,17 +487,35 @@ export const AdminSection: React.FC = () => {
     setSchTitle(sch.title);
     setSchAmount(sch.amount);
     setSchSlots(sch.totalSlots);
-    setSchDeadline(sch.deadline);
+    setSchMinGPAX(sch.minGPAX);
+    setSchTargetYears(sch.targetYears);
+    setSchDeadline(sch.deadline.split('T')[0]);
     setSchScope(sch.scope || 'internal');
     setSchStatus(sch.status);
     setSchDesc(sch.description);
     setIsSchModalOpen(true);
   };
 
+  const selectedSchYearPreset = SCHOLARSHIP_YEAR_PRESETS.find(
+    preset => preset.years.join('|') === schTargetYears.join('|')
+  )?.value;
+
   const handleSaveSch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!schTitle.trim()) {
       showToast('กรุณาระบุชื่อทุนการศึกษา', 'warning');
+      return;
+    }
+    if (schTargetYears.length === 0) {
+      showToast('กรุณาเลือกชั้นปีที่มีสิทธิ์สมัครอย่างน้อย 1 ชั้นปี', 'warning');
+      return;
+    }
+    if (!Number.isFinite(schMinGPAX) || schMinGPAX < 0 || schMinGPAX > 4) {
+      showToast('กรุณาระบุ GPAX ขั้นต่ำระหว่าง 0.00 ถึง 4.00', 'warning');
+      return;
+    }
+    if (!Number.isInteger(schSlots) || schSlots < 1) {
+      showToast('กรุณาระบุจำนวนทุนที่เปิดรับให้ถูกต้อง', 'warning');
       return;
     }
 
@@ -492,13 +524,19 @@ export const AdminSection: React.FC = () => {
         title: schTitle.trim(),
         amount: schAmount.trim(),
         totalSlots: Number(schSlots),
-        deadline: schDeadline.trim(),
+        minGPAX: Number(schMinGPAX),
+        targetYears: schTargetYears,
+        deadline: schDeadline,
         scope: schScope,
         status: schStatus,
         description: schDesc.trim()
       });
     } else {
-      createNewScholarship(schTitle.trim(), schAmount.trim(), Number(schSlots));
+      createNewScholarship(schTitle.trim(), schAmount.trim(), Number(schSlots), {
+        minGPAX: Number(schMinGPAX),
+        targetYears: schTargetYears,
+        deadline: schDeadline
+      });
     }
     setIsSchModalOpen(false);
   };
@@ -3450,7 +3488,7 @@ export const AdminSection: React.FC = () => {
       {/* MODAL: ADD / EDIT SCHOLARSHIP */}
       {isSchModalOpen && (
         <div className="modal-backdrop open">
-          <div className="modal-card" style={{ maxWidth: 540 }}>
+          <div className="modal-card announcement-modal" style={{ maxWidth: 540 }}>
             <div className="modal-header">
               <h3 style={{ margin: 0, fontSize: '1.25rem' }}>
                 {editingSchId ? 'แก้ไขประกาศทุนการศึกษา' : 'เพิ่มประกาศทุนการศึกษาใหม่'}
@@ -3508,6 +3546,45 @@ export const AdminSection: React.FC = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                   <div className="form-group">
                     <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
+                      GPAX ขั้นต่ำ
+                    </label>
+                    <input
+                      type="number"
+                      className="form-input-light"
+                      min="0"
+                      max="4"
+                      step="0.01"
+                      value={schMinGPAX}
+                      onChange={(e) => setSchMinGPAX(Number(e.target.value))}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
+                      ชั้นปีที่มีสิทธิ์สมัคร
+                    </label>
+                    <select
+                      className="form-input-light"
+                      value={selectedSchYearPreset || 'custom'}
+                      onChange={(e) => {
+                        const preset = SCHOLARSHIP_YEAR_PRESETS.find(option => option.value === e.target.value);
+                        if (preset) setSchTargetYears(preset.years);
+                      }}
+                      required
+                    >
+                      {!selectedSchYearPreset && (
+                        <option value="custom">กำหนดเอง ({schTargetYears.join(', ')})</option>
+                      )}
+                      {SCHOLARSHIP_YEAR_PRESETS.map(preset => (
+                        <option key={preset.value} value={preset.value}>{preset.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                  <div className="form-group">
+                    <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
                       ประเภทแหล่งทุน
                     </label>
                     <select 
@@ -3541,9 +3618,8 @@ export const AdminSection: React.FC = () => {
                     กำหนดการปิดรับสมัคร
                   </label>
                   <input 
-                    type="text" 
+                    type="date"
                     className="form-input-light" 
-                    placeholder="เช่น 31 ตุลาคม 2567"
                     value={schDeadline}
                     onChange={(e) => setSchDeadline(e.target.value)}
                     required
@@ -3587,7 +3663,7 @@ export const AdminSection: React.FC = () => {
       {/* MODAL: ADD / EDIT ANNOUNCEMENT */}
       {isAnnModalOpen && (
         <div className="modal-backdrop open">
-          <div className="modal-card" style={{ maxWidth: 520 }}>
+          <div className="modal-card announcement-modal" style={{ maxWidth: 520 }}>
             <div className="modal-header">
               <h3 style={{ margin: 0, fontSize: '1.25rem' }}>
                 {editingAnnId ? 'แก้ไขข่าวสาร/ประกาศ' : 'เพิ่มข่าวสาร/ประกาศใหม่'}
@@ -3972,7 +4048,7 @@ export const AdminSection: React.FC = () => {
                           </div>
 
                           {/* TOP META ROW: General info on left and photo on right */}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, gap: 16 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6, gap: 16 }}>
                             {/* Left: General Scholarship & Application Info */}
                             <div style={{ flex: 1, fontSize: '9.2pt', lineHeight: 1.8 }}>
                               <div>
@@ -3997,8 +4073,8 @@ export const AdminSection: React.FC = () => {
                             {/* Right: Photo Box */}
                             <div style={{
                               border: '1px dashed #94a3b8',
-                              width: '105px',
-                              height: '130px',
+                              width: '84px',
+                              height: '104px',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',

@@ -81,6 +81,11 @@ const INITIAL_FORM: ApplicationFormData = {
   systemComment: ''
 };
 
+const isValidThaiPhoneNumber = (value: string): boolean => {
+  const digits = value.replace(/[\s()-]/g, '');
+  return /^0(?:[2-7]\d{7,8}|[689]\d{8})$/.test(digits);
+};
+
 export const ApplicationWizardModal: React.FC = () => {
   const {
     isWizardModalOpen,
@@ -128,8 +133,8 @@ export const ApplicationWizardModal: React.FC = () => {
         showToast('กรุณากรอกเกรดเฉลี่ยสะสม (GPAX) ระหว่าง 0.00 - 4.00', 'warning');
         return false;
       }
-      if (!formData.phone.trim()) {
-        showToast('กรุณากรอกเบอร์โทรศัพท์สำหรับติดต่อ', 'warning');
+      if (!isValidThaiPhoneNumber(formData.phone)) {
+        showToast('กรุณากรอกเบอร์โทรศัพท์ให้ครบและถูกต้อง เช่น 089-123-4567', 'warning');
         return false;
       }
       if (!formData.email.trim() || !formData.email.includes('@')) {
@@ -151,6 +156,23 @@ export const ApplicationWizardModal: React.FC = () => {
     }
 
     if (currentStep === 2) {
+      if (
+        (formData.fatherPhone.trim() && !isValidThaiPhoneNumber(formData.fatherPhone)) ||
+        (formData.motherPhone.trim() && !isValidThaiPhoneNumber(formData.motherPhone))
+      ) {
+        showToast('กรุณากรอกเบอร์โทรศัพท์บิดาและมารดาให้ครบและถูกต้อง', 'warning');
+        return false;
+      }
+      const incomes = [
+        formData.fatherIncome,
+        formData.motherIncome,
+        formData.familyIncome,
+        ...(formData.hasPartTimeJob ? [formData.partTimeJobIncome] : [])
+      ];
+      if (incomes.some(income => Number(income) < 0)) {
+        showToast('รายได้ต้องไม่เป็นจำนวนติดลบ', 'warning');
+        return false;
+      }
       if (formData.sponsor.length === 0) {
         showToast('กรุณาเลือกผู้รับผิดชอบค่าใช้จ่ายในการศึกษาอย่างน้อย 1 ข้อ', 'warning');
         return false;
@@ -507,7 +529,7 @@ export const ApplicationWizardModal: React.FC = () => {
               <div className="wizard-form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', marginTop: '24px' }}>
                 <div className="form-group">
                   <label>เบอร์โทรศัพท์ติดต่อ *</label>
-                  <input type="tel" className="form-input-light" placeholder="เช่น 089-123-4567" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} required />
+                  <input type="tel" inputMode="tel" maxLength={12} className="form-input-light" placeholder="เช่น 089-123-4567" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} required />
                 </div>
                 <div className="form-group">
                   <label>อีเมลมหาวิทยาลัย (@email.kmutnb.ac.th) *</label>
@@ -595,7 +617,7 @@ export const ApplicationWizardModal: React.FC = () => {
                     </div>
                     <div className="form-group">
                       <label>เบอร์โทรศัพท์บิดา</label>
-                      <input type="text" className="form-input-light" value={formData.fatherPhone} onChange={(e) => setFormData({ ...formData, fatherPhone: e.target.value })} />
+                      <input type="tel" inputMode="tel" maxLength={12} className="form-input-light" placeholder="เช่น 081-999-8888" value={formData.fatherPhone} onChange={(e) => setFormData({ ...formData, fatherPhone: e.target.value })} />
                     </div>
                     <div className="form-group">
                       <label>อาชีพบิดา</label>
@@ -606,6 +628,8 @@ export const ApplicationWizardModal: React.FC = () => {
                       <input
                         type="number"
                         className="form-input-light"
+                        min="0"
+                        step="1"
                         placeholder="0"
                         value={formData.fatherIncome}
                         onChange={(e) => handleNumberChange('fatherIncome', e.target.value)}
@@ -631,7 +655,7 @@ export const ApplicationWizardModal: React.FC = () => {
                     </div>
                     <div className="form-group">
                       <label>เบอร์โทรศัพท์มารดา</label>
-                      <input type="text" className="form-input-light" value={formData.motherPhone} onChange={(e) => setFormData({ ...formData, motherPhone: e.target.value })} />
+                      <input type="tel" inputMode="tel" maxLength={12} className="form-input-light" placeholder="เช่น 081-777-6666" value={formData.motherPhone} onChange={(e) => setFormData({ ...formData, motherPhone: e.target.value })} />
                     </div>
                     <div className="form-group">
                       <label>อาชีพมารดา</label>
@@ -642,6 +666,8 @@ export const ApplicationWizardModal: React.FC = () => {
                       <input
                         type="number"
                         className="form-input-light"
+                        min="0"
+                        step="1"
                         placeholder="0"
                         value={formData.motherIncome}
                         onChange={(e) => handleNumberChange('motherIncome', e.target.value)}
@@ -674,6 +700,8 @@ export const ApplicationWizardModal: React.FC = () => {
                       <input
                         type="number"
                         className="form-input-light"
+                        min="0"
+                        step="1"
                         placeholder="0"
                         value={formData.familyIncome}
                         onChange={(e) => handleNumberChange('familyIncome', e.target.value)}
@@ -780,6 +808,8 @@ export const ApplicationWizardModal: React.FC = () => {
                           <input
                             type="number"
                             className="form-input-light"
+                            min="0"
+                            step="1"
                             placeholder="ระบุรายได้"
                             value={formData.partTimeJobIncome}
                             onChange={(e) => handleNumberChange('partTimeJobIncome', e.target.value)}

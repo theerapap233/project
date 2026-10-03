@@ -9,6 +9,9 @@ interface DbScholarshipProgram {
   amount: number | null;
   quota: number | null;
   is_open: boolean;
+  deadline: string | null;
+  min_gpax: number | null;
+  target_years: string[] | null;
   description: string | null;
   created_at: string;
   updated_at: string;
@@ -75,10 +78,10 @@ const mapProgramToScholarship = (row: DbScholarshipProgram, index: number): Scho
     remainingSlots: Math.max(1, Math.floor((row.quota || 10) * 0.4)),
     academicYear: '2567',
     term: 'ภาคการศึกษาที่ 1',
-    deadline: '2026-10-31',
+    deadline: row.deadline?.slice(0, 10) || '2026-10-31',
     status: row.is_open ? 'open' : 'closed',
-    minGPAX: categorySlug === 'academic' ? 3.00 : 2.00,
-    targetYears: ['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4', 'บัณฑิตศึกษา'],
+    minGPAX: row.min_gpax ?? (categorySlug === 'academic' ? 3.00 : 2.00),
+    targetYears: row.target_years ?? ['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4', 'บัณฑิตศึกษา'],
     targetMajors: ['คณิตศาสตร์ประยุกต์', 'สถิติประยุกต์และการวิเคราะห์ข้อมูล'],
     description: row.description || 'ทุนการศึกษาเพื่อส่งเสริมศักยภาพนักศึกษา ภาควิชาคณิตศาสตร์ คณะวิทยาศาสตร์ประยุกต์ มจพ.',
     requirements: [
@@ -114,6 +117,9 @@ export const scholarshipService = {
           amount,
           quota,
           is_open,
+          deadline,
+          min_gpax,
+          target_years,
           description,
           created_at,
           updated_at,
@@ -183,6 +189,9 @@ export const scholarshipService = {
           quota: sch.totalSlots,
           is_open: sch.status === 'open',
           description: sch.description,
+          deadline: sch.deadline ? `${sch.deadline}T00:00:00.000Z` : null,
+          min_gpax: sch.minGPAX,
+          target_years: sch.targetYears,
         }
       ]);
 
@@ -224,6 +233,9 @@ export const scholarshipService = {
       if (sch.totalSlots !== undefined) updates.quota = sch.totalSlots;
       if (sch.status) updates.is_open = sch.status === 'open';
       if (sch.description !== undefined) updates.description = sch.description;
+      if (sch.deadline !== undefined) updates.deadline = `${sch.deadline}T00:00:00.000Z`;
+      if (sch.minGPAX !== undefined) updates.min_gpax = sch.minGPAX;
+      if (sch.targetYears !== undefined) updates.target_years = sch.targetYears;
 
       const { error } = await supabase
         .from('scholarship_programs')

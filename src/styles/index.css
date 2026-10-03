@@ -3121,6 +3121,10 @@ button, input, select, textarea {
   visibility: visible;
 }
 
+body:has(.modal-backdrop.open) {
+  overflow: hidden;
+}
+
 .modal-card {
   background: var(--surface-white);
   border-radius: var(--radius-xl);
@@ -3171,6 +3175,19 @@ button, input, select, textarea {
   padding: 28px;
   overflow-y: auto;
   flex: 1;
+}
+
+.announcement-modal > form {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.announcement-modal > form > .modal-body {
+  min-height: 0;
+  overscroll-behavior: contain;
 }
 
 .modal-footer {

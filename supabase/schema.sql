@@ -119,6 +119,7 @@ CREATE TABLE IF NOT EXISTS public.scholarship_programs (
   CONSTRAINT scholarship_programs_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.scholarship_categories(id) ON DELETE SET NULL
 );
 
+
 -- 2.3 ข่าวสารและประกาศทุน
 CREATE TABLE IF NOT EXISTS public.news (
   id UUID NOT NULL DEFAULT gen_random_uuid(),

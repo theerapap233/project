@@ -89,7 +89,12 @@ interface ScholarshipContextType {
   updateApplicationDetails: (application: Application) => void;
   deleteApplication: (trackingId: string) => void;
   quickApprove: (trackingId: string) => void;
-  createNewScholarship: (title: string, amount: string, totalSlots: number) => void;
+  createNewScholarship: (
+    title: string,
+    amount: string,
+    totalSlots: number,
+    criteria?: Pick<Scholarship, 'minGPAX' | 'targetYears'> & { deadline?: string }
+  ) => void;
   updateScholarship: (id: string, data: Partial<Scholarship>) => void;
   deleteScholarship: (id: string) => void;
   exportApplicationsCSV: () => void;
@@ -827,7 +832,12 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   };
 
-  const createNewScholarship = (title: string, amount: string, totalSlots: number) => {
+  const createNewScholarship = (
+    title: string,
+    amount: string,
+    totalSlots: number,
+    criteria?: Pick<Scholarship, 'minGPAX' | 'targetYears'> & { deadline?: string }
+  ) => {
     const newSch: Scholarship = {
       id: `sch-${Date.now()}`,
       code: `MATH-NEW-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -842,15 +852,15 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
       remainingSlots: totalSlots,
       academicYear: '2567',
       term: 'ภาคการศึกษาที่ 1',
-      deadline: '2026-11-15',
+      deadline: criteria?.deadline ?? '2026-11-15',
       status: 'open',
-      minGPAX: 2.75,
-      targetYears: ['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4'],
+      minGPAX: criteria?.minGPAX ?? 2.75,
+      targetYears: criteria?.targetYears ?? ['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4'],
       targetMajors: ['ทุกสาขาวิชาในภาควิชาคณิตศาสตร์'],
       description: `ประกาศทุนการศึกษาใหม่ของภาควิชาคณิตศาสตร์ มจพ. เพื่อส่งเสริมนักศึกษาตามนโยบายสนับสนุนทุนปี 2567`,
       requirements: [
         'เป็นนักศึกษาภาควิชาคณิตศาสตร์ มจพ.',
-        'มีเกรดเฉลี่ยสะสมไม่ต่ำกว่า 2.75',
+        `มีเกรดเฉลี่ยสะสมไม่ต่ำกว่า ${(criteria?.minGPAX ?? 2.75).toFixed(2)}`,
         'มีความประพฤติเรียบร้อย'
       ],
       documents: [
