@@ -9,14 +9,24 @@ import { isSupabaseConfigured, supabase, testSupabaseConnection } from '../lib/s
 import { scholarshipService } from '../services/scholarshipService';
 import { applicationService } from '../services/applicationService';
 import { settingsService, DEFAULT_SITE_SETTINGS } from '../services/settingsService';
+import { contentService } from '../services/contentService';
 
 export interface UserProfile {
   studentId: string;
+  username?: string;
   name: string;
   email: string;
   faculty: string;
   major: string;
+  position?: string;
+  avatarUrl?: string | null;
   role?: 'admin' | 'officer' | 'student';
+}
+
+interface StoredStaffCredentials {
+  username: string;
+  salt: string;
+  passwordHash: string;
 }
 
 export type SupabaseConnectionStatus = 'connected' | 'demo' | 'error' | 'loading';
@@ -36,6 +46,7 @@ interface ScholarshipContextType {
   toasts: ToastMessage[];
   searchTrackingId: string;
   currentUser: UserProfile | null;
+  hasStaffCredentials: boolean;
   isLoginModalOpen: boolean;
   isLogoutModalOpen: boolean;
   
@@ -75,6 +86,8 @@ interface ScholarshipContextType {
     interviewDate: string, 
     notes: string
   ) => void;
+  updateApplicationDetails: (application: Application) => void;
+  deleteApplication: (trackingId: string) => void;
   quickApprove: (trackingId: string) => void;
   createNewScholarship: (title: string, amount: string, totalSlots: number) => void;
   updateScholarship: (id: string, data: Partial<Scholarship>) => void;
@@ -87,7 +100,8 @@ interface ScholarshipContextType {
   openLogoutModal: () => void;
   closeLogoutModal: () => void;
   updateCurrentUser: (updates: Partial<UserProfile>) => void;
-  login: (identifier: string, customName?: string) => void;
+  login: (identifier: string, password: string, customName?: string) => Promise<boolean>;
+  changeStaffCredentials: (username: string, newPassword: string, currentPassword?: string) => Promise<boolean>;
   logout: () => void;
 
   // Website CMS Actions
@@ -110,8 +124,26 @@ const LOCAL_STORAGE_ANNOUNCEMENTS_KEY = 'KMUTNB_SCH_ANNOUNCEMENTS';
 const LOCAL_STORAGE_FAQS_KEY = 'KMUTNB_SCH_FAQS';
 const LOCAL_STORAGE_DOWNLOADS_KEY = 'KMUTNB_SCH_DOWNLOADS';
 const LOCAL_STORAGE_SETTINGS_KEY = 'KMUTNB_SCH_SETTINGS';
+const LOCAL_STORAGE_STAFF_CREDENTIALS_KEY = 'KMUTNB_SCH_STAFF_CREDENTIALS';
+
+const createPasswordHash = async (password: string, salt: string) => {
+  const bytes = new TextEncoder().encode(`${salt}:${password}`);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+};
+
+const createPasswordSalt = () => {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+};
 
 export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [staffCredentials, setStaffCredentials] = useState<StoredStaffCredentials | null>(() => {
+    const saved = localStorage.getItem(LOCAL_STORAGE_STAFF_CREDENTIALS_KEY);
+    if (!saved) return null;
+    try { return JSON.parse(saved) as StoredStaffCredentials; } catch { return null; }
+  });
+
   const [scholarships, setScholarships] = useState<Scholarship[]>(() => {
     const saved = localStorage.getItem(LOCAL_STORAGE_SCH_KEY);
     if (saved) {
@@ -316,14 +348,70 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
     showToast('บันทึกข้อมูลส่วนตัวสำเร็จ', 'success');
   };
 
-  const login = (identifier: string, customName?: string) => {
+  const changeStaffCredentials = async (username: string, newPassword: string, currentPassword = ''): Promise<boolean> => {
+    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'officer')) return false;
+    const cleanUsername = username.trim();
+    if (!cleanUsername || (!staffCredentials && !newPassword)) return false;
+
+    try {
+      let credentials: StoredStaffCredentials;
+      if (newPassword) {
+        if (staffCredentials) {
+          if (!currentPassword) {
+            showToast('กรุณากรอกรหัสผ่านเดิมเพื่อยืนยัน', 'warning');
+            return false;
+          }
+          const currentHash = await createPasswordHash(currentPassword, staffCredentials.salt);
+          if (currentHash !== staffCredentials.passwordHash) {
+            showToast('รหัสผ่านเดิมไม่ถูกต้อง', 'error');
+            return false;
+          }
+        }
+        const salt = createPasswordSalt();
+        credentials = { username: cleanUsername, salt, passwordHash: await createPasswordHash(newPassword, salt) };
+      } else if (staffCredentials) {
+        credentials = { ...staffCredentials, username: cleanUsername };
+      } else {
+        return false;
+      }
+
+      localStorage.setItem(LOCAL_STORAGE_STAFF_CREDENTIALS_KEY, JSON.stringify(credentials));
+      setStaffCredentials(credentials);
+      const updatedUser = { ...currentUser, username: cleanUsername };
+      setCurrentUser(updatedUser);
+      localStorage.setItem('KMUTNB_SCH_USER', JSON.stringify(updatedUser));
+      showToast('เปลี่ยนชื่อผู้ใช้และรหัสผ่านเรียบร้อยแล้ว', 'success');
+      return true;
+    } catch (err) {
+      console.error('Error updating staff credentials:', err);
+      showToast('ไม่สามารถบันทึกข้อมูลบัญชีได้', 'error');
+      return false;
+    }
+  };
+
+  const login = async (identifier: string, password: string, customName?: string): Promise<boolean> => {
     const cleanId = (identifier || '').trim();
-    const isAdmin = cleanId.toLowerCase() === 'admin' || cleanId.toLowerCase().includes('staff') || cleanId.toLowerCase().includes('officer');
+    const legacyStaffName = cleanId.toLowerCase() === 'admin' || cleanId.toLowerCase().includes('staff') || cleanId.toLowerCase().includes('officer') || cleanId.toLowerCase().includes('committee') || cleanId.toLowerCase().includes('math');
+    let isAdmin = false;
+
+    if (staffCredentials) {
+      if (cleanId.toLowerCase() !== staffCredentials.username.toLowerCase() || !password) return false;
+      const submittedHash = await createPasswordHash(password, staffCredentials.salt);
+      if (submittedHash !== staffCredentials.passwordHash) return false;
+      isAdmin = true;
+    } else {
+      if (!legacyStaffName || !password) return false;
+      const salt = createPasswordSalt();
+      const credentials = { username: cleanId, salt, passwordHash: await createPasswordHash(password, salt) };
+      localStorage.setItem(LOCAL_STORAGE_STAFF_CREDENTIALS_KEY, JSON.stringify(credentials));
+      setStaffCredentials(credentials);
+      isAdmin = true;
+    }
     
     let resolvedName = customName;
     let resolvedMajor = 'ภาควิชาคณิตศาสตร์ (คณิตศาสตร์ประยุกต์)';
     let resolvedFaculty = 'คณะวิทยาศาสตร์ประยุกต์';
-    let resolvedEmail = cleanId.includes('@') ? cleanId : `${cleanId}@kmutnb.ac.th`;
+    let resolvedEmail = cleanId.includes('@') ? cleanId : `${cleanId}@email.kmutnb.ac.th`;
 
     if (isAdmin) {
       resolvedName = resolvedName || 'เจ้าหน้าที่ธุรการ/กรรมการทุน ภาควิชาคณิตศาสตร์';
@@ -348,10 +436,12 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     const user: UserProfile = {
       studentId: cleanId || '6604062610099',
+      username: isAdmin ? cleanId : undefined,
       name: resolvedName,
       email: resolvedEmail,
       faculty: resolvedFaculty,
       major: resolvedMajor,
+      position: isAdmin ? 'เจ้าหน้าที่ธุรการ/กรรมการทุน' : '',
       role: isAdmin ? 'admin' : 'student'
     };
 
@@ -362,6 +452,7 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
     localStorage.setItem('KMUTNB_SCH_USER', JSON.stringify(user));
     setIsLoginModalOpen(false);
     showToast(`เข้าสู่ระบบสำเร็จ: ยินดีต้อนรับ ${user.name}`, 'success');
+    return true;
   };
 
   const logout = () => {
@@ -412,17 +503,41 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const addAnnouncement = (ann: Omit<Announcement, 'id'>) => {
     const newAnn: Announcement = { ...ann, id: `ann-${Date.now()}` };
     setAnnouncements(prev => [newAnn, ...prev]);
-    showToast('เพิ่มข่าวสาร/ประกาศสำเร็จ', 'success');
+
+    if (isSupabaseConfigured()) {
+      contentService.createNews(newAnn).then(ok => {
+        if (ok) showToast('เพิ่มข่าวประกาศและบันทึกลง Supabase เรียบร้อยแล้ว', 'success');
+        else showToast('เพิ่มข่าวประกาศในเครื่องเรียบร้อยแล้ว', 'success');
+      });
+    } else {
+      showToast('เพิ่มข่าวสาร/ประกาศสำเร็จ', 'success');
+    }
   };
 
   const updateAnnouncement = (id: string, updated: Partial<Announcement>) => {
     setAnnouncements(prev => prev.map(a => a.id === id ? { ...a, ...updated } : a));
-    showToast('แก้ไขข่าวสาร/ประกาศสำเร็จ', 'success');
+
+    if (isSupabaseConfigured()) {
+      contentService.updateNews(id, updated).then(ok => {
+        if (ok) showToast('แก้ไขข่าวประกาศและบันทึกลง Supabase สำเร็จ', 'success');
+        else showToast('แก้ไขข่าวประกาศในเครื่องสำเร็จ', 'success');
+      });
+    } else {
+      showToast('แก้ไขข่าวสาร/ประกาศสำเร็จ', 'success');
+    }
   };
 
   const deleteAnnouncement = (id: string) => {
     setAnnouncements(prev => prev.filter(a => a.id !== id));
-    showToast('ลบข่าวสาร/ประกาศเรียบร้อยแล้ว', 'info');
+
+    if (isSupabaseConfigured()) {
+      contentService.deleteNews(id).then(ok => {
+        if (ok) showToast('ลบข่าวประกาศจาก Supabase เรียบร้อยแล้ว', 'info');
+        else showToast('ลบข่าวประกาศในเครื่องเรียบร้อยแล้ว', 'info');
+      });
+    } else {
+      showToast('ลบข่าวสาร/ประกาศเรียบร้อยแล้ว', 'info');
+    }
   };
 
   const addFaq = (faq: FaqItem) => {
@@ -453,12 +568,28 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const updateScholarship = (id: string, data: Partial<Scholarship>) => {
     setScholarships(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
-    showToast('อัปเดตข้อมูลทุนการศึกษาสำเร็จ', 'success');
+    
+    if (isSupabaseConfigured()) {
+      scholarshipService.updateScholarship(id, data).then(ok => {
+        if (ok) showToast('อัปเดตข้อมูลทุนการศึกษาและบันทึกลง Supabase สำเร็จ', 'success');
+        else showToast('อัปเดตข้อมูลทุนการศึกษาสำเร็จ (บันทึกในเครื่อง)', 'success');
+      });
+    } else {
+      showToast('อัปเดตข้อมูลทุนการศึกษาสำเร็จ', 'success');
+    }
   };
 
   const deleteScholarship = (id: string) => {
     setScholarships(prev => prev.filter(s => s.id !== id));
-    showToast('ลบประกาศทุนการศึกษาเรียบร้อยแล้ว', 'info');
+    
+    if (isSupabaseConfigured()) {
+      scholarshipService.deleteScholarship(id).then(ok => {
+        if (ok) showToast('ลบประกาศทุนการศึกษาจาก Supabase เรียบร้อยแล้ว', 'info');
+        else showToast('ลบประกาศทุนการศึกษาในเครื่องเรียบร้อยแล้ว', 'info');
+      });
+    } else {
+      showToast('ลบประกาศทุนการศึกษาเรียบร้อยแล้ว', 'info');
+    }
   };
 
   const updateSiteSettings = (settings: Partial<SiteSettings>) => {
@@ -572,15 +703,14 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
       interviewDate: 'รอการตรวจสอบเอกสาร',
       score: null,
       committeeNotes: 'ยื่นใบสมัครออนไลน์ผ่านระบบ',
-      documents: uploadedList
+      documents: uploadedList,
+      profilePhoto: files.profilePhoto
     };
 
-    // อัปเดตใน Local State ทันทีเพื่อให้ UI ตอบสนองรวดเร็ว
     setApplications(prev => [newApp, ...prev]);
     setLatestTrackingId(trackingId);
     setSearchTrackingId(trackingId);
     setIsWizardModalOpen(false);
-    setIsSuccessModalOpen(true);
 
     // บันทึกไปยัง Supabase ในพื้นหลัง (ถ้าเชื่อมต่อ)
     if (isSupabaseConfigured()) {
@@ -633,6 +763,36 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
       });
     } else {
       showToast(`บันทึกผลการพิจารณาสำหรับ ${trackingId} เรียบร้อยแล้ว`, 'success');
+    }
+  };
+
+  const updateApplicationDetails = (application: Application) => {
+    setApplications(prev => prev.map(current =>
+      current.trackingId === application.trackingId ? application : current
+    ));
+
+    if (isSupabaseConfigured()) {
+      applicationService.updateApplicationDetails(application).then(ok => {
+        showToast(
+          ok ? 'บันทึกข้อมูลใบสมัครลง Supabase เรียบร้อยแล้ว' : 'บันทึกข้อมูลในเครื่องแล้ว แต่ซิงก์ Supabase ไม่สำเร็จ',
+          ok ? 'success' : 'warning'
+        );
+      });
+    } else {
+      showToast('บันทึกข้อมูลใบสมัครเรียบร้อยแล้ว', 'success');
+    }
+  };
+
+  const deleteApplication = (trackingId: string) => {
+    setApplications(prev => prev.filter(app => app.trackingId !== trackingId));
+
+    if (isSupabaseConfigured()) {
+      applicationService.deleteApplication(trackingId).then(ok => {
+        if (ok) showToast(`ลบใบสมัคร ${trackingId} ออกจาก Supabase เรียบร้อยแล้ว`, 'info');
+        else showToast(`ลบใบสมัคร ${trackingId} ในเครื่องเรียบร้อยแล้ว`, 'info');
+      });
+    } else {
+      showToast(`ลบใบสมัคร ${trackingId} เรียบร้อยแล้ว`, 'info');
     }
   };
 
@@ -777,6 +937,7 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
         toasts,
         searchTrackingId,
         currentUser,
+        hasStaffCredentials: Boolean(staffCredentials),
         isLoginModalOpen,
         isLogoutModalOpen,
         isSupabaseConnected: supabaseStatus === 'connected',
@@ -789,6 +950,7 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
         openLogoutModal,
         closeLogoutModal,
         updateCurrentUser,
+        changeStaffCredentials,
         login,
         logout,
         isPreviewMode,
@@ -820,6 +982,8 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
         removeToast,
         submitApplication,
         updateApplicationReview,
+        updateApplicationDetails,
+        deleteApplication,
         quickApprove,
         createNewScholarship,
         exportApplicationsCSV,

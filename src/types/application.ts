@@ -23,6 +23,19 @@ export interface Application {
   score: number | null;
   committeeNotes: string;
   documents: string[];
+  profilePhoto?: string | null;
+  formData?: ApplicationFormData;
+}
+
+export interface Address {
+  houseNo: string;
+  moo: string;
+  soi: string;
+  road: string;
+  subDistrict: string;
+  district: string;
+  province: string;
+  zipCode: string;
 }
 
 export interface ApplicationFormData {
@@ -36,9 +49,9 @@ export interface ApplicationFormData {
   gpax: number;
   phone: string;
   email: string;
-  address: string;
+  address: Address;
   isIdCardAddress: boolean;
-  idCardProvince: string;
+  idCardAddress: Address;
 
   // 2. Family Info
   fatherName: string;
@@ -72,9 +85,11 @@ export interface ApplicationFormData {
   activities: string; // Used as summary or combined string
   activityRole: string; // Specific role/duty in activity
   volunteerHours: number; // Keep for backward compatibility
+  activityList?: { name: string; role: string; photoBase64: string | null }[];
   
   // 5. General
   reason: string;
+  reasonsList?: string[];
   consent: boolean;
 }
 
@@ -82,4 +97,5 @@ export interface UploadedFiles {
   doc1: string | null;
   doc2: string | null;
   doc3: string | null;
+  profilePhoto: string | null;
 }

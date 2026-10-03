@@ -71,9 +71,6 @@ export const ApplicationSuccessModal: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-            <button className="btn btn-secondary" onClick={() => window.print()}>
-              🖨️ พิมพ์ใบเสร็จรับสมัคร
-            </button>
             <button className="btn btn-primary" onClick={handleGoToTracking}>
               🔍 ติดตามสถานะตอนนี้
             </button>

@@ -92,5 +92,73 @@ export const contentService = {
     } catch {
       return DOWNLOAD_FORMS;
     }
+  },
+
+  /**
+   * เพิ่มข่าวสาร/ประกาศใหม่ลงตาราง news
+   */
+  async createNews(news: Announcement): Promise<boolean> {
+    if (!isSupabaseConfigured()) return false;
+
+    try {
+      const { error } = await supabase.from('news').insert([
+        {
+          title: news.title,
+          content: news.summary,
+          is_published: true,
+          // category_id might need to be resolved if you have categories, assuming null for now or adding a default
+        }
+      ]);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('Error creating news in Supabase:', err);
+      return false;
+    }
+  },
+
+  /**
+   * แก้ไขข่าวสาร/ประกาศในตาราง news
+   */
+  async updateNews(newsId: string, news: Partial<Announcement>): Promise<boolean> {
+    if (!isSupabaseConfigured()) return false;
+
+    try {
+      const updates: any = {};
+      if (news.title) updates.title = news.title;
+      if (news.summary) updates.content = news.summary;
+
+      const { error } = await supabase
+        .from('news')
+        .update(updates)
+        .eq('id', newsId);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('Error updating news in Supabase:', err);
+      return false;
+    }
+  },
+
+  /**
+   * ลบข่าวสาร/ประกาศจากตาราง news
+   */
+  async deleteNews(newsId: string): Promise<boolean> {
+    if (!isSupabaseConfigured()) return false;
+
+    try {
+      const { error } = await supabase
+        .from('news')
+        .delete()
+        .eq('id', newsId);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('Error deleting news from Supabase:', err);
+      return false;
+    }
   }
 };

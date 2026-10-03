@@ -1,9 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { 
+  ChevronDown, 
+  Pencil, 
+  Trash2, 
+  FileText, 
+  GraduationCap, 
+  Bell, 
+  HelpCircle, 
+  Settings, 
+  Clock, 
+  Mic, 
+  CheckCircle2, 
+  Search,
+  Calendar,
+  Plus,
+  Eye,
+  Check,
+  Printer,
+  X
+} from 'lucide-react';
 import { useScholarship } from '../../context/ScholarshipContext';
-import { Application, ApplicationStatus } from '../../types/application';
+import { Application, ApplicationStatus, ApplicationFormData } from '../../types/application';
 import { Scholarship } from '../../types/scholarship';
 import { Announcement, FaqItem } from '../../types/common';
 import { formatThaiDate } from '../../utils/dateFormatter';
+import { PROVINCES } from '../../data/provinces';
 
 type AdminTab = 'applications' | 'scholarships' | 'news' | 'faq' | 'settings';
 
@@ -15,7 +36,6 @@ export const AdminSection: React.FC = () => {
     faqs,
     siteSettings,
     quickApprove, 
-    exportApplicationsCSV, 
     createNewScholarship, 
     updateScholarship,
     deleteScholarship,
@@ -26,10 +46,9 @@ export const AdminSection: React.FC = () => {
     updateFaq,
     deleteFaq,
     updateSiteSettings,
-    updateApplicationReview,
-    setIsPreviewMode,
-    showToast,
-    isSupabaseConnected
+    updateApplicationDetails,
+    deleteApplication,
+    showToast
   } = useScholarship();
 
   const [activeTab, setActiveTab] = useState<AdminTab>('applications');
@@ -37,12 +56,38 @@ export const AdminSection: React.FC = () => {
   // Application Filter & Review states
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterType, setFilterType] = useState<string>('all');
+  const [filterYear, setFilterYear] = useState<string>('all');
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [appModalTab, setAppModalTab] = useState<number>(1);
+  const [appEditData, setAppEditData] = useState<ApplicationFormData | null>(null);
   const [reviewStatus, setReviewStatus] = useState<ApplicationStatus>('submitted');
-  const [reviewScore, setReviewScore] = useState<number | ''>('');
-  const [reviewInterviewDate, setReviewInterviewDate] = useState('');
-  const [reviewNotes, setReviewNotes] = useState('');
+  const [printModalState, setPrintModalState] = useState<{
+    isOpen: boolean;
+    type: 'list' | 'application';
+    targetAppId?: string;
+  }>({
+    isOpen: false,
+    type: 'list'
+  });
+
+  const getFullAddressText = (addr?: { houseNo?: string; moo?: string; soi?: string; road?: string; subDistrict?: string; district?: string; province?: string; zipCode?: string }) => {
+    if (!addr) return '-';
+    const parts = [
+      addr.houseNo ? `บ้านเลขที่ ${addr.houseNo}` : '',
+      addr.moo ? `หมู่ ${addr.moo}` : '',
+      addr.soi ? `ซอย${addr.soi}` : '',
+      addr.road ? `ถนน${addr.road}` : '',
+      addr.subDistrict ? `ต./แขวง ${addr.subDistrict}` : '',
+      addr.district ? `อ./เขต ${addr.district}` : '',
+      addr.province ? `จ.${addr.province}` : '',
+      addr.zipCode ? addr.zipCode : ''
+    ].filter(Boolean);
+    return parts.length > 0 ? parts.join(' ') : '-';
+  };
+  const [appProfilePhoto, setAppProfilePhoto] = useState<string | null>(null);
 
   // Scholarship Modal states
   const [isSchModalOpen, setIsSchModalOpen] = useState(false);
@@ -83,6 +128,51 @@ export const AdminSection: React.FC = () => {
   const interviewScheduled = applications.filter(a => a.status === 'interview_scheduled').length;
   const approvedCount = applications.filter(a => a.status === 'approved').length;
 
+  // Helper to find matching scholarship info
+  const getAppScholarshipInfo = (app: Application) => {
+    return scholarships.find(s => 
+      s.id === app.scholarshipId || 
+      s.code === app.scholarshipId || 
+      s.title === app.scholarshipName || 
+      app.scholarshipName.includes(s.title) ||
+      (s.code && app.scholarshipName.includes(s.code))
+    );
+  };
+
+  const getAppYear = (app: Application) => {
+    const sch = getAppScholarshipInfo(app);
+    if (sch?.academicYear) return sch.academicYear;
+    const match = app.scholarshipName.match(/25\d{2}/);
+    if (match) return match[0];
+    return '2567';
+  };
+
+  const checkAppMatchesType = (app: Application, typeVal: string) => {
+    if (typeVal === 'all') return true;
+    const sch = getAppScholarshipInfo(app);
+    if (typeVal === 'internal') {
+      return sch ? sch.scope === 'internal' : !app.scholarshipName.includes('ศิษย์เก่า');
+    }
+    if (typeVal === 'external') {
+      return sch ? sch.scope === 'external' : app.scholarshipName.includes('ศิษย์เก่า');
+    }
+    if (typeVal === 'academic') {
+      return (sch?.category === 'academic') || app.scholarshipName.includes('เรียนดี') || app.scholarshipName.includes('MATH-EXC');
+    }
+    if (typeVal === 'need') {
+      return (sch?.category === 'need') || app.scholarshipName.includes('ขาดแคลน') || app.scholarshipName.includes('MATH-AID');
+    }
+    if (typeVal === 'work') {
+      return (sch?.category === 'work') || app.scholarshipName.includes('ผู้ช่วยสอน') || app.scholarshipName.includes('TA') || app.scholarshipName.includes('MATH-TA');
+    }
+    return true;
+  };
+
+  const checkAppMatchesYear = (app: Application, yearVal: string) => {
+    if (yearVal === 'all') return true;
+    return getAppYear(app) === yearVal;
+  };
+
   // Filtered Applications
   const filteredApps = applications.filter(app => {
     const matchesSearch = 
@@ -92,31 +182,211 @@ export const AdminSection: React.FC = () => {
       app.scholarshipName.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = filterStatus === 'all' || app.status === filterStatus;
-    return matchesSearch && matchesStatus;
+    const matchesType = checkAppMatchesType(app, filterType);
+    const matchesYear = checkAppMatchesYear(app, filterYear);
+
+    return matchesSearch && matchesStatus && matchesType && matchesYear;
   });
 
-  // Handlers for Applications Review
+  // Multi-select state
+  const [selectedAppIds, setSelectedAppIds] = useState<Set<string>>(new Set());
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+
+  const selectedAppsList = useMemo(() => {
+    return filteredApps.filter(app => selectedAppIds.has(app.trackingId));
+  }, [filteredApps, selectedAppIds]);
+
+  const printListApps = useMemo(() => {
+    if (selectedAppIds.size > 0) {
+      return selectedAppsList;
+    }
+    return filteredApps;
+  }, [filteredApps, selectedAppsList, selectedAppIds]);
+
+  const handleToggleApp = (trackingId: string) => {
+    setSelectedAppIds(prev => {
+      const next = new Set(prev);
+      if (next.has(trackingId)) {
+        next.delete(trackingId);
+      } else {
+        next.add(trackingId);
+      }
+      if (next.size === 0) {
+        setIsSelectionMode(false);
+      } else {
+        setIsSelectionMode(true);
+      }
+      return next;
+    });
+  };
+
+  const handleToggleSelectAll = () => {
+    if (selectedAppIds.size === filteredApps.length && filteredApps.length > 0) {
+      setSelectedAppIds(new Set());
+      setIsSelectionMode(false);
+    } else {
+      setSelectedAppIds(new Set(filteredApps.map(a => a.trackingId)));
+      setIsSelectionMode(true);
+    }
+  };
+
+  const handleClearSelection = () => {
+    setSelectedAppIds(new Set());
+    setIsSelectionMode(false);
+  };
+
+  const handleRowClick = (app: Application) => {
+    if (isSelectionMode || selectedAppIds.size > 0) {
+      handleToggleApp(app.trackingId);
+    }
+  };
+
+  const handlePrintList = () => {
+    setPrintModalState({
+      isOpen: true,
+      type: 'list'
+    });
+  };
+
+  const handlePrintApplications = (appId?: string) => {
+    let target = appId;
+    if (!target) {
+      if (selectedAppIds.size > 0) {
+        target = 'selected';
+      } else {
+        target = 'all';
+      }
+    }
+    setPrintModalState({
+      isOpen: true,
+      type: 'application',
+      targetAppId: target
+    });
+  };
+
+  // Handlers for Applications View & Edit
   const handleOpenReview = (app: Application) => {
     setSelectedApp(app);
+    setAppModalTab(1);
+    setIsEditMode(false);
+
+    const fallbackForm: ApplicationFormData = app.formData ? JSON.parse(JSON.stringify(app.formData)) : {
+      scholarshipId: app.scholarshipId || (scholarships[0]?.id || ''),
+      studentId: app.studentId || '',
+      fullName: app.fullName || '',
+      nickname: '',
+      major: app.major || 'MA โครงการปกติ',
+      year: app.year || 'ปี 2',
+      gpax: app.gpax || 3.00,
+      phone: app.phone || '',
+      email: app.email || '',
+      address: {
+        houseNo: '1518',
+        moo: '',
+        soi: '',
+        road: 'ประชาราษฎร์ 1',
+        subDistrict: 'วงศ์สว่าง',
+        district: 'บางซื่อ',
+        province: 'กรุงเทพมหานคร',
+        zipCode: '10800'
+      },
+      isIdCardAddress: true,
+      idCardAddress: {
+        houseNo: '1518',
+        moo: '',
+        soi: '',
+        road: 'ประชาราษฎร์ 1',
+        subDistrict: 'วงศ์สว่าง',
+        district: 'บางซื่อ',
+        province: 'กรุงเทพมหานคร',
+        zipCode: '10800'
+      },
+      fatherName: 'นายประสิทธิ์ มุ่งมั่นวิทยา',
+      fatherPhone: '081-999-8888',
+      fatherJob: 'รับจ้างทั่วไป',
+      fatherIncome: 12000,
+      fatherAlive: 'alive',
+      motherName: 'นางมาลี มุ่งมั่นวิทยา',
+      motherPhone: '081-777-6666',
+      motherJob: 'ค้าขาย',
+      motherIncome: 8000,
+      motherAlive: 'alive',
+      parentsRelation: 'together',
+      familyIncome: app.familyIncome || 240000,
+      siblings: 2,
+      sponsor: ['father', 'mother'],
+      sponsorOther: '',
+      loanStatus: 'none',
+      loanAmount: 0,
+      hasPartTimeJob: false,
+      partTimeJobLocation: '',
+      partTimeJobIncome: 0,
+      hasActivities: true,
+      activities: 'ค่ายคณิตศาสตร์สัญจร มจพ.',
+      activityRole: 'สวัสดิการ',
+      activityList: [
+        { name: 'ค่ายคณิตศาสตร์สัญจร มจพ.', role: 'สวัสดิการ', photoBase64: null }
+      ],
+      volunteerHours: 35,
+      reason: 'ครอบครัวมีภาระค่าใช้จ่ายสูง\nต้องการนำเงินมาแบ่งเบาภาระค่าใช้จ่ายในการครองชีพ และค่าอุปกรณ์การเรียน',
+      reasonsList: [
+        'ครอบครัวมีภาระค่าใช้จ่ายสูง',
+        'ต้องการนำเงินมาแบ่งเบาภาระค่าใช้จ่ายในการครองชีพ และค่าอุปกรณ์การเรียน'
+      ],
+      consent: true
+    };
+
+    setAppEditData(fallbackForm);
     setReviewStatus(app.status);
-    setReviewScore(app.score ?? '');
-    setReviewInterviewDate(app.interviewDate || '');
-    setReviewNotes(app.committeeNotes || '');
+    setAppProfilePhoto(app.profilePhoto || null);
     setIsReviewModalOpen(true);
   };
 
   const handleSaveReview = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedApp) return;
+    if (!isEditMode) {
+      setIsEditMode(true);
+      return;
+    }
+    if (!selectedApp || !appEditData) return;
 
-    updateApplicationReview(
-      selectedApp.trackingId,
-      reviewStatus,
-      reviewScore === '' ? null : Number(reviewScore),
-      reviewInterviewDate,
-      reviewNotes
-    );
+    const targetSch = scholarships.find(s => s.id === appEditData.scholarshipId);
+
+    const updatedApp: Application = {
+      ...selectedApp,
+      scholarshipId: appEditData.scholarshipId,
+      scholarshipName: targetSch ? targetSch.title : selectedApp.scholarshipName,
+      studentId: appEditData.studentId,
+      fullName: appEditData.fullName,
+      major: appEditData.major,
+      year: appEditData.year,
+      gpax: Number(appEditData.gpax),
+      phone: appEditData.phone,
+      email: appEditData.email,
+      familyIncome: appEditData.familyIncome || (appEditData.fatherIncome + appEditData.motherIncome) * 12,
+      status: reviewStatus,
+      score: selectedApp.score ?? null,
+      interviewDate: selectedApp.interviewDate || '',
+      committeeNotes: selectedApp.committeeNotes || '',
+      documents: [],
+      profilePhoto: appProfilePhoto,
+      formData: {
+        ...appEditData,
+        activities: (appEditData.activityList || []).map(a => a.name).filter(Boolean).join(', ') || appEditData.activities,
+        reason: (appEditData.reasonsList || []).filter(Boolean).join('\n') || appEditData.reason
+      }
+    };
+
+    updateApplicationDetails(updatedApp);
     setIsReviewModalOpen(false);
+  };
+
+  const handleDeleteCurrentApp = () => {
+    if (!selectedApp) return;
+    if (window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบใบสมัครของ "${selectedApp.fullName}" (${selectedApp.trackingId}) ออกจากระบบ?`)) {
+      deleteApplication(selectedApp.trackingId);
+      setIsReviewModalOpen(false);
+    }
   };
 
   // Handlers for Scholarships CMS
@@ -276,18 +546,122 @@ export const AdminSection: React.FC = () => {
     updateSiteSettings(settingsForm);
   };
 
+  const formatMajorAbbr = (major: string): string => {
+    if (!major) return 'MA';
+    const text = major.trim();
+    if (text.includes('MC') || text.includes('คอมพิวเตอร์')) return 'MC';
+    if (text.includes('MA') || text.includes('ประยุกต์')) return 'MA';
+    if (text.includes('สถิติ')) return 'AS';
+    return text;
+  };
+
   const getStatusBadge = (status: ApplicationStatus) => {
     switch (status) {
       case 'submitted':
-        return <span className="status-badge" style={{ background: 'var(--info-bg, #eff6ff)', color: 'var(--info, #2563eb)' }}>ยื่นใบสมัครแล้ว</span>;
+        return (
+          <span 
+            className="status-badge" 
+            style={{ 
+              background: '#eff6ff', 
+              color: '#1d4ed8', 
+              border: '1px solid #bfdbfe', 
+              fontWeight: 600, 
+              padding: '4px 12px', 
+              borderRadius: '20px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              boxShadow: '0 1px 3px rgba(37, 99, 235, 0.08)'
+            }}
+          >
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#2563eb' }} />
+            ยื่นใบสมัครแล้ว
+          </span>
+        );
       case 'doc_verified':
-        return <span className="status-badge" style={{ background: 'var(--warning-bg, #fffbeb)', color: 'var(--warning, #d97706)' }}>เอกสารผ่านแล้ว</span>;
+        return (
+          <span 
+            className="status-badge" 
+            style={{ 
+              background: '#fffbeb', 
+              color: '#b45309', 
+              border: '1px solid #fde68a', 
+              fontWeight: 600, 
+              padding: '4px 12px', 
+              borderRadius: '20px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              boxShadow: '0 1px 3px rgba(245, 158, 11, 0.08)'
+            }}
+          >
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f59e0b' }} />
+            ผ่านคุณสมบัติแล้ว
+          </span>
+        );
       case 'interview_scheduled':
-        return <span className="status-badge" style={{ background: 'var(--purple-bg, #faf5ff)', color: 'var(--purple, #9333ea)' }}>นัดสัมภาษณ์</span>;
+        return (
+          <span 
+            className="status-badge" 
+            style={{ 
+              background: '#faf5ff', 
+              color: '#7c3aed', 
+              border: '1px solid #e9d5ff', 
+              fontWeight: 600, 
+              padding: '4px 12px', 
+              borderRadius: '20px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              boxShadow: '0 1px 3px rgba(124, 58, 237, 0.08)'
+            }}
+          >
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#a855f7' }} />
+            นัดสัมภาษณ์
+          </span>
+        );
       case 'approved':
-        return <span className="status-badge" style={{ background: 'var(--success-bg, #f0fdf4)', color: 'var(--success, #16a34a)' }}>อนุมัติทุนแล้ว</span>;
+        return (
+          <span 
+            className="status-badge" 
+            style={{ 
+              background: '#f0fdf4', 
+              color: '#047857', 
+              border: '1px solid #86efac', 
+              fontWeight: 600, 
+              padding: '4px 12px', 
+              borderRadius: '20px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              boxShadow: '0 1px 3px rgba(16, 185, 129, 0.08)'
+            }}
+          >
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981' }} />
+            อนุมัติทุนแล้ว
+          </span>
+        );
       case 'rejected':
-        return <span className="status-badge" style={{ background: 'var(--danger-bg, #fef2f2)', color: 'var(--danger, #dc2626)' }}>ไม่ผ่านการพิจารณา</span>;
+        return (
+          <span 
+            className="status-badge" 
+            style={{ 
+              background: '#fef2f2', 
+              color: '#b91c1c', 
+              border: '1px solid #fecaca', 
+              fontWeight: 600, 
+              padding: '4px 12px', 
+              borderRadius: '20px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              boxShadow: '0 1px 3px rgba(239, 68, 68, 0.08)'
+            }}
+          >
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ef4444' }} />
+            ไม่ผ่านการพิจารณา
+          </span>
+        );
       default:
         return <span className="status-badge">{status}</span>;
     }
@@ -300,57 +674,16 @@ export const AdminSection: React.FC = () => {
         <div className="admin-header" style={{ marginBottom: 20 }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-
-              <h2 style={{ fontSize: '1.6rem', color: 'var(--navy-900, #0f172a)', margin: 0 }}>
+              <h2 style={{ fontSize: '1.6rem', color: 'var(--navy-900, #0f172a)', margin: 0, fontWeight: 800 }}>
                 ระบบจัดการเว็บไซต์และทุนการศึกษา
               </h2>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0' }}>
+                Staff Portal
+              </span>
             </div>
             <p style={{ color: 'var(--text-muted, #64748b)', fontSize: '0.9rem', margin: 0 }}>
               บริหารจัดการใบสมัคร ประกาศทุนการศึกษา ข่าวสารประชาสัมพันธ์ และเนื้อหาหน้าเว็บไซต์
             </p>
-          </div>
-
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-            {/* PREVIEW BUTTON */}
-            <button 
-              className="btn btn-primary"
-              onClick={() => {
-                setIsPreviewMode(true);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-                showToast('เข้าสู่โหมดดูตัวอย่างหน้าเว็บ (Preview Mode)', 'info');
-              }}
-              style={{ 
-                background: 'linear-gradient(135deg, #077b38, #059669)',
-                borderColor: '#059669',
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 8,
-                padding: '8px 16px',
-                fontWeight: 700,
-                boxShadow: '0 4px 12px rgba(7, 123, 56, 0.3)'
-              }}
-              title="ดูตัวอย่างหน้าเว็บไซต์ตามมุมมองของนักศึกษา"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                <circle cx="12" cy="12" r="3"></circle>
-              </svg>
-              <span>ดูตัวอย่างหน้าเว็บ (Preview)</span>
-            </button>
-
-            <button 
-              className="btn btn-secondary btn-sm" 
-              onClick={exportApplicationsCSV}
-              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
-              </svg>
-              ส่งออก CSV
-            </button>
-
           </div>
         </div>
 
@@ -385,7 +718,7 @@ export const AdminSection: React.FC = () => {
               whiteSpace: 'nowrap'
             }}
           >
-            <span>📋</span>
+            <FileText size={16} />
             <span>จัดการใบสมัคร</span>
             <span style={{
               background: activeTab === 'applications' ? 'rgba(255,255,255,0.25)' : '#E2E8F0',
@@ -419,7 +752,7 @@ export const AdminSection: React.FC = () => {
               whiteSpace: 'nowrap'
             }}
           >
-            <span>🎓</span>
+            <GraduationCap size={16} />
             <span>จัดการประกาศทุน</span>
             <span style={{
               background: activeTab === 'scholarships' ? 'rgba(255,255,255,0.25)' : '#E2E8F0',
@@ -453,7 +786,7 @@ export const AdminSection: React.FC = () => {
               whiteSpace: 'nowrap'
             }}
           >
-            <span>📢</span>
+            <Bell size={16} />
             <span>จัดการข่าวสาร & ประกาศ</span>
             <span style={{
               background: activeTab === 'news' ? 'rgba(255,255,255,0.25)' : '#E2E8F0',
@@ -487,7 +820,7 @@ export const AdminSection: React.FC = () => {
               whiteSpace: 'nowrap'
             }}
           >
-            <span>❓</span>
+            <HelpCircle size={16} />
             <span>คำถามที่พบบ่อย (FAQ)</span>
             <span style={{
               background: activeTab === 'faq' ? 'rgba(255,255,255,0.25)' : '#E2E8F0',
@@ -521,7 +854,7 @@ export const AdminSection: React.FC = () => {
               whiteSpace: 'nowrap'
             }}
           >
-            <span>⚙️</span>
+            <Settings size={16} />
             <span>ตั้งค่าเว็บไซต์</span>
           </button>
         </div>
@@ -531,165 +864,654 @@ export const AdminSection: React.FC = () => {
           <div>
             {/* KPI Grid */}
             <div className="admin-kpi-grid">
-              <div className="kpi-card" style={{ borderLeft: '4px solid var(--navy-700, #334155)' }}>
-                <div className="kpi-card-header">
-                  <span style={{ fontSize: '0.88rem', color: 'var(--text-muted)', fontWeight: 600 }}>ใบสมัครทั้งหมด</span>
-                  <span style={{ fontSize: '1.2rem' }}>📋</span>
+              <div className="kpi-card" style={{ border: '1px solid var(--border-light)', borderTop: '3px solid var(--info)', borderRadius: '6px', background: '#ffffff', padding: '16px 20px', boxShadow: 'var(--shadow-sm)' }}>
+                <div className="kpi-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.86rem', color: '#1e3a8a', fontWeight: 600 }}>ใบสมัครทั้งหมด</span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: '8px', background: '#dbeafe', border: '1px solid #93c5fd', color: '#1d4ed8' }}>
+                    <FileText size={17} strokeWidth={2} />
+                  </div>
                 </div>
-                <div className="kpi-value">{totalApps}</div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 4 }}>จากทุกประกาศทุน</div>
+                <div className="kpi-value" style={{ fontSize: '1.75rem', fontWeight: 800, color: '#1d4ed8', marginTop: 8 }}>{totalApps}</div>
+                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 4 }}>จากทุกประกาศทุน</div>
               </div>
 
-              <div className="kpi-card" style={{ borderLeft: '4px solid #d97706' }}>
-                <div className="kpi-card-header">
-                  <span style={{ fontSize: '0.88rem', color: 'var(--text-muted)', fontWeight: 600 }}>รอตรวจสอบเอกสาร</span>
-                  <span style={{ fontSize: '1.2rem' }}>⏳</span>
+              <div className="kpi-card" style={{ border: '1px solid var(--border-light)', borderTop: '3px solid var(--warning)', borderRadius: '6px', background: '#ffffff', padding: '16px 20px', boxShadow: 'var(--shadow-sm)' }}>
+                <div className="kpi-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.86rem', color: '#78350f', fontWeight: 600 }}>รอตรวจสอบคุณสมบัติ</span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: '8px', background: '#fef3c7', border: '1px solid #fcd34d', color: '#d97706' }}>
+                    <Clock size={17} strokeWidth={2} />
+                  </div>
                 </div>
-                <div className="kpi-value" style={{ color: '#d97706' }}>{pendingDocs}</div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 4 }}>ต้องตรวจสอบคุณสมบัติ</div>
+                <div className="kpi-value" style={{ fontSize: '1.75rem', fontWeight: 800, color: '#b45309', marginTop: 8 }}>{pendingDocs}</div>
+                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 4 }}>ต้องตรวจสอบคุณสมบัติ</div>
               </div>
 
-              <div className="kpi-card" style={{ borderLeft: '4px solid #9333ea' }}>
-                <div className="kpi-card-header">
-                  <span style={{ fontSize: '0.88rem', color: 'var(--text-muted)', fontWeight: 600 }}>นัดหมายสัมภาษณ์</span>
-                  <span style={{ fontSize: '1.2rem' }}>🎙️</span>
+              <div className="kpi-card" style={{ border: '1px solid var(--border-light)', borderTop: '3px solid var(--purple)', borderRadius: '6px', background: '#ffffff', padding: '16px 20px', boxShadow: 'var(--shadow-sm)' }}>
+                <div className="kpi-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.86rem', color: '#581c87', fontWeight: 600 }}>นัดหมายสัมภาษณ์</span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: '8px', background: '#f3e8ff', border: '1px solid #d8b4fe', color: '#7c3aed' }}>
+                    <Mic size={17} strokeWidth={2} />
+                  </div>
                 </div>
-                <div className="kpi-value" style={{ color: '#9333ea' }}>{interviewScheduled}</div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 4 }}>รอผลการสัมภาษณ์</div>
+                <div className="kpi-value" style={{ fontSize: '1.75rem', fontWeight: 800, color: '#6d28d9', marginTop: 8 }}>{interviewScheduled}</div>
+                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 4 }}>รอผลการสัมภาษณ์</div>
               </div>
 
-              <div className="kpi-card" style={{ borderLeft: '4px solid var(--math-green, #077b38)' }}>
-                <div className="kpi-card-header">
-                  <span style={{ fontSize: '0.88rem', color: 'var(--text-muted)', fontWeight: 600 }}>อนุมัติทุนแล้ว</span>
-                  <span style={{ fontSize: '1.2rem' }}>🎉</span>
+              <div className="kpi-card" style={{ border: '1px solid var(--border-light)', borderTop: '3px solid var(--success)', borderRadius: '6px', background: '#ffffff', padding: '16px 20px', boxShadow: 'var(--shadow-sm)' }}>
+                <div className="kpi-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.86rem', color: '#064e3b', fontWeight: 600 }}>อนุมัติทุนแล้ว</span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: '8px', background: '#dcfce7', border: '1px solid #86efac', color: '#059669' }}>
+                    <CheckCircle2 size={17} strokeWidth={2} />
+                  </div>
                 </div>
-                <div className="kpi-value" style={{ color: 'var(--math-green, #077b38)' }}>{approvedCount}</div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 4 }}>พร้อมทำสัญญารับทุน</div>
+                <div className="kpi-value" style={{ fontSize: '1.75rem', fontWeight: 800, color: '#047857', marginTop: 8 }}>{approvedCount}</div>
+                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 4 }}>พร้อมทำสัญญารับทุน</div>
               </div>
             </div>
 
-            {/* Filter & Search Bar */}
+            {/* Search & Combobox Filters (ปีการศึกษา, สถานะ) */}
             <div style={{ 
               background: 'var(--surface-card)', 
-              padding: '16px 20px', 
+              padding: '12px 16px', 
               borderRadius: '12px', 
               border: '1px solid var(--border-light, #e2e8f0)',
               display: 'flex',
-              justifyContent: 'space-between',
               alignItems: 'center',
-              gap: 16,
+              gap: 12,
               flexWrap: 'wrap',
-              marginBottom: 20
+              marginBottom: 14
             }}>
-              <div style={{ flex: 1, minWidth: 260 }}>
+              {/* Search Input */}
+              <div style={{ position: 'relative', flex: '1 1 260px' }}>
+                <Search size={16} strokeWidth={1.8} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                 <input 
                   type="text" 
                   className="form-input-light" 
-                  placeholder="ค้นหาชื่อผู้สมัคร, รหัสนักศึกษา, รหัสติดตาม, หรือชื่อทุน..."
+                  placeholder="ค้นหาชื่อผู้สมัคร, รหัสนักศึกษา หรือชื่อทุน..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  style={{ fontSize: '0.9rem' }}
+                  style={{ fontSize: '0.88rem', paddingLeft: 38, height: '42px', borderRadius: '8px', width: '100%', boxSizing: 'border-box' }}
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>สถานะ:</span>
-                <select 
-                  value={filterStatus} 
-                  onChange={(e) => setFilterStatus(e.target.value)}
+              {/* Combobox: ปีการศึกษา */}
+              <div style={{ position: 'relative', minWidth: 160 }}>
+                <select
+                  value={filterYear}
+                  onChange={(e) => setFilterYear(e.target.value)}
                   className="form-input-light"
-                  style={{ width: 'auto', padding: '8px 12px', fontSize: '0.85rem' }}
+                  style={{
+                    height: '42px',
+                    borderRadius: '8px',
+                    fontSize: '0.86rem',
+                    fontWeight: 500,
+                    color: filterYear !== 'all' ? '#4338ca' : 'var(--navy-800, #1e293b)',
+                    background: filterYear !== 'all' ? '#eef2ff' : 'var(--surface-ground, #f8fafc)',
+                    borderColor: filterYear !== 'all' ? '#818cf8' : 'var(--border-light, #e2e8f0)',
+                    paddingLeft: 12,
+                    paddingRight: 28,
+                    cursor: 'pointer',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    outline: 'none'
+                  }}
                 >
-                  <option value="all">ทั้งหมด ({applications.length})</option>
-                  <option value="submitted">ยื่นใบสมัครแล้ว</option>
-                  <option value="doc_verified">เอกสารผ่านแล้ว</option>
-                  <option value="interview_scheduled">นัดสัมภาษณ์</option>
-                  <option value="approved">อนุมัติทุนแล้ว</option>
-                  <option value="rejected">ไม่ผ่านการพิจารณา</option>
+                  <option value="all">ปีการศึกษา: ทั้งหมด</option>
+                  <option value="2568">ปีการศึกษา 2568</option>
+                  <option value="2567">ปีการศึกษา 2567</option>
+                  <option value="2566">ปีการศึกษา 2566</option>
                 </select>
               </div>
+
+              {/* Combobox: ชนิดทุน */}
+              <div style={{ position: 'relative', minWidth: 170 }}>
+                <select
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value)}
+                  className="form-input-light"
+                  style={{
+                    height: '42px',
+                    borderRadius: '8px',
+                    fontSize: '0.86rem',
+                    fontWeight: 500,
+                    color: filterType !== 'all' ? '#0369a1' : 'var(--navy-800, #1e293b)',
+                    background: filterType !== 'all' ? '#e0f2fe' : 'var(--surface-ground, #f8fafc)',
+                    borderColor: filterType !== 'all' ? '#38bdf8' : 'var(--border-light, #e2e8f0)',
+                    paddingLeft: 12,
+                    paddingRight: 28,
+                    cursor: 'pointer',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    outline: 'none'
+                  }}
+                >
+                  <option value="all">ชนิดทุน: ทั้งหมด</option>
+                  <option value="internal">ทุนภายใน ({applications.filter(a => checkAppMatchesType(a, 'internal')).length})</option>
+                  <option value="external">ทุนภายนอก ({applications.filter(a => checkAppMatchesType(a, 'external')).length})</option>
+                  <option value="academic">ทุนเรียนดี ({applications.filter(a => checkAppMatchesType(a, 'academic')).length})</option>
+                  <option value="need">ทุนขาดแคลน ({applications.filter(a => checkAppMatchesType(a, 'need')).length})</option>
+                  <option value="work">ทุนทำงาน/TA ({applications.filter(a => checkAppMatchesType(a, 'work')).length})</option>
+                </select>
+              </div>
+
+              {/* Reset filter button if any active (เฉพาะปีการศึกษาและชนิดทุน) */}
+              {(filterType !== 'all' || filterYear !== 'all') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilterType('all');
+                    setFilterYear('all');
+                  }}
+                  style={{
+                    height: '42px',
+                    padding: '0 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #fecaca',
+                    background: '#fef2f2',
+                    color: '#dc2626',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.15s ease'
+                  }}
+                  title="ล้างค่าตัวกรองปีการศึกษาและชนิดทุน"
+                >
+                  ล้างตัวกรอง
+                </button>
+              )}
             </div>
 
+            {/* Filter: สถานะใบสมัคร & ปุ่มพิมพ์รายงาน (1. รายชื่อ 2. ใบสมัคร) */}
+            <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <span style={{ 
+                  fontSize: '0.85rem', 
+                  fontWeight: 600, 
+                  color: 'var(--navy-800)', 
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6
+                }}>
+                  <Clock size={15} color="var(--math-green, #077b38)" />
+                  <span>สถานะใบสมัคร:</span>
+                </span>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {[
+                  { 
+                    value: 'all', 
+                    label: 'ทั้งหมด', 
+                    count: applications.length,
+                    activeBg: 'var(--math-green, #077b38)',
+                    activeBorder: 'var(--math-green, #077b38)',
+                    activeColor: '#ffffff',
+                    inactiveBg: '#f0fdf4',
+                    inactiveBorder: '#bbf7d0',
+                    inactiveColor: 'var(--math-green)',
+                    badgeBg: '#dcfce7',
+                    badgeText: '#065f46',
+                    activeBadgeBg: 'rgba(255,255,255,0.28)',
+                    activeBadgeText: '#ffffff',
+                    shadow: '0 2px 8px rgba(7, 123, 56, 0.35)'
+                  },
+                  { 
+                    value: 'submitted', 
+                    label: 'ยื่นใบสมัครแล้ว', 
+                    count: applications.filter(a => a.status === 'submitted').length,
+                    activeBg: '#2563eb',
+                    activeBorder: '#2563eb',
+                    activeColor: '#ffffff',
+                    inactiveBg: '#eff6ff',
+                    inactiveBorder: '#bfdbfe',
+                    inactiveColor: '#1d4ed8',
+                    badgeBg: '#dbeafe',
+                    badgeText: '#1e40af',
+                    activeBadgeBg: 'rgba(255,255,255,0.28)',
+                    activeBadgeText: '#ffffff',
+                    shadow: '0 2px 8px rgba(37, 99, 235, 0.35)'
+                  },
+                  { 
+                    value: 'doc_verified', 
+                    label: 'ผ่านคุณสมบัติแล้ว', 
+                    count: applications.filter(a => a.status === 'doc_verified').length,
+                    activeBg: '#d97706',
+                    activeBorder: '#d97706',
+                    activeColor: '#ffffff',
+                    inactiveBg: '#fffbeb',
+                    inactiveBorder: '#fde68a',
+                    inactiveColor: '#b45309',
+                    badgeBg: '#fef3c7',
+                    badgeText: '#92400e',
+                    activeBadgeBg: 'rgba(255,255,255,0.28)',
+                    activeBadgeText: '#ffffff',
+                    shadow: '0 2px 8px rgba(217, 119, 6, 0.35)'
+                  },
+                  { 
+                    value: 'interview_scheduled', 
+                    label: 'นัดสัมภาษณ์', 
+                    count: applications.filter(a => a.status === 'interview_scheduled').length,
+                    activeBg: '#7c3aed',
+                    activeBorder: '#7c3aed',
+                    activeColor: '#ffffff',
+                    inactiveBg: '#faf5ff',
+                    inactiveBorder: '#e9d5ff',
+                    inactiveColor: '#6d28d9',
+                    badgeBg: '#f3e8ff',
+                    badgeText: '#7c3aed',
+                    activeBadgeBg: 'rgba(255,255,255,0.28)',
+                    activeBadgeText: '#ffffff',
+                    shadow: '0 2px 8px rgba(124, 58, 237, 0.35)'
+                  },
+                  { 
+                    value: 'approved', 
+                    label: 'อนุมัติทุนแล้ว', 
+                    count: applications.filter(a => a.status === 'approved').length,
+                    activeBg: '#059669',
+                    activeBorder: '#059669',
+                    activeColor: '#ffffff',
+                    inactiveBg: '#f0fdf4',
+                    inactiveBorder: '#bbf7d0',
+                    inactiveColor: '#047857',
+                    badgeBg: '#dcfce7',
+                    badgeText: '#065f46',
+                    activeBadgeBg: 'rgba(255,255,255,0.28)',
+                    activeBadgeText: '#ffffff',
+                    shadow: '0 2px 8px rgba(5, 150, 105, 0.35)'
+                  },
+                  { 
+                    value: 'rejected', 
+                    label: 'ไม่ผ่านการพิจารณา', 
+                    count: applications.filter(a => a.status === 'rejected').length,
+                    activeBg: '#dc2626',
+                    activeBorder: '#dc2626',
+                    activeColor: '#ffffff',
+                    inactiveBg: '#fef2f2',
+                    inactiveBorder: '#fecaca',
+                    inactiveColor: '#be123c',
+                    badgeBg: '#fee2e2',
+                    badgeText: '#b91c1c',
+                    activeBadgeBg: 'rgba(255,255,255,0.28)',
+                    activeBadgeText: '#ffffff',
+                    shadow: '0 2px 8px rgba(220, 38, 38, 0.35)'
+                  }
+                ].map((opt) => {
+                  const isActive = filterStatus === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setFilterStatus(opt.value)}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '20px',
+                        fontSize: '0.82rem',
+                        fontWeight: isActive ? 700 : 600,
+                        border: `1px solid ${isActive ? opt.activeBorder : opt.inactiveBorder}`,
+                        background: isActive ? opt.activeBg : opt.inactiveBg,
+                        color: isActive ? opt.activeColor : opt.inactiveColor,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 7,
+                        boxShadow: isActive ? opt.shadow : '0 1px 3px rgba(0,0,0,0.03)',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <span>{opt.label}</span>
+                      <span style={{
+                        fontSize: '0.72rem',
+                        padding: '1px 6px',
+                        borderRadius: '10px',
+                        background: isActive ? opt.activeBadgeBg : opt.badgeBg,
+                        color: isActive ? opt.activeBadgeText : opt.badgeText,
+                        fontWeight: 700
+                      }}>
+                        {opt.count}
+                      </span>
+                    </button>
+                  );
+                })}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Helper Tip & Multi-Select Action Bar */}
+            {selectedAppIds.size > 0 ? (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '10px 16px',
+                background: 'var(--math-green)',
+                borderRadius: '6px',
+                color: '#ffffff',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                marginBottom: 12,
+                flexWrap: 'wrap',
+                gap: 10
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{
+                    background: '#ffffff',
+                    color: 'var(--math-green)',
+                    fontWeight: 800,
+                    fontSize: '0.84rem',
+                    padding: '2px 9px',
+                    borderRadius: '999px'
+                  }}>
+                    {selectedAppIds.size}
+                  </span>
+                  <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>
+                    เลือกอยู่ {selectedAppIds.size} คน จากทั้งหมด {filteredApps.length} คน (พร้อมสำหรับสั่งพิมพ์)
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={handlePrintList}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '6px 14px',
+                      borderRadius: '7px',
+                      background: '#ffffff',
+                      color: 'var(--math-green)',
+                      border: 'none',
+                      fontWeight: 700,
+                      fontSize: '0.84rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                    }}
+                  >
+                    <Printer size={15} />
+                    <span>พิมพ์รายชื่อ ({selectedAppIds.size})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handlePrintApplications('selected')}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '6px 14px',
+                      borderRadius: '7px',
+                      background: '#ffffff',
+                      color: 'var(--math-green)',
+                      border: 'none',
+                      fontWeight: 700,
+                      fontSize: '0.84rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                    }}
+                  >
+                    <FileText size={15} />
+                    <span>พิมพ์ใบสมัคร ({selectedAppIds.size})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleToggleSelectAll}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '7px',
+                      background: 'rgba(255, 255, 255, 0.18)',
+                      color: '#ffffff',
+                      border: '1px solid rgba(255, 255, 255, 0.35)',
+                      fontSize: '0.82rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {selectedAppIds.size === filteredApps.length ? 'ยกเลิกทั้งหมด' : `เลือกทั้งหมด (${filteredApps.length})`}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleClearSelection}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      padding: '6px 10px',
+                      borderRadius: '7px',
+                      background: 'transparent',
+                      color: '#fed7aa',
+                      border: 'none',
+                      fontSize: '0.82rem',
+                      cursor: 'pointer'
+                    }}
+                    title="ล้างการเลือกทั้งหมด"
+                  >
+                    <X size={15} />
+                    <span>ล้าง</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, padding: '0 4px', fontSize: '0.78rem', color: '#64748b' }}>
+                <span>💡 คลิกกล่องเลือกด้านหน้า หรือคลิกที่แถวเมื่ออยู่ในโหมดเลือก เพื่อสั่งพิมพ์รายงานทีละหลายคน</span>
+              </div>
+            )}
+
             {/* Applications Table */}
-            <div className="table-responsive">
-              <table className="admin-table">
+            <div className="table-responsive" style={{ background: 'var(--surface-card)', borderRadius: '12px', border: '1px solid var(--border-light, #e2e8f0)', overflow: 'hidden' }}>
+              <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr>
-                    <th>รหัสติดตาม</th>
-                    <th>ผู้สมัคร</th>
-                    <th>สาขาวิชา / ชั้นปี</th>
-                    <th>ทุนที่สมัคร</th>
-                    <th style={{ textAlign: 'center' }}>GPAX</th>
-                    <th>วันที่ยื่น</th>
-                    <th style={{ textAlign: 'center' }}>สถานะ</th>
-                    <th style={{ textAlign: 'center' }}>คะแนน</th>
-                    <th style={{ textAlign: 'right' }}>การดำเนินการ</th>
+                  <tr style={{ background: 'var(--surface-ground, #f8fafc)', borderBottom: '1px solid var(--border-light, #e2e8f0)' }}>
+                    <th style={{ width: 44, padding: '12px 14px', textAlign: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={filteredApps.length > 0 && selectedAppIds.size === filteredApps.length}
+                        onChange={handleToggleSelectAll}
+                        style={{ cursor: 'pointer', width: 16, height: 16, accentColor: 'var(--math-green, #077b38)' }}
+                        title="เลือกทั้งหมด / ยกเลิกทั้งหมด"
+                      />
+                    </th>
+                    <th style={{ padding: '12px 18px', textAlign: 'left', fontWeight: 600, fontSize: '0.82rem', color: 'var(--text-muted)' }}>ผู้สมัคร</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'left', fontWeight: 600, fontSize: '0.82rem', color: 'var(--text-muted)' }}>สาขา / ชั้นปี</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'left', fontWeight: 600, fontSize: '0.82rem', color: 'var(--text-muted)' }}>ทุนที่สมัคร</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'center', fontWeight: 600, fontSize: '0.82rem', color: 'var(--text-muted)' }}>GPAX</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'center', fontWeight: 600, fontSize: '0.82rem', color: 'var(--text-muted)' }}>วันที่ยื่น</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'center', fontWeight: 600, fontSize: '0.82rem', color: 'var(--text-muted)' }}>สถานะ</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'right', fontWeight: 600, fontSize: '0.82rem', color: 'var(--text-muted)' }}>การดำเนินการ</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredApps.length === 0 ? (
                     <tr>
-                      <td colSpan={9} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
+                      <td colSpan={8} style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
                         ไม่พบข้อมูลใบสมัครที่ตรงกับเงื่อนไขการค้นหา
                       </td>
                     </tr>
                   ) : (
-                    filteredApps.map((app) => (
-                      <tr key={app.trackingId}>
-                        <td>
-                          <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--navy-900)' }}>
-                            {app.trackingId}
-                          </span>
-                        </td>
-                        <td>
-                          <div style={{ fontWeight: 600, color: 'var(--navy-900)' }}>{app.fullName}</div>
-                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{app.studentId} • {app.phone}</div>
-                        </td>
-                        <td>
-                          <div>{app.major}</div>
-                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{app.year}</div>
-                        </td>
-                        <td>
-                          <span style={{ fontSize: '0.88rem', fontWeight: 500 }}>
-                            {app.scholarshipName}
-                          </span>
-                        </td>
-                        <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--math-green)' }}>
-                          {app.gpax.toFixed(2)}
-                        </td>
-                        <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                          {formatThaiDate(app.submissionDate)}
-                        </td>
-                        <td style={{ textAlign: 'center' }}>
-                          {getStatusBadge(app.status)}
-                        </td>
-                        <td style={{ textAlign: 'center', fontWeight: 600 }}>
-                          {app.score !== null ? `${app.score}/100` : '-'}
-                        </td>
-                        <td style={{ textAlign: 'right' }}>
-                          <div style={{ display: 'inline-flex', gap: 6 }}>
-                            <button 
-                              className="btn btn-secondary btn-sm"
-                              onClick={() => handleOpenReview(app)}
-                              style={{ padding: '4px 10px', fontSize: '0.78rem' }}
-                              title="พิจารณาใบสมัครและบันทึกคะแนน"
-                            >
-                              ตรวจ/พิจารณา
-                            </button>
-                            {app.status !== 'approved' && (
+                    filteredApps.map((app) => {
+                      const isSelected = selectedAppIds.has(app.trackingId);
+
+                      return (
+                        <tr 
+                          key={app.trackingId}
+                          onClick={() => handleRowClick(app)}
+                          style={{ 
+                            borderBottom: '1px solid var(--border-light, #f1f5f9)', 
+                            transition: 'all 0.15s ease',
+                            background: isSelected ? 'rgba(7, 123, 56, 0.08)' : 'transparent',
+                            cursor: (isSelectionMode || selectedAppIds.size > 0) ? 'pointer' : 'default'
+                          }}
+                        >
+                          <td 
+                            style={{ width: 44, padding: '14px 14px', textAlign: 'center' }}
+                            onClick={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onTouchStart={(e) => e.stopPropagation()}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => handleToggleApp(app.trackingId)}
+                              style={{ cursor: 'pointer', width: 16, height: 16, accentColor: 'var(--math-green, #077b38)' }}
+                              title={isSelected ? 'ยกเลิกการเลือก' : 'เลือกรายชื่อนี้'}
+                            />
+                          </td>
+                          <td style={{ padding: '14px 18px' }}>
+                            <div style={{ fontWeight: 600, color: 'var(--navy-900)' }}>{app.fullName}</div>
+                            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 2 }}>{app.studentId}</div>
+                          </td>
+                          <td style={{ padding: '14px 18px' }}>
+                            <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--navy-900)' }}>
+                              {formatMajorAbbr(app.major)}
+                            </div>
+                            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 2 }}>{app.year}</div>
+                          </td>
+                          <td style={{ padding: '14px 18px' }}>
+                            <span style={{ fontSize: '0.88rem', fontWeight: 500, color: 'var(--navy-900)' }}>
+                              {app.scholarshipName}
+                            </span>
+                          </td>
+                          <td style={{ padding: '14px 18px', textAlign: 'center', fontWeight: 600, color: 'var(--navy-800)' }}>
+                            {app.gpax.toFixed(2)}
+                          </td>
+                          <td style={{ padding: '14px 18px', textAlign: 'center', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                            {formatThaiDate(app.submissionDate)}
+                          </td>
+                          <td style={{ padding: '14px 18px', textAlign: 'center' }}>
+                            {getStatusBadge(app.status)}
+                          </td>
+                          <td 
+                            style={{ padding: '14px 18px', textAlign: 'right' }}
+                            onClick={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onTouchStart={(e) => e.stopPropagation()}
+                          >
+                            <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center', justifyContent: 'flex-end' }}>
                               <button 
-                                className="btn btn-primary btn-sm"
-                                onClick={() => quickApprove(app.trackingId)}
-                                style={{ padding: '4px 10px', fontSize: '0.78rem' }}
-                                title="อนุมัติทุนทันที"
+                                type="button"
+                                onClick={() => handleOpenReview(app)}
+                                style={{ 
+                                  width: '32px', 
+                                  height: '32px', 
+                                  display: 'inline-flex', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'center', 
+                                  borderRadius: '6px', 
+                                  border: '1px solid var(--border-light, #e2e8f0)', 
+                                  background: 'var(--surface-card, #ffffff)', 
+                                  color: 'var(--navy-800, #1e293b)', 
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease'
+                                }}
+                                title="ดูข้อมูลใบสมัคร"
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = '#f1f5f9';
+                                  e.currentTarget.style.borderColor = '#cbd5e1';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = 'var(--surface-card, #ffffff)';
+                                  e.currentTarget.style.borderColor = 'var(--border-light, #e2e8f0)';
+                                }}
                               >
-                                อนุมัติ
+                                <Eye size={15} strokeWidth={1.8} />
                               </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                              <button 
+                                type="button"
+                                onClick={() => handlePrintApplications(app.trackingId)}
+                                style={{ 
+                                  width: '32px', 
+                                  height: '32px', 
+                                  display: 'inline-flex', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'center', 
+                                  borderRadius: '6px', 
+                                  border: '1px solid var(--border-light, #e2e8f0)', 
+                                  background: 'var(--surface-card, #ffffff)', 
+                                  color: 'var(--navy-800, #1e293b)', 
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease'
+                                }}
+                                title="พิมพ์ใบสมัครของรายนี้"
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = '#f1f5f9';
+                                  e.currentTarget.style.borderColor = '#cbd5e1';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = 'var(--surface-card, #ffffff)';
+                                  e.currentTarget.style.borderColor = 'var(--border-light, #e2e8f0)';
+                                }}
+                              >
+                                <Printer size={14} strokeWidth={1.8} />
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                  if (window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบใบสมัครของ "${app.fullName}" (${app.trackingId}) ออกจากระบบ?`)) {
+                                    deleteApplication(app.trackingId);
+                                  }
+                                }}
+                                style={{ 
+                                  width: '32px', 
+                                  height: '32px', 
+                                  display: 'inline-flex', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'center', 
+                                  borderRadius: '6px', 
+                                  border: '1px solid #fecaca', 
+                                  background: '#fef2f2', 
+                                  color: '#dc2626', 
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease'
+                                }}
+                                title="ลบใบสมัคร"
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = '#fee2e2';
+                                  e.currentTarget.style.borderColor = '#fca5a5';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = '#fef2f2';
+                                  e.currentTarget.style.borderColor = '#fecaca';
+                                }}
+                              >
+                                <Trash2 size={14} strokeWidth={1.8} />
+                              </button>
+                              {app.status !== 'approved' && (
+                                <button 
+                                  type="button"
+                                  onClick={() => quickApprove(app.trackingId)}
+                                  style={{ 
+                                    width: '32px', 
+                                    height: '32px', 
+                                    display: 'inline-flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center', 
+                                    borderRadius: '6px', 
+                                    border: '1px solid var(--math-green, #077b38)', 
+                                    background: 'var(--math-green, #077b38)', 
+                                    color: '#ffffff', 
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  title="อนุมัติทุนทันที"
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = '#05622d';
+                                    e.currentTarget.style.borderColor = '#05622d';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'var(--math-green, #077b38)';
+                                    e.currentTarget.style.borderColor = 'var(--math-green, #077b38)';
+                                  }}
+                                >
+                                  <Check size={15} strokeWidth={2.2} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -700,166 +1522,345 @@ export const AdminSection: React.FC = () => {
         {/* TAB 2: SCHOLARSHIPS CMS */}
         {activeTab === 'scholarships' && (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--navy-900)' }}>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--navy-900)', fontWeight: 700 }}>
                   รายการประกาศทุนการศึกษาทั้งหมด ({scholarships.length} ทุน)
                 </h3>
-                <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                <p style={{ margin: '4px 0 0', fontSize: '0.88rem', color: 'var(--text-muted)' }}>
                   จัดการรายละเอียดทุน จำนวนที่เปิดรับ วันปิดรับสมัคร และเงื่อนไขทุนการศึกษา
                 </p>
               </div>
+
               <button 
                 className="btn btn-primary btn-sm"
                 onClick={handleOpenNewSch}
-                style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, height: 36, padding: '0 14px' }}
               >
-                <span>➕</span> เพิ่มประกาศทุนใหม่
+                <span>+</span> เพิ่มประกาศทุนใหม่
               </button>
             </div>
 
-            <div className="table-responsive">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>ชื่อทุนการศึกษา</th>
-                    <th>ประเภท</th>
-                    <th>มูลค่าทุน</th>
-                    <th style={{ textAlign: 'center' }}>จำนวนรับ (คน)</th>
-                    <th>วันปิดรับสมัคร</th>
-                    <th style={{ textAlign: 'center' }}>สถานะ</th>
-                    <th style={{ textAlign: 'right' }}>การดำเนินการ</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {scholarships.map((sch) => (
-                    <tr key={sch.id}>
-                      <td>
-                        <div style={{ fontWeight: 600, color: 'var(--navy-900)' }}>{sch.title}</div>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', maxWidth: 380, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {sch.description}
+            <div className="admin-cards-grid">
+                {scholarships.map((sch) => {
+                  let statusBg = '#DCFCE7';
+                  let statusColor = '#166534';
+                  let statusText = 'เปิดรับสมัคร';
+                  if (sch.status === 'closing_soon') {
+                    statusBg = '#FEF3C7';
+                    statusColor = '#B45309';
+                    statusText = 'ใกล้ปิดรับ';
+                  } else if (sch.status === 'closed') {
+                    statusBg = '#F1F5F9';
+                    statusColor = '#64748B';
+                    statusText = 'ปิดรับแล้ว';
+                  }
+
+                  return (
+                    <div 
+                      key={sch.id}
+                      className="admin-sch-box"
+                      style={{
+                        background: 'var(--surface-card)',
+                        borderRadius: '16px',
+                        border: '1px solid var(--border-light)',
+                        boxShadow: 'var(--shadow-xs)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden',
+                        transition: 'all 0.2s ease',
+                        position: 'relative'
+                      }}
+                    >
+                      {/* Top Accent Strip */}
+                      <div style={{
+                        height: 5,
+                        background: sch.scope === 'internal' 
+                          ? 'var(--math-green)' 
+                          : 'var(--kmutnb-orange)'
+                      }} />
+
+                      <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', flex: 1 }}>
+                        {/* Header Badges */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 8 }}>
+                          <span style={{ 
+                            fontSize: '0.75rem', 
+                            background: sch.scope === 'internal' ? 'var(--math-green-soft)' : 'var(--kmutnb-orange-glow)', 
+                            color: sch.scope === 'internal' ? 'var(--math-green)' : 'var(--kmutnb-orange)',
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            fontWeight: 600
+                          }}>
+                            {sch.scope === 'internal' ? 'ทุนภายในภาควิชา' : 'ทุนภายนอก/เครือข่าย'}
+                          </span>
+
+                          <span style={{
+                            fontSize: '0.72rem',
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            fontWeight: 600,
+                            background: statusBg,
+                            color: statusColor
+                          }}>
+                            {statusText}
+                          </span>
                         </div>
-                      </td>
-                      <td>
-                        <span style={{ 
-                          fontSize: '0.75rem', 
-                          background: sch.scope === 'internal' ? 'var(--math-green-subtle, #e8f5e9)' : 'var(--kmutnb-orange-subtle, #fff3e0)', 
-                          color: sch.scope === 'internal' ? 'var(--math-green, #077b38)' : 'var(--kmutnb-orange, #e65100)',
-                          padding: '3px 8px',
-                          borderRadius: '4px',
-                          fontWeight: 600
+
+                        {/* Title */}
+                        <h4 style={{ 
+                          margin: '0 0 8px 0', 
+                          fontSize: '1.05rem', 
+                          fontWeight: 700, 
+                          color: 'var(--navy-900)',
+                          lineHeight: 1.4,
+                          minHeight: '2.8rem',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden'
                         }}>
-                          {sch.scope === 'internal' ? 'ทุนภายในภาควิชา' : 'ทุนภายนอก/เครือข่าย'}
-                        </span>
-                      </td>
-                      <td style={{ fontWeight: 600, color: 'var(--navy-900)' }}>
-                        {sch.amount}
-                      </td>
-                      <td style={{ textAlign: 'center', fontWeight: 600 }}>
-                        {sch.totalSlots}
-                      </td>
-                      <td style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                        {sch.deadline}
-                      </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <span style={{
-                          fontSize: '0.75rem',
-                          padding: '2px 8px',
-                          borderRadius: '4px',
-                          fontWeight: 600,
-                          background: sch.status === 'open' ? '#DCFCE7' : sch.status === 'closing_soon' ? '#FEF3C7' : '#F1F5F9',
-                          color: sch.status === 'open' ? '#166534' : sch.status === 'closing_soon' ? '#B45309' : '#64748B'
+                          {sch.title}
+                        </h4>
+
+                        {/* Description */}
+                        <p style={{ 
+                          margin: '0 0 16px 0', 
+                          fontSize: '0.85rem', 
+                          color: 'var(--text-muted)',
+                          lineHeight: 1.5,
+                          minHeight: '2.5rem',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden'
                         }}>
-                          {sch.status === 'open' ? 'เปิดรับสมัคร' : sch.status === 'closing_soon' ? 'ใกล้ปิดรับ' : 'ปิดรับแล้ว'}
-                        </span>
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <div style={{ display: 'inline-flex', gap: 6 }}>
+                          {sch.description}
+                        </p>
+
+                        {/* Details Info Box */}
+                        <div style={{
+                          background: 'var(--surface-ground)',
+                          borderRadius: '10px',
+                          padding: '12px 14px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 8,
+                          marginBottom: 16,
+                          border: '1px solid var(--border-light)'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>มูลค่าทุน:</span>
+                            <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--kmutnb-orange-dark, #c2410c)' }}>
+                              {sch.amount}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>จำนวนโควตา:</span>
+                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--navy-800)' }}>
+                              {sch.totalSlots} ทุน (เหลือ {sch.remainingSlots})
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>ปิดรับสมัคร:</span>
+                            <span style={{ fontSize: '0.82rem', color: 'var(--navy-700)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                              <Calendar size={13} strokeWidth={1.8} style={{ color: 'var(--text-muted)' }} />
+                              {sch.deadline}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Actions at bottom */}
+                        <div style={{ 
+                          display: 'flex', 
+                          gap: 8, 
+                          marginTop: 'auto', 
+                          paddingTop: 12, 
+                          borderTop: '1px solid var(--border-light)' 
+                        }}>
                           <button 
                             className="btn btn-secondary btn-sm"
                             onClick={() => handleOpenEditSch(sch)}
-                            style={{ padding: '4px 10px', fontSize: '0.78rem' }}
+                            style={{ flex: 1, padding: '7px 0', fontSize: '0.82rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 5 }}
                           >
-                            แก้ไข
+                            <Pencil size={13} /> แก้ไข
                           </button>
                           <button 
                             className="btn btn-sm"
                             onClick={() => handleDeleteSch(sch.id, sch.title)}
-                            style={{ padding: '4px 8px', fontSize: '0.78rem', color: '#dc2626', borderColor: '#fca5a5', background: 'var(--danger-bg)' }}
+                            style={{ 
+                              padding: '7px 12px', 
+                              fontSize: '0.82rem', 
+                              color: '#dc2626', 
+                              borderColor: '#fca5a5', 
+                              background: 'var(--danger-bg)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 5
+                            }}
                             title="ลบทุนนี้"
                           >
-                            ลบ
+                            <Trash2 size={13} /> ลบ
                           </button>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
         )}
 
         {/* TAB 3: NEWS & ANNOUNCEMENTS CMS */}
         {activeTab === 'news' && (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--navy-900)' }}>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--navy-900)', fontWeight: 700 }}>
                   ข่าวสารและประกาศ ({announcements.length} รายการ)
                 </h3>
-                <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                <p style={{ margin: '4px 0 0', fontSize: '0.88rem', color: 'var(--text-muted)' }}>
                   จัดการข่าวสาร ประกาศผล และการแจ้งเตือนต่างๆ
                 </p>
               </div>
+
               <button 
-                className="btn btn-primary"
+                className="btn btn-primary btn-sm"
                 onClick={handleOpenNewAnn}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, height: 36, padding: '0 14px' }}
               >
-                + เพิ่มประกาศ
+                <span>+</span> เพิ่มประกาศ
               </button>
             </div>
             
-            <div className="table-responsive" style={{ background: 'var(--surface-card)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
-                <thead style={{ background: 'var(--surface-ground)' }}>
-                  <tr>
-                    <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-light)' }}>วันที่</th>
-                    <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-light)' }}>ประเภท</th>
-                    <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-light)' }}>หัวข้อประกาศ</th>
-                    <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-light)' }}>จัดการ</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {announcements.map(ann => (
-                    <tr key={ann.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                      <td style={{ padding: '12px 16px', width: '120px' }}>{ann.date}</td>
-                      <td style={{ padding: '12px 16px', width: '100px' }}>{ann.tag}</td>
-                      <td style={{ padding: '12px 16px' }}>{ann.title}</td>
-                      <td style={{ padding: '12px 16px', width: '140px' }}>
-                        <div style={{ display: 'flex', gap: 8 }}>
+            <div className="admin-cards-grid">
+                {announcements.map((ann) => {
+                  let badgeBg = 'var(--math-green-soft, #dcfce7)';
+                  let badgeColor = 'var(--math-green-dark, #166534)';
+                  let badgeBorder = 'var(--math-green-border, #bbf7d0)';
+
+                  if (ann.tagType === 'warning') {
+                    badgeBg = 'var(--warning-bg, #fef3c7)';
+                    badgeColor = 'var(--warning, #b45309)';
+                    badgeBorder = 'var(--warning-border, #fde68a)';
+                  } else if (ann.tag === 'ทุนนวัตกรรม') {
+                    badgeBg = 'rgba(232,78,15,0.1)';
+                    badgeColor = 'var(--kmutnb-orange, #e65100)';
+                    badgeBorder = 'rgba(232,78,15,0.25)';
+                  }
+
+                  return (
+                    <div
+                      key={ann.id}
+                      className="admin-ann-box"
+                      style={{
+                        background: 'var(--surface-card)',
+                        borderRadius: '16px',
+                        border: '1px solid var(--border-light)',
+                        boxShadow: 'var(--shadow-xs)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden',
+                        transition: 'all 0.2s ease',
+                        position: 'relative'
+                      }}
+                    >
+                      {/* Top Accent Strip */}
+                      <div style={{
+                        height: 5,
+                        background: ann.tagType === 'warning' ? 'var(--warning, #f59e0b)' : 'var(--math-green, #10b981)'
+                      }} />
+
+                      <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', flex: 1 }}>
+                        {/* Header: Tag + Date */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 8 }}>
+                          <span style={{
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            padding: '3px 10px',
+                            borderRadius: 'var(--radius-full, 9999px)',
+                            background: badgeBg,
+                            color: badgeColor,
+                            border: `1px solid ${badgeBorder}`
+                          }}>
+                            {ann.tag}
+                          </span>
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <Calendar size={13} strokeWidth={1.8} style={{ color: 'var(--text-muted)' }} />
+                            {ann.date}
+                          </span>
+                        </div>
+
+                        {/* Title */}
+                        <h4 style={{ 
+                          margin: '0 0 10px 0', 
+                          fontSize: '1.05rem', 
+                          fontWeight: 700, 
+                          color: 'var(--navy-900)',
+                          lineHeight: 1.45,
+                          minHeight: '3.1rem',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden'
+                        }}>
+                          {ann.title}
+                        </h4>
+
+                        {/* Summary */}
+                        <p style={{ 
+                          margin: '0 0 16px 0', 
+                          fontSize: '0.86rem', 
+                          color: 'var(--navy-600)',
+                          lineHeight: 1.6,
+                          flex: 1,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 3,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          minHeight: '4.1rem'
+                        }}>
+                          {ann.summary}
+                        </p>
+
+                        {/* Actions at bottom */}
+                        <div style={{ 
+                          display: 'flex', 
+                          gap: 8, 
+                          marginTop: 'auto', 
+                          paddingTop: 12, 
+                          borderTop: '1px solid var(--border-light)' 
+                        }}>
                           <button 
-                            className="btn btn-sm btn-outline"
+                            className="btn btn-secondary btn-sm"
                             onClick={() => handleOpenEditAnn(ann)}
-                            style={{ padding: '4px 8px', fontSize: '0.78rem' }}
+                            style={{ flex: 1, padding: '7px 0', fontSize: '0.82rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 5 }}
                           >
-                            แก้ไข
+                            <Pencil size={13} /> แก้ไข
                           </button>
                           <button 
                             className="btn btn-sm"
                             onClick={() => handleDeleteAnn(ann.id, ann.title)}
-                            style={{ padding: '4px 8px', fontSize: '0.78rem', color: '#dc2626', borderColor: '#fca5a5', background: 'var(--danger-bg)' }}
+                            style={{ 
+                              padding: '7px 12px', 
+                              fontSize: '0.82rem', 
+                              color: '#dc2626', 
+                              borderColor: '#fca5a5', 
+                              background: 'var(--danger-bg)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 5
+                            }}
+                            title="ลบประกาศนี้"
                           >
-                            ลบ
+                            <Trash2 size={13} /> ลบ
                           </button>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
         )}
 
         {/* TAB 4: FAQ & HELP CMS */}
@@ -879,7 +1880,8 @@ export const AdminSection: React.FC = () => {
                 onClick={handleOpenNewFaq}
                 style={{ display: 'flex', alignItems: 'center', gap: 6 }}
               >
-                <span>➕</span> เพิ่มคำถาม-คำตอบ
+                <Plus size={15} strokeWidth={2} />
+                <span>เพิ่มคำถาม-คำตอบ</span>
               </button>
             </div>
 
@@ -896,8 +1898,9 @@ export const AdminSection: React.FC = () => {
                   gap: 16
                 }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, color: 'var(--navy-900)', fontSize: '0.95rem', marginBottom: 6 }}>
-                      ❓ {faq.question}
+                    <div style={{ fontWeight: 600, color: 'var(--navy-900)', fontSize: '0.95rem', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <HelpCircle size={16} strokeWidth={1.8} style={{ color: 'var(--navy-600, #475569)', flexShrink: 0 }} />
+                      <span>{faq.question}</span>
                     </div>
                     <div style={{ fontSize: '0.85rem', color: 'var(--navy-700)', lineHeight: 1.6 }}>
                       {faq.answer}
@@ -927,258 +1930,1371 @@ export const AdminSection: React.FC = () => {
 
         {/* TAB 5: SITE SETTINGS */}
         {activeTab === 'settings' && (
-          <div style={{ background: 'var(--surface-card)', border: '1px solid var(--border-light, #e2e8f0)', borderRadius: '12px', padding: '24px 28px', maxWidth: 840 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
-              <div>
-                <h3 style={{ margin: '0 0 4px', fontSize: '1.25rem', color: 'var(--navy-900)' }}>
-                  ⚙️ ตั้งค่าเว็บไซต์ทั่วไป (Site Settings)
-                </h3>
-                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                  ปรับแต่งข้อมูลหลักของเว็บไซต์ ปีการศึกษา ข้อความหัวเรื่อง และข้อมูลติดต่อ
-                </p>
-              </div>
-
+          <div style={{ 
+            background: 'var(--surface-white, #ffffff)', 
+            borderRadius: '16px', 
+            border: '1px solid var(--border-light, #e2e8f0)',
+            padding: '32px 40px', 
+            width: '100%', 
+            boxSizing: 'border-box',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)' 
+          }}>
+            <div style={{ marginBottom: 32, borderBottom: '1px solid var(--border-light)', paddingBottom: 20 }}>
+              <h3 style={{ margin: '0 0 8px', fontSize: '1.4rem', fontWeight: 600, color: 'var(--navy-900)', letterSpacing: '-0.01em' }}>
+                ตั้งค่าเว็บไซต์ทั่วไป
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-muted)' }}>
+                ปรับแต่งข้อมูลหลักของเว็บไซต์ ปีการศึกษา ข้อความหัวเรื่อง และข้อมูลติดต่อ
+              </p>
             </div>
 
-            <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <div className="form-group">
-                  <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
-                    ปีการศึกษา (Academic Year)
+            <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+              {/* Section: ข้อมูลทั่วไป */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <h4 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--navy-800)', fontWeight: 600 }}>ข้อมูลทั่วไป</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)', marginBottom: 6, display: 'block' }}>
+                      ปีการศึกษา (Academic Year)
+                    </label>
+                    <input
+                      type="text"
+                      list="academic-years"
+                      className="form-input-light"
+                      value={settingsForm.academicYear}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, academicYear: e.target.value })}
+                      required
+                      style={{
+                        width: '100%',
+                        height: '46px',
+                        padding: '0 16px',
+                        borderRadius: '8px',
+                        border: '1px solid var(--border-light)',
+                        background: 'var(--surface-ground)',
+                        boxSizing: 'border-box',
+                        fontSize: '0.95rem'
+                      }}
+                    />
+                    <datalist id="academic-years">
+                      <option value={new Date().getFullYear() + 543 - 1} />
+                      <option value={new Date().getFullYear() + 543} />
+                      <option value={new Date().getFullYear() + 543 + 1} />
+                    </datalist>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)', marginBottom: 6, display: 'block' }}>
+                      ภาคการศึกษา (Semester)
+                    </label>
+                    <div style={{ position: 'relative', width: '100%' }}>
+                      <select
+                        className="form-input-light"
+                        value={settingsForm.semester}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, semester: e.target.value })}
+                        required
+                        style={{
+                          width: '100%',
+                          height: '46px',
+                          padding: '0 38px 0 16px',
+                          borderRadius: '8px',
+                          border: '1px solid var(--border-light)',
+                          background: 'var(--surface-ground)',
+                          WebkitAppearance: 'none',
+                          MozAppearance: 'none',
+                          appearance: 'none',
+                          cursor: 'pointer',
+                          boxSizing: 'border-box',
+                          fontSize: '0.95rem',
+                          color: 'var(--text-main)'
+                        }}
+                      >
+                        <option value="" disabled>เลือกภาคการศึกษา</option>
+                        <option value="1">1 (ภาคเรียนที่ 1)</option>
+                        <option value="2">2 (ภาคเรียนที่ 2)</option>
+                        <option value="3">3 (ภาคฤดูร้อน)</option>
+                      </select>
+                      <div style={{
+                        position: 'absolute',
+                        right: 14,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        pointerEvents: 'none',
+                        color: 'var(--text-muted)',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}>
+                        <ChevronDown size={18} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ height: 1, background: 'var(--border-light)' }} />
+
+              {/* Section: เนื้อหาหน้าแรก */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <h4 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--navy-800)', fontWeight: 600 }}>เนื้อหาหน้าแรก</h4>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)', marginBottom: 6, display: 'block' }}>
+                    ข้อความพาดหัว (Hero Title)
                   </label>
-                  <input 
-                    type="text" 
-                    list="academic-years"
+                  <input
+                    type="text"
                     className="form-input-light"
-                    value={settingsForm.academicYear}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, academicYear: e.target.value })}
+                    value={settingsForm.heroTitle}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, heroTitle: e.target.value })}
                     required
+                    style={{
+                      width: '100%',
+                      height: '46px',
+                      padding: '0 16px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-light)',
+                      background: 'var(--surface-ground)',
+                      boxSizing: 'border-box'
+                    }}
                   />
-                  <datalist id="academic-years">
-                    <option value={new Date().getFullYear() + 543 - 1} />
-                    <option value={new Date().getFullYear() + 543} />
-                    <option value={new Date().getFullYear() + 543 + 1} />
-                  </datalist>
                 </div>
 
-                <div className="form-group">
-                  <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
-                    ภาคการศึกษา (Semester)
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)', marginBottom: 6, display: 'block' }}>
+                    คำอธิบาย (Hero Subtitle)
                   </label>
-                  <select 
+                  <textarea
                     className="form-input-light"
-                    value={settingsForm.semester}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, semester: e.target.value })}
+                    rows={2}
+                    value={settingsForm.heroSubtitle}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, heroSubtitle: e.target.value })}
                     required
-                    style={{ width: '100%' }}
-                  >
-                    <option value="" disabled>เลือกภาคการศึกษา</option>
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
-                  ข้อความพาดหัวหน้าแรก (Hero Title)
-                </label>
-                <textarea 
-                  className="form-input-light" 
-                  rows={2}
-                  value={settingsForm.heroTitle}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, heroTitle: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
-                  คำอธิบายหน้าแรก (Hero Subtitle)
-                </label>
-                <textarea 
-                  className="form-input-light" 
-                  rows={3}
-                  value={settingsForm.heroSubtitle}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, heroSubtitle: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
-                  ข้อความแถบวิ่งประชาสัมพันธ์ (Marquee Ticker Text)
-                </label>
-                <input 
-                  type="text" 
-                  className="form-input-light"
-                  value={settingsForm.tickerText || ''}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, tickerText: e.target.value })}
-                  placeholder="เช่น 📢 เปิดรับสมัครทุนการศึกษาภาควิชาคณิตศาสตร์ ประจำภาคการศึกษาที่ 1/2567..."
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <div className="form-group">
-                  <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
-                    เบอร์โทรศัพท์ติดต่อ
-                  </label>
-                  <input 
-                    type="text" 
-                    className="form-input-light"
-                    value={settingsForm.contactPhone}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, contactPhone: e.target.value })}
-                    required
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-light)',
+                      background: 'var(--surface-ground)',
+                      resize: 'none',
+                      boxSizing: 'border-box',
+                      lineHeight: 1.5
+                    }}
                   />
                 </div>
 
-                <div className="form-group">
-                  <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
-                    อีเมลติดต่อ
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)', marginBottom: 6, display: 'block' }}>
+                    แถบวิ่งประชาสัมพันธ์ (Marquee Ticker Text)
                   </label>
-                  <input 
-                    type="email" 
+                  <input
+                    type="text"
                     className="form-input-light"
-                    value={settingsForm.contactEmail}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, contactEmail: e.target.value })}
-                    required
+                    value={settingsForm.tickerText || ''}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, tickerText: e.target.value })}
+                    placeholder="เช่น เปิดรับสมัครทุนการศึกษา..."
+                    style={{
+                      width: '100%',
+                      height: '46px',
+                      padding: '0 16px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-light)',
+                      background: 'var(--surface-ground)',
+                      boxSizing: 'border-box'
+                    }}
                   />
                 </div>
               </div>
 
-              <div className="form-group">
-                <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
-                  ที่ตั้งสำนักงานภาควิชา
-                </label>
-                <input 
-                  type="text" 
-                  className="form-input-light"
-                  value={settingsForm.contactAddress || ''}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, contactAddress: e.target.value })}
-                  placeholder="เช่น อาคาร 78 ชั้น 7 คณะวิทยาศาสตร์ประยุกต์ มจพ."
-                />
+              <div style={{ height: 1, background: 'var(--border-light)' }} />
+
+              {/* Section: ข้อมูลติดต่อ */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <h4 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--navy-800)', fontWeight: 600 }}>ข้อมูลติดต่อ</h4>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)', marginBottom: 6, display: 'block' }}>
+                      เบอร์โทรศัพท์
+                    </label>
+                    <input
+                      type="text"
+                      className="form-input-light"
+                      value={settingsForm.contactPhone}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, contactPhone: e.target.value })}
+                      required
+                      style={{
+                        width: '100%',
+                        height: '46px',
+                        padding: '0 16px',
+                        borderRadius: '8px',
+                        border: '1px solid var(--border-light)',
+                        background: 'var(--surface-ground)',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)', marginBottom: 6, display: 'block' }}>
+                      อีเมล
+                    </label>
+                    <input
+                      type="email"
+                      className="form-input-light"
+                      value={settingsForm.contactEmail}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, contactEmail: e.target.value })}
+                      required
+                      style={{
+                        width: '100%',
+                        height: '46px',
+                        padding: '0 16px',
+                        borderRadius: '8px',
+                        border: '1px solid var(--border-light)',
+                        background: 'var(--surface-ground)',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)', marginBottom: 6, display: 'block' }}>
+                    ที่ตั้งสำนักงาน
+                  </label>
+                  <input
+                    type="text"
+                    className="form-input-light"
+                    value={settingsForm.contactAddress || ''}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, contactAddress: e.target.value })}
+                    placeholder="เช่น อาคาร 78 ชั้น 7..."
+                    style={{
+                      width: '100%',
+                      height: '46px',
+                      padding: '0 16px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-light)',
+                      background: 'var(--surface-ground)',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)', marginBottom: 6, display: 'block' }}>
+                    ลิงก์ Facebook
+                  </label>
+                  <input
+                    type="url"
+                    className="form-input-light"
+                    value={settingsForm.facebookUrl || ''}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, facebookUrl: e.target.value })}
+                    placeholder="https://facebook.com/..."
+                    style={{
+                      width: '100%',
+                      height: '46px',
+                      padding: '0 16px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-light)',
+                      background: 'var(--surface-ground)',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
               </div>
 
-              <div className="form-group">
-                <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
-                  ลิงก์ Facebook Fanpage
-                </label>
-                <input 
-                  type="url" 
-                  className="form-input-light"
-                  value={settingsForm.facebookUrl || ''}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, facebookUrl: e.target.value })}
-                  placeholder="https://facebook.com/..."
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
-                <button type="submit" className="btn btn-primary" style={{ minWidth: 160 }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12, paddingTop: 24, borderTop: '1px solid var(--border-light)' }}>
+                <button type="submit" className="btn btn-primary" style={{ minWidth: 160, borderRadius: '8px', padding: '12px 24px', fontWeight: 600, boxShadow: '0 4px 14px rgba(7, 123, 56, 0.25)' }}>
                   บันทึกการตั้งค่า
                 </button>
               </div>
             </form>
           </div>
-
         )}
       </div>
 
-      {/* MODAL: REVIEW APPLICATION */}
-      {isReviewModalOpen && selectedApp && (
-        <div className="modal-backdrop open">
-          <div className="modal-card" style={{ maxWidth: 560 }}>
-            <div className="modal-header">
-              <h3 style={{ margin: 0, fontSize: '1.25rem' }}>
-                พิจารณาใบสมัคร: {selectedApp.trackingId}
-              </h3>
-              <button className="modal-close-btn" onClick={() => setIsReviewModalOpen(false)}>&times;</button>
-            </div>
-
-            <form onSubmit={handleSaveReview}>
-              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div style={{ background: 'var(--surface-ground, #f8fafc)', padding: 14, borderRadius: 8, fontSize: '0.85rem' }}>
-                  <div style={{ fontWeight: 600, color: 'var(--navy-900)', marginBottom: 4 }}>
-                    {selectedApp.fullName} (รหัสนักศึกษา: {selectedApp.studentId})
-                  </div>
-                  <div style={{ color: 'var(--text-muted)' }}>
-                    ทุน: {selectedApp.scholarshipName} | เกรดเฉลี่ย: {selectedApp.gpax.toFixed(2)}
-                  </div>
+      {/* MODAL: VIEW / EDIT APPLICATION DATA */}
+      {isReviewModalOpen && selectedApp && appEditData && (
+        <div className="modal-backdrop open" style={{ zIndex: 2000 }}>
+          <div className="modal-card" style={{ maxWidth: 920, width: '95%', maxHeight: '92vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.18)', background: '#ffffff' }}>
+            {/* Minimal Header */}
+            <div style={{
+              padding: '18px 24px',
+              background: '#ffffff',
+              borderBottom: '1px solid #f1f5f9',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 16
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.18rem', color: 'var(--navy-900)', fontWeight: 700 }}>
+                    {isEditMode ? 'แก้ไขข้อมูลใบสมัคร' : 'ดูข้อมูลใบสมัคร'}
+                  </h3>
+                  <span style={{ fontSize: '0.8rem', padding: '2px 8px', borderRadius: '6px', background: '#f1f5f9', color: '#475569', fontWeight: 600, fontFamily: 'monospace' }}>
+                    #{selectedApp.trackingId}
+                  </span>
+                  {isEditMode ? (
+                    <select
+                      value={reviewStatus}
+                      onChange={(e) => setReviewStatus(e.target.value as ApplicationStatus)}
+                      style={{
+                        fontSize: '0.78rem',
+                        padding: '3px 10px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        background: reviewStatus === 'approved' ? '#dcfce7' : reviewStatus === 'rejected' ? '#fef2f2' : '#eff6ff',
+                        color: reviewStatus === 'approved' ? '#15803d' : reviewStatus === 'rejected' ? '#b91c1c' : '#1d4ed8',
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="submitted">ยื่นใบสมัครแล้ว (รอพิจารณา)</option>
+                      <option value="approved">อนุมัติทุนการศึกษา</option>
+                      <option value="rejected">ไม่ผ่านการพิจารณา</option>
+                    </select>
+                  ) : (
+                    <span style={{ 
+                      fontSize: '0.78rem', 
+                      padding: '3px 10px', 
+                      borderRadius: '12px', 
+                      background: reviewStatus === 'approved' ? '#dcfce7' : reviewStatus === 'rejected' ? '#fef2f2' : '#eff6ff', 
+                      color: reviewStatus === 'approved' ? '#15803d' : reviewStatus === 'rejected' ? '#b91c1c' : '#1d4ed8', 
+                      fontWeight: 600 
+                    }}>
+                      {reviewStatus === 'submitted' ? 'ยื่นใบสมัครแล้ว' : reviewStatus === 'approved' ? 'อนุมัติทุนแล้ว' : reviewStatus === 'rejected' ? 'ไม่ผ่านการพิจารณา' : reviewStatus}
+                    </span>
+                  )}
                 </div>
-
-                <div className="form-group">
-                  <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
-                    สถานะการพิจารณา
-                  </label>
-                  <select 
-                    className="form-input-light"
-                    value={reviewStatus}
-                    onChange={(e) => setReviewStatus(e.target.value as ApplicationStatus)}
-                  >
-                    <option value="submitted">ยื่นใบสมัครแล้ว (รอตรวจเอกสาร)</option>
-                    <option value="doc_verified">เอกสารผ่านการตรวจสอบแล้ว</option>
-                    <option value="interview_scheduled">นัดหมายสัมภาษณ์</option>
-                    <option value="approved">อนุมัติทุนการศึกษา</option>
-                    <option value="rejected">ไม่ผ่านการคัดเลือก</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
-                    คะแนนประเมิน (เต็ม 100 คะแนน)
-                  </label>
-                  <input 
-                    type="number" 
-                    className="form-input-light"
-                    placeholder="เช่น 85"
-                    min="0"
-                    max="100"
-                    value={reviewScore}
-                    onChange={(e) => setReviewScore(e.target.value === '' ? '' : Number(e.target.value))}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
-                    วัน-เวลานัดสัมภาษณ์ (ถ้ามี)
-                  </label>
-                  <input 
-                    type="text" 
-                    className="form-input-light"
-                    placeholder="เช่น 28 กันยายน 2567 เวลา 10:00 น. ห้อง 704 อาคาร 78"
-                    value={reviewInterviewDate}
-                    onChange={(e) => setReviewInterviewDate(e.target.value)}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
-                    ความเห็นคณะกรรมการ / บันทึกเพิ่มเติม
-                  </label>
-                  <textarea 
-                    className="form-input-light"
-                    rows={3}
-                    placeholder="กรอกผลการพิจารณาคุณสมบัติ หรือข้อเสนอแนะของคณะกรรมการ..."
-                    value={reviewNotes}
-                    onChange={(e) => setReviewNotes(e.target.value)}
-                  />
+                <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: 4 }}>
+                  {appEditData.fullName} • รหัส {appEditData.studentId} • ทุน: {selectedApp.scholarshipName}
                 </div>
               </div>
 
-              <div className="modal-footer">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => handlePrintApplications(selectedApp.trackingId)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    fontSize: '0.84rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    border: '1px solid #cbd5e1',
+                    background: '#ffffff',
+                    color: 'var(--navy-800, #1e293b)'
+                  }}
+                  title="พิมพ์ใบสมัครนี้"
+                >
+                  <Printer size={14} />
+                  <span>พิมพ์ใบสมัคร</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsEditMode(!isEditMode)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '6px 14px',
+                    borderRadius: '8px',
+                    fontSize: '0.84rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    border: isEditMode ? '1px solid var(--math-green, #077b38)' : '1px solid #cbd5e1',
+                    background: isEditMode ? '#f0fdf4' : '#ffffff',
+                    color: isEditMode ? 'var(--math-green, #077b38)' : 'var(--navy-800, #1e293b)'
+                  }}
+                  title={isEditMode ? 'สลับเป็นโหมดดูข้อมูล' : 'แก้ไขข้อมูลใบสมัคร'}
+                >
+                  <Pencil size={14} />
+                  <span>{isEditMode ? 'กำลังแก้ไข' : 'แก้ไข'}</span>
+                </button>
+
                 <button 
-                  type="button" 
-                  className="btn btn-secondary" 
+                  type="button"
+                  className="modal-close-btn" 
                   onClick={() => setIsReviewModalOpen(false)}
+                  style={{ fontSize: '1.4rem', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', lineHeight: 1 }}
                 >
-                  ยกเลิก
+                  &times;
                 </button>
-                <button 
-                  type="submit" 
-                  className="btn btn-primary"
+              </div>
+            </div>
+
+            {/* Minimal Step Navigation Tabs */}
+            <div style={{
+              display: 'flex',
+              background: '#f8fafc',
+              borderBottom: '1px solid #e2e8f0',
+              overflowX: 'auto',
+              padding: '0 20px'
+            }}>
+              {[
+                { id: 1, label: '1. ข้อมูลส่วนตัว & การศึกษา' },
+                { id: 2, label: '2. ข้อมูลครอบครัว & การกู้ยืม' },
+                { id: 3, label: '3. กิจกรรม & เหตุผลความจำเป็น' }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setAppModalTab(tab.id)}
+                  style={{
+                    padding: '11px 18px',
+                    border: 'none',
+                    borderBottom: appModalTab === tab.id ? '2.5px solid var(--math-green, #077b38)' : '2.5px solid transparent',
+                    background: 'transparent',
+                    color: appModalTab === tab.id ? 'var(--math-green, #077b38)' : '#64748b',
+                    fontWeight: appModalTab === tab.id ? 700 : 500,
+                    fontSize: '0.86rem',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.15s ease'
+                  }}
                 >
-                  บันทึกผลการพิจารณา
+                  {tab.label}
                 </button>
+              ))}
+            </div>
+
+            {/* Form Body */}
+            <form onSubmit={handleSaveReview} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+              <fieldset disabled={!isEditMode} style={{ border: 'none', padding: 0, margin: 0, display: 'contents' }}>
+                <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  {/* TAB 1: ข้อมูลส่วนตัวและการศึกษา */}
+                  {appModalTab === 1 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                        {/* Photo Box */}
+                        <div style={{ width: 140, textAlign: 'center' }}>
+                          <div style={{
+                            width: 140,
+                            height: 170,
+                            borderRadius: '12px',
+                            border: isEditMode ? '2px dashed #cbd5e1' : '1px solid #e2e8f0',
+                            background: '#f8fafc',
+                            overflow: 'hidden',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            position: 'relative'
+                          }}>
+                            {appProfilePhoto ? (
+                              <img src={appProfilePhoto} alt="Student" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              <div style={{ fontSize: '0.8rem', color: '#64748b' }}>ไม่มีรูปถ่าย</div>
+                            )}
+                          </div>
+                          {isEditMode && (
+                            <>
+                              <label style={{
+                                display: 'inline-block',
+                                marginTop: 8,
+                                padding: '4px 10px',
+                                background: '#e2e8f0',
+                                color: '#334155',
+                                borderRadius: '6px',
+                                fontSize: '0.76rem',
+                                cursor: 'pointer',
+                                fontWeight: 600
+                              }}>
+                                เปลี่ยนรูป
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  style={{ display: 'none' }}
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      const reader = new FileReader();
+                                      reader.onloadend = () => setAppProfilePhoto(reader.result as string);
+                                      reader.readAsDataURL(file);
+                                    }
+                                  }}
+                                />
+                              </label>
+                              {appProfilePhoto && (
+                                <button
+                                  type="button"
+                                  onClick={() => setAppProfilePhoto(null)}
+                                  style={{ display: 'block', margin: '4px auto 0', background: 'none', border: 'none', color: '#dc2626', fontSize: '0.72rem', cursor: 'pointer' }}
+                                >
+                                  ลบรูป
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+
+                      {/* Top Form Fields */}
+                      <div style={{ flex: 1, minWidth: 260, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--navy-800)', marginBottom: 4, display: 'block' }}>
+                            ทุนการศึกษาที่สมัคร *
+                          </label>
+                          <select
+                            className="form-input-light"
+                            value={appEditData.scholarshipId}
+                            onChange={(e) => setAppEditData({ ...appEditData, scholarshipId: e.target.value })}
+                            required
+                          >
+                            {scholarships.map(s => (
+                              <option key={s.id} value={s.id}>{s.title} ({s.amount})</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--navy-800)', marginBottom: 4, display: 'block' }}>
+                              ชื่อ-นามสกุล (พร้อมคำนำหน้า) *
+                            </label>
+                            <input
+                              type="text"
+                              className="form-input-light"
+                              value={appEditData.fullName}
+                              onChange={(e) => setAppEditData({ ...appEditData, fullName: e.target.value })}
+                              required
+                            />
+                          </div>
+
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--navy-800)', marginBottom: 4, display: 'block' }}>
+                              รหัสนักศึกษา (13 หลัก) *
+                            </label>
+                            <input
+                              type="text"
+                              className="form-input-light"
+                              value={appEditData.studentId}
+                              maxLength={13}
+                              onChange={(e) => setAppEditData({ ...appEditData, studentId: e.target.value })}
+                              required
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Secondary Student Info Grid */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--navy-800)', marginBottom: 4, display: 'block' }}>
+                          ชื่อเล่น
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input-light"
+                          value={appEditData.nickname || ''}
+                          onChange={(e) => setAppEditData({ ...appEditData, nickname: e.target.value })}
+                        />
+                      </div>
+
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--navy-800)', marginBottom: 4, display: 'block' }}>
+                          เบอร์โทรศัพท์ติดต่อ *
+                        </label>
+                        <input
+                          type="tel"
+                          className="form-input-light"
+                          value={appEditData.phone}
+                          onChange={(e) => setAppEditData({ ...appEditData, phone: e.target.value })}
+                          required
+                        />
+                      </div>
+
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--navy-800)', marginBottom: 4, display: 'block' }}>
+                          สาขาวิชา *
+                        </label>
+                        <select
+                          className="form-input-light"
+                          value={appEditData.major}
+                          onChange={(e) => setAppEditData({ ...appEditData, major: e.target.value })}
+                          required
+                        >
+                          <option value="MA โครงการปกติ">MA โครงการปกติ</option>
+                          <option value="MA โครงการสมทบ">MA โครงการสมทบ</option>
+                          <option value="MC โครงการปกติ">MC โครงการปกติ</option>
+                          <option value="MC โครงการสมทบ">MC โครงการสมทบ</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--navy-800)', marginBottom: 4, display: 'block' }}>
+                          ระดับชั้นปี *
+                        </label>
+                        <select
+                          className="form-input-light"
+                          value={appEditData.year}
+                          onChange={(e) => setAppEditData({ ...appEditData, year: e.target.value })}
+                          required
+                        >
+                          <option value="ปี 1">ชั้นปีที่ 1</option>
+                          <option value="ปี 2">ชั้นปีที่ 2</option>
+                          <option value="ปี 3">ชั้นปีที่ 3</option>
+                          <option value="ปี 4">ชั้นปีที่ 4</option>
+                          <option value="บัณฑิตศึกษา">บัณฑิตศึกษา</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--navy-800)', marginBottom: 4, display: 'block' }}>
+                          เกรดเฉลี่ยสะสม (GPAX) *
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max="4"
+                          className="form-input-light"
+                          value={appEditData.gpax}
+                          onChange={(e) => setAppEditData({ ...appEditData, gpax: parseFloat(e.target.value) || 0 })}
+                          required
+                        />
+                      </div>
+
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--navy-800)', marginBottom: 4, display: 'block' }}>
+                          อีเมลมหาวิทยาลัย *
+                        </label>
+                        <input
+                          type="email"
+                          className="form-input-light"
+                          value={appEditData.email}
+                          onChange={(e) => setAppEditData({ ...appEditData, email: e.target.value })}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    {/* Address Section */}
+                    <div style={{ background: '#f8fafc', padding: 18, borderRadius: 12, border: '1px solid #e2e8f0', marginTop: 10 }}>
+                      <h4 style={{ margin: '0 0 12px 0', fontSize: '0.92rem', color: 'var(--navy-900)' }}>
+                        ที่อยู่ตามบัตรประจำตัวประชาชน *
+                      </h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px' }}>
+                        <div>
+                          <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>บ้านเลขที่ *</label>
+                          <input
+                            type="text"
+                            className="form-input-light"
+                            value={appEditData.idCardAddress.houseNo}
+                            onChange={(e) => setAppEditData({
+                              ...appEditData,
+                              idCardAddress: { ...appEditData.idCardAddress, houseNo: e.target.value },
+                              ...(appEditData.isIdCardAddress ? { address: { ...appEditData.address, houseNo: e.target.value } } : {})
+                            })}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>หมู่</label>
+                          <input
+                            type="text"
+                            className="form-input-light"
+                            value={appEditData.idCardAddress.moo}
+                            onChange={(e) => setAppEditData({
+                              ...appEditData,
+                              idCardAddress: { ...appEditData.idCardAddress, moo: e.target.value },
+                              ...(appEditData.isIdCardAddress ? { address: { ...appEditData.address, moo: e.target.value } } : {})
+                            })}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>ซอย</label>
+                          <input
+                            type="text"
+                            className="form-input-light"
+                            value={appEditData.idCardAddress.soi}
+                            onChange={(e) => setAppEditData({
+                              ...appEditData,
+                              idCardAddress: { ...appEditData.idCardAddress, soi: e.target.value },
+                              ...(appEditData.isIdCardAddress ? { address: { ...appEditData.address, soi: e.target.value } } : {})
+                            })}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>ถนน</label>
+                          <input
+                            type="text"
+                            className="form-input-light"
+                            value={appEditData.idCardAddress.road}
+                            onChange={(e) => setAppEditData({
+                              ...appEditData,
+                              idCardAddress: { ...appEditData.idCardAddress, road: e.target.value },
+                              ...(appEditData.isIdCardAddress ? { address: { ...appEditData.address, road: e.target.value } } : {})
+                            })}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>ตำบล/แขวง *</label>
+                          <input
+                            type="text"
+                            className="form-input-light"
+                            value={appEditData.idCardAddress.subDistrict}
+                            onChange={(e) => setAppEditData({
+                              ...appEditData,
+                              idCardAddress: { ...appEditData.idCardAddress, subDistrict: e.target.value },
+                              ...(appEditData.isIdCardAddress ? { address: { ...appEditData.address, subDistrict: e.target.value } } : {})
+                            })}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>อำเภอ/เขต *</label>
+                          <input
+                            type="text"
+                            className="form-input-light"
+                            value={appEditData.idCardAddress.district}
+                            onChange={(e) => setAppEditData({
+                              ...appEditData,
+                              idCardAddress: { ...appEditData.idCardAddress, district: e.target.value },
+                              ...(appEditData.isIdCardAddress ? { address: { ...appEditData.address, district: e.target.value } } : {})
+                            })}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>จังหวัด *</label>
+                          <select
+                            className="form-input-light"
+                            value={appEditData.idCardAddress.province}
+                            onChange={(e) => setAppEditData({
+                              ...appEditData,
+                              idCardAddress: { ...appEditData.idCardAddress, province: e.target.value },
+                              ...(appEditData.isIdCardAddress ? { address: { ...appEditData.address, province: e.target.value } } : {})
+                            })}
+                            required
+                          >
+                            {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>รหัสไปรษณีย์ *</label>
+                          <input
+                            type="text"
+                            className="form-input-light"
+                            value={appEditData.idCardAddress.zipCode}
+                            onChange={(e) => setAppEditData({
+                              ...appEditData,
+                              idCardAddress: { ...appEditData.idCardAddress, zipCode: e.target.value },
+                              ...(appEditData.isIdCardAddress ? { address: { ...appEditData.address, zipCode: e.target.value } } : {})
+                            })}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ marginTop: 14 }}>
+                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', color: '#334155', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={appEditData.isIdCardAddress}
+                            onChange={(e) => {
+                              const isChecked = e.target.checked;
+                              setAppEditData({
+                                ...appEditData,
+                                isIdCardAddress: isChecked,
+                                address: isChecked ? { ...appEditData.idCardAddress } : { ...appEditData.address }
+                              });
+                            }}
+                          />
+                          <span>ที่อยู่ปัจจุบันตรงกับที่อยู่ตามบัตรประชาชน</span>
+                        </label>
+                      </div>
+
+                      {!appEditData.isIdCardAddress && (
+                        <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px dashed #cbd5e1' }}>
+                          <h4 style={{ margin: '0 0 12px 0', fontSize: '0.92rem', color: 'var(--navy-900)' }}>
+                            ที่อยู่ปัจจุบัน *
+                          </h4>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px' }}>
+                            <div>
+                              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>บ้านเลขที่ *</label>
+                              <input
+                                type="text"
+                                className="form-input-light"
+                                value={appEditData.address.houseNo}
+                                onChange={(e) => setAppEditData({ ...appEditData, address: { ...appEditData.address, houseNo: e.target.value } })}
+                                required
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>หมู่</label>
+                              <input
+                                type="text"
+                                className="form-input-light"
+                                value={appEditData.address.moo}
+                                onChange={(e) => setAppEditData({ ...appEditData, address: { ...appEditData.address, moo: e.target.value } })}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>ซอย</label>
+                              <input
+                                type="text"
+                                className="form-input-light"
+                                value={appEditData.address.soi}
+                                onChange={(e) => setAppEditData({ ...appEditData, address: { ...appEditData.address, soi: e.target.value } })}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>ถนน</label>
+                              <input
+                                type="text"
+                                className="form-input-light"
+                                value={appEditData.address.road}
+                                onChange={(e) => setAppEditData({ ...appEditData, address: { ...appEditData.address, road: e.target.value } })}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>ตำบล/แขวง *</label>
+                              <input
+                                type="text"
+                                className="form-input-light"
+                                value={appEditData.address.subDistrict}
+                                onChange={(e) => setAppEditData({ ...appEditData, address: { ...appEditData.address, subDistrict: e.target.value } })}
+                                required
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>อำเภอ/เขต *</label>
+                              <input
+                                type="text"
+                                className="form-input-light"
+                                value={appEditData.address.district}
+                                onChange={(e) => setAppEditData({ ...appEditData, address: { ...appEditData.address, district: e.target.value } })}
+                                required
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>จังหวัด *</label>
+                              <select
+                                className="form-input-light"
+                                value={appEditData.address.province}
+                                onChange={(e) => setAppEditData({ ...appEditData, address: { ...appEditData.address, province: e.target.value } })}
+                                required
+                              >
+                                {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>รหัสไปรษณีย์ *</label>
+                              <input
+                                type="text"
+                                className="form-input-light"
+                                value={appEditData.address.zipCode}
+                                onChange={(e) => setAppEditData({ ...appEditData, address: { ...appEditData.address, zipCode: e.target.value } })}
+                                required
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 2: ข้อมูลครอบครัว & การกู้ยืม */}
+                {appModalTab === 2 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                    {/* Father Info */}
+                    <div style={{ background: '#f8fafc', padding: 18, borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                      <h4 style={{ margin: '0 0 12px 0', fontSize: '0.92rem', color: 'var(--navy-900)' }}>
+                        ข้อมูลบิดา
+                      </h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+                        <div>
+                          <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>ชื่อ-นามสกุลบิดา</label>
+                          <input
+                            type="text"
+                            className="form-input-light"
+                            value={appEditData.fatherName}
+                            onChange={(e) => setAppEditData({ ...appEditData, fatherName: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>เบอร์โทรศัพท์บิดา</label>
+                          <input
+                            type="tel"
+                            className="form-input-light"
+                            value={appEditData.fatherPhone}
+                            onChange={(e) => setAppEditData({ ...appEditData, fatherPhone: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>อาชีพบิดา</label>
+                          <input
+                            type="text"
+                            className="form-input-light"
+                            value={appEditData.fatherJob}
+                            onChange={(e) => setAppEditData({ ...appEditData, fatherJob: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>รายได้บิดา (บาท/เดือน)</label>
+                          <input
+                            type="number"
+                            className="form-input-light"
+                            value={appEditData.fatherIncome}
+                            onChange={(e) => setAppEditData({ ...appEditData, fatherIncome: Number(e.target.value) || 0 })}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>สถานะการมีชีวิต</label>
+                          <select
+                            className="form-input-light"
+                            value={appEditData.fatherAlive}
+                            onChange={(e) => setAppEditData({ ...appEditData, fatherAlive: e.target.value as 'alive' | 'deceased' })}
+                          >
+                            <option value="alive">ยังมีชีวิตอยู่</option>
+                            <option value="deceased">ถึงแก่กรรม</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Mother Info */}
+                    <div style={{ background: '#f8fafc', padding: 18, borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                      <h4 style={{ margin: '0 0 12px 0', fontSize: '0.92rem', color: 'var(--navy-900)' }}>
+                        ข้อมูลมารดา
+                      </h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+                        <div>
+                          <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>ชื่อ-นามสกุลมารดา</label>
+                          <input
+                            type="text"
+                            className="form-input-light"
+                            value={appEditData.motherName}
+                            onChange={(e) => setAppEditData({ ...appEditData, motherName: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>เบอร์โทรศัพท์มารดา</label>
+                          <input
+                            type="tel"
+                            className="form-input-light"
+                            value={appEditData.motherPhone}
+                            onChange={(e) => setAppEditData({ ...appEditData, motherPhone: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>อาชีพมารดา</label>
+                          <input
+                            type="text"
+                            className="form-input-light"
+                            value={appEditData.motherJob}
+                            onChange={(e) => setAppEditData({ ...appEditData, motherJob: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>รายได้มารดา (บาท/เดือน)</label>
+                          <input
+                            type="number"
+                            className="form-input-light"
+                            value={appEditData.motherIncome}
+                            onChange={(e) => setAppEditData({ ...appEditData, motherIncome: Number(e.target.value) || 0 })}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>สถานะการมีชีวิต</label>
+                          <select
+                            className="form-input-light"
+                            value={appEditData.motherAlive}
+                            onChange={(e) => setAppEditData({ ...appEditData, motherAlive: e.target.value as 'alive' | 'deceased' })}
+                          >
+                            <option value="alive">ยังมีชีวิตอยู่</option>
+                            <option value="deceased">ถึงแก่กรรม</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Family Status & Income */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--navy-800)', marginBottom: 4, display: 'block' }}>
+                          สถานภาพของบิดามารดา
+                        </label>
+                        <select
+                          className="form-input-light"
+                          value={appEditData.parentsRelation}
+                          onChange={(e) => setAppEditData({ ...appEditData, parentsRelation: e.target.value as 'together' | 'divorced' | 'other' })}
+                        >
+                          <option value="together">บิดามารดาอยู่ด้วยกัน</option>
+                          <option value="divorced">หย่าร้าง / แยกกันอยู่</option>
+                          <option value="other">บิดาหรือมารดาถึงแก่กรรม / อื่นๆ</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--navy-800)', marginBottom: 4, display: 'block' }}>
+                          รายได้ครอบครัวรวม (บาท/ปี)
+                        </label>
+                        <input
+                          type="number"
+                          className="form-input-light"
+                          value={appEditData.familyIncome}
+                          onChange={(e) => setAppEditData({ ...appEditData, familyIncome: Number(e.target.value) || 0 })}
+                        />
+                      </div>
+
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--navy-800)', marginBottom: 4, display: 'block' }}>
+                          จำนวนพี่น้องร่วมบิดามารดา (คน)
+                        </label>
+                        <input
+                          type="number"
+                          className="form-input-light"
+                          value={appEditData.siblings}
+                          onChange={(e) => setAppEditData({ ...appEditData, siblings: Number(e.target.value) || 0 })}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Sponsor & Loan */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--navy-800)', marginBottom: 4, display: 'block' }}>
+                          การกู้ยืมเงินเพื่อการศึกษา
+                        </label>
+                        <select
+                          className="form-input-light"
+                          value={appEditData.loanStatus}
+                          onChange={(e) => setAppEditData({ ...appEditData, loanStatus: e.target.value as 'none' | 'กยศ' | 'กรอ' })}
+                        >
+                          <option value="none">ไม่ได้กู้ยืมเงิน</option>
+                          <option value="กยศ">กู้ยืมกองทุน กยศ.</option>
+                          <option value="กรอ">กู้ยืมกองทุน กรอ.</option>
+                        </select>
+                      </div>
+
+                      {appEditData.loanStatus !== 'none' && (
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--navy-800)', marginBottom: 4, display: 'block' }}>
+                            จำนวนเงินที่กู้ยืม (บาท/ภาคเรียน)
+                          </label>
+                          <input
+                            type="number"
+                            className="form-input-light"
+                            value={appEditData.loanAmount}
+                            onChange={(e) => setAppEditData({ ...appEditData, loanAmount: Number(e.target.value) || 0 })}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 3: กิจกรรม & เหตุผลความจำเป็น */}
+                {appModalTab === 3 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                    {/* Part-time & Volunteer */}
+                    <div style={{ background: '#f8fafc', padding: 18, borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                        <input
+                          type="checkbox"
+                          id="partTimeCheck"
+                          checked={appEditData.hasPartTimeJob}
+                          onChange={(e) => setAppEditData({ ...appEditData, hasPartTimeJob: e.target.checked })}
+                        />
+                        <label htmlFor="partTimeCheck" style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)', cursor: 'pointer' }}>
+                          มีการทำงานพิเศษ / งานพาร์ทไทม์ (Part-time)
+                        </label>
+                      </div>
+
+                      {appEditData.hasPartTimeJob && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                          <div>
+                            <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>สถานที่ทำงานพิเศษ</label>
+                            <input
+                              type="text"
+                              className="form-input-light"
+                              value={appEditData.partTimeJobLocation}
+                              onChange={(e) => setAppEditData({ ...appEditData, partTimeJobLocation: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>รายได้พิเศษ (บาท/เดือน)</label>
+                            <input
+                              type="number"
+                              className="form-input-light"
+                              value={appEditData.partTimeJobIncome}
+                              onChange={(e) => setAppEditData({ ...appEditData, partTimeJobIncome: Number(e.target.value) || 0 })}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Activities List (Add / Edit / Delete) */}
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                        <label style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--navy-900)' }}>
+                          ประวัติกิจกรรมที่เคยเข้าร่วม (Activity List)
+                        </label>
+                        {isEditMode && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = appEditData.activityList || [];
+                              setAppEditData({
+                                ...appEditData,
+                                activityList: [...current, { name: '', role: '', photoBase64: null }]
+                              });
+                            }}
+                            style={{
+                              padding: '4px 12px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--math-green, #077b38)',
+                              background: '#f0fdf4',
+                              color: 'var(--math-green)',
+                              fontSize: '0.8rem',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4
+                            }}
+                          >
+                            <Plus size={14} />
+                            <span>เพิ่มกิจกรรม</span>
+                          </button>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {(!appEditData.activityList || appEditData.activityList.length === 0) ? (
+                          <div style={{ padding: 14, textAlign: 'center', background: '#f8fafc', borderRadius: 8, color: 'var(--text-muted)', fontSize: '0.84rem' }}>
+                            {isEditMode ? 'ยังไม่มีข้อมูลกิจกรรม (กดปุ่ม "+ เพิ่มกิจกรรม" เพื่อเพิ่มรายการ)' : 'ไม่มีข้อมูลกิจกรรม'}
+                          </div>
+                        ) : (
+                          appEditData.activityList.map((act, idx) => (
+                            <div key={idx} style={{ display: 'flex', gap: 10, alignItems: 'center', background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', width: 20 }}>
+                                {idx + 1}.
+                              </span>
+                              <div style={{ flex: 2 }}>
+                                <input
+                                  type="text"
+                                  className="form-input-light"
+                                  placeholder="ชื่อกิจกรรม เช่น ค่ายคณิตศาสตร์สัญจร"
+                                  value={act.name}
+                                  onChange={(e) => {
+                                    const next = [...(appEditData.activityList || [])];
+                                    next[idx].name = e.target.value;
+                                    setAppEditData({ ...appEditData, activityList: next });
+                                  }}
+                                />
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <input
+                                  type="text"
+                                  className="form-input-light"
+                                  placeholder="บทบาทหน้าที่ เช่น สวัสดิการ"
+                                  value={act.role}
+                                  onChange={(e) => {
+                                    const next = [...(appEditData.activityList || [])];
+                                    next[idx].role = e.target.value;
+                                    setAppEditData({ ...appEditData, activityList: next });
+                                  }}
+                                />
+                              </div>
+                              {isEditMode && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = (appEditData.activityList || []).filter((_, i) => i !== idx);
+                                    setAppEditData({ ...appEditData, activityList: next });
+                                  }}
+                                  style={{
+                                    width: 32,
+                                    height: 32,
+                                    border: '1px solid #fca5a5',
+                                    background: '#fef2f2',
+                                    color: '#dc2626',
+                                    borderRadius: 6,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                  title="ลบกิจกรรมนี้"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Reasons List (Add / Edit / Delete) */}
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                        <label style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--navy-900)' }}>
+                          เหตุผลความจำเป็นในการขอรับทุนการศึกษา
+                        </label>
+                        {isEditMode && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = appEditData.reasonsList || [];
+                              setAppEditData({
+                                ...appEditData,
+                                reasonsList: [...current, '']
+                              });
+                            }}
+                            style={{
+                              padding: '4px 12px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--math-green, #077b38)',
+                              background: '#f0fdf4',
+                              color: 'var(--math-green)',
+                              fontSize: '0.8rem',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4
+                            }}
+                          >
+                            <Plus size={14} />
+                            <span>เพิ่มเหตุผล</span>
+                          </button>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {(!appEditData.reasonsList || appEditData.reasonsList.length === 0) ? (
+                          <div style={{ padding: 14, textAlign: 'center', background: '#f8fafc', borderRadius: 8, color: 'var(--text-muted)', fontSize: '0.84rem' }}>
+                            {isEditMode ? 'ยังไม่มีรายการเหตุผล (กดปุ่ม "+ เพิ่มเหตุผล" เพื่อเพิ่มข้อความ)' : 'ไม่มีข้อมูลเหตุผล'}
+                          </div>
+                        ) : (
+                          appEditData.reasonsList.map((reasonText, idx) => (
+                            <div key={idx} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', width: 20 }}>
+                                {idx + 1}.
+                              </span>
+                              <input
+                                type="text"
+                                className="form-input-light"
+                                placeholder="ระบุเหตุผลความจำเป็น เช่น ครอบครัวมีภาระค่าใช้จ่ายสูง..."
+                                value={reasonText}
+                                onChange={(e) => {
+                                  const next = [...(appEditData.reasonsList || [])];
+                                  next[idx] = e.target.value;
+                                  setAppEditData({ ...appEditData, reasonsList: next });
+                                }}
+                                style={{ flex: 1 }}
+                              />
+                              {isEditMode && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = (appEditData.reasonsList || []).filter((_, i) => i !== idx);
+                                    setAppEditData({ ...appEditData, reasonsList: next });
+                                  }}
+                                  style={{
+                                    width: 32,
+                                    height: 32,
+                                    border: '1px solid #fca5a5',
+                                    background: '#fef2f2',
+                                    color: '#dc2626',
+                                    borderRadius: 6,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                  title="ลบข้อนี้"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+              </fieldset>
+
+              {/* Modal Footer */}
+              <div style={{
+                padding: '14px 24px',
+                borderTop: '1px solid #f1f5f9',
+                background: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12
+              }}>
+                <button
+                  type="button"
+                  onClick={handleDeleteCurrentApp}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '8px',
+                    border: '1px solid #fecaca',
+                    background: '#fef2f2',
+                    color: '#dc2626',
+                    fontWeight: 600,
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    transition: 'all 0.15s ease'
+                  }}
+                  title="ลบใบสมัครนี้ออกจากระบบ"
+                >
+                  <Trash2 size={14} />
+                  <span>ลบใบสมัครนี้</span>
+                </button>
+
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      if (isEditMode) {
+                        setIsEditMode(false);
+                      } else {
+                        setIsReviewModalOpen(false);
+                      }
+                    }}
+                    style={{ padding: '8px 20px', fontSize: '0.86rem' }}
+                  >
+                    {isEditMode ? 'ยกเลิก' : 'ปิด'}
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    style={{
+                      padding: '8px 24px',
+                      fontSize: '0.86rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      background: 'var(--math-green, #077b38)',
+                      borderColor: 'var(--math-green, #077b38)'
+                    }}
+                  >
+                    <Check size={16} strokeWidth={2.2} />
+                    <span>บันทึก</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -1489,6 +3605,340 @@ export const AdminSection: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* ========================================== */}
+      {/* PRINT PREVIEW MODAL (1. รายชื่อ 2. ใบสมัคร) */}
+      {/* ========================================== */}
+      {printModalState.isOpen && (
+        <div className="modal-backdrop open" style={{ zIndex: 3000, overflowY: 'auto', padding: '20px 10px', alignItems: 'flex-start' }}>
+          <div style={{ maxWidth: 940, width: '100%', margin: '20px auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Top Toolbar (no-print) */}
+            <div className="no-print" style={{
+              background: '#ffffff',
+              borderRadius: '12px',
+              padding: '12px 20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+              border: '1px solid #e2e8f0',
+              position: 'sticky',
+              top: 10,
+              zIndex: 20
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: 700, fontSize: '0.98rem', color: 'var(--navy-900)' }}>
+                  {printModalState.type === 'list' ? '🖨️ รายงานสรุปรายชื่อผู้สมัคร (1. รายชื่อ)' : '📄 แบบฟอร์มใบสมัครขอรับทุน (2. ใบสมัคร)'}
+                </span>
+
+                {printModalState.type === 'application' && (
+                  <select
+                    value={printModalState.targetAppId}
+                    onChange={(e) => setPrintModalState({ ...printModalState, targetAppId: e.target.value })}
+                    style={{ fontSize: '0.84rem', padding: '5px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#f8fafc', color: 'var(--navy-900)', fontWeight: 500 }}
+                  >
+                    {selectedAppIds.size > 0 && (
+                      <option value="selected">
+                        พิมพ์เฉพาะรายชื่อที่เลือกไว้ ({selectedAppIds.size} คน)
+                      </option>
+                    )}
+                    <option value="all">พิมพ์ใบสมัครทุกคนในรายการที่กรอง ({filteredApps.length} คน)</option>
+                    {filteredApps.map(a => (
+                      <option key={a.trackingId} value={a.trackingId}>
+                        {a.fullName} ({a.studentId}) - {a.scholarshipName}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="btn btn-primary"
+                  style={{
+                    padding: '8px 22px',
+                    fontSize: '0.88rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    background: 'var(--math-green, #077b38)',
+                    borderColor: 'var(--math-green, #077b38)'
+                  }}
+                >
+                  <Printer size={16} />
+                  <span>สั่งพิมพ์ (Print)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPrintModalState({ ...printModalState, isOpen: false })}
+                  className="btn btn-secondary"
+                  style={{ padding: '8px 18px', fontSize: '0.88rem' }}
+                >
+                  ปิด
+                </button>
+              </div>
+            </div>
+
+            {/* Document Paper Container */}
+            <div className="printable-report-area" style={{
+              background: '#ffffff',
+              borderRadius: '8px',
+              padding: '48px 52px',
+              color: '#0f172a',
+              boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
+              fontFamily: '"Sarabun", "Noto Sans Thai", system-ui, -apple-system, sans-serif'
+            }}>
+              {/* ========================================== */}
+              {/* REPORT 1: รายชื่อผู้สมัคร (NAME LIST REPORT) */}
+              {/* ========================================== */}
+              {printModalState.type === 'list' && (
+                <div>
+                  {/* Formal Header */}
+                  <div style={{ textAlign: 'center', borderBottom: '2px solid #0f172a', paddingBottom: 16, marginBottom: 20 }}>
+                    <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#0f172a' }}>
+                      ภาควิชาคณิตศาสตร์ คณะวิทยาศาสตร์ประยุกต์
+                    </h2>
+                    <h3 style={{ margin: '4px 0 0', fontSize: '1.05rem', fontWeight: 600, color: '#334155' }}>
+                      มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ
+                    </h3>
+                    <h1 style={{ margin: '14px 0 6px', fontSize: '1.35rem', fontWeight: 800, color: 'var(--math-green, #077b38)' }}>
+                      รายงานสรุปรายชื่อผู้สมัครขอรับทุนการศึกษา
+                    </h1>
+                    <div style={{ fontSize: '0.9rem', color: '#475569' }}>
+                      ประจำปีการศึกษา {siteSettings.academicYear || '2567'} ภาคการศึกษาที่ {siteSettings.semester || '1'}
+                    </div>
+                  </div>
+
+                  {/* Summary Box */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, fontSize: '0.86rem', color: '#334155', background: '#f8fafc', padding: '10px 16px', borderRadius: 6, border: '1px solid #e2e8f0' }}>
+                    <div>
+                      <strong>เงื่อนไข:</strong> {selectedAppIds.size > 0 ? `เลือกเฉพาะรายชื่อ (${printListApps.length} คน)` : (filterType !== 'all' ? `ชนิดทุน: ${filterType}` : 'ทุนการศึกษาทั้งหมด')} | {filterStatus !== 'all' ? `สถานะ: ${filterStatus}` : 'ทุกสถานะ'}
+                    </div>
+                    <div>
+                      <strong>จำนวนผู้สมัคร:</strong> {printListApps.length} คน | <strong>วันที่ออกรายงาน:</strong> {new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}
+                    </div>
+                  </div>
+
+                  {/* Table */}
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.86rem', color: '#0f172a' }}>
+                    <thead>
+                      <tr style={{ background: '#f1f5f9' }}>
+                        <th style={{ border: '1px solid #94a3b8', padding: '8px 6px', textAlign: 'center', width: 40 }}>ลำดับ</th>
+                        <th style={{ border: '1px solid #94a3b8', padding: '8px 10px', textAlign: 'center', width: 110 }}>รหัสนักศึกษา</th>
+                        <th style={{ border: '1px solid #94a3b8', padding: '8px 10px', textAlign: 'left' }}>ชื่อ - นามสกุล</th>
+                        <th style={{ border: '1px solid #94a3b8', padding: '8px 8px', textAlign: 'center', width: 90 }}>สาขา/ชั้นปี</th>
+                        <th style={{ border: '1px solid #94a3b8', padding: '8px 10px', textAlign: 'left' }}>ทุนการศึกษาที่สมัคร</th>
+                        <th style={{ border: '1px solid #94a3b8', padding: '8px 6px', textAlign: 'center', width: 55 }}>GPAX</th>
+                        <th style={{ border: '1px solid #94a3b8', padding: '8px 8px', textAlign: 'center', width: 85 }}>วันที่ยื่น</th>
+                        <th style={{ border: '1px solid #94a3b8', padding: '8px 8px', textAlign: 'center', width: 95 }}>สถานะ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {printListApps.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} style={{ border: '1px solid #cbd5e1', padding: 24, textAlign: 'center', color: '#64748b' }}>
+                            ไม่พบข้อมูลผู้สมัครตามเงื่อนไขที่ระบุ
+                          </td>
+                        </tr>
+                      ) : (
+                        printListApps.map((app, idx) => (
+                          <tr key={app.trackingId}>
+                            <td style={{ border: '1px solid #cbd5e1', padding: '7px 6px', textAlign: 'center' }}>{idx + 1}</td>
+                            <td style={{ border: '1px solid #cbd5e1', padding: '7px 10px', textAlign: 'center', fontFamily: 'monospace', fontWeight: 600 }}>{app.studentId}</td>
+                            <td style={{ border: '1px solid #cbd5e1', padding: '7px 10px', fontWeight: 600 }}>{app.fullName}</td>
+                            <td style={{ border: '1px solid #cbd5e1', padding: '7px 8px', textAlign: 'center' }}>{app.major} {app.year}</td>
+                            <td style={{ border: '1px solid #cbd5e1', padding: '7px 10px' }}>{app.scholarshipName}</td>
+                            <td style={{ border: '1px solid #cbd5e1', padding: '7px 6px', textAlign: 'center', fontWeight: 700 }}>{app.gpax.toFixed(2)}</td>
+                            <td style={{ border: '1px solid #cbd5e1', padding: '7px 8px', textAlign: 'center', fontSize: '0.8rem' }}>{formatThaiDate(app.submissionDate)}</td>
+                            <td style={{ border: '1px solid #cbd5e1', padding: '7px 8px', textAlign: 'center', fontSize: '0.8rem' }}>
+                              {app.status === 'submitted' ? 'ยื่นใบสมัครแล้ว' : app.status === 'approved' ? 'อนุมัติทุนแล้ว' : app.status === 'rejected' ? 'ไม่ผ่านการคัดเลือก' : app.status === 'doc_verified' ? 'ผ่านคุณสมบัติแล้ว' : app.status === 'interview_scheduled' ? 'นัดสัมภาษณ์' : app.status}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+
+                  {/* Sign-off Blocks */}
+                  <div style={{ marginTop: 44, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, textAlign: 'center', fontSize: '0.9rem' }}>
+                    <div>
+                      <div style={{ marginBottom: 44 }}>ลงชื่อ ................................................................ ผู้จัดทำรายงาน</div>
+                      <div>( ................................................................ )</div>
+                      <div style={{ color: '#64748b', fontSize: '0.84rem', marginTop: 4 }}>เจ้าหน้าที่ฝ่ายทุนการศึกษา ภาควิชาคณิตศาสตร์</div>
+                      <div style={{ color: '#64748b', fontSize: '0.84rem', marginTop: 2 }}>วันที่ ......... / ......... / ...............</div>
+                    </div>
+                    <div>
+                      <div style={{ marginBottom: 44 }}>ลงชื่อ ................................................................ ผู้รับรองรายงาน</div>
+                      <div>( ................................................................ )</div>
+                      <div style={{ color: '#64748b', fontSize: '0.84rem', marginTop: 4 }}>หัวหน้าภาควิชาคณิตศาสตร์</div>
+                      <div style={{ color: '#64748b', fontSize: '0.84rem', marginTop: 2 }}>วันที่ ......... / ......... / ...............</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ========================================== */}
+              {/* REPORT 2: ใบสมัครขอรับทุน (APPLICATION FORM) */}
+              {/* ========================================== */}
+              {printModalState.type === 'application' && (
+                <div>
+                  {(printModalState.targetAppId === 'selected'
+                    ? printListApps
+                    : printModalState.targetAppId === 'all'
+                      ? filteredApps
+                      : [filteredApps.find(a => a.trackingId === printModalState.targetAppId) || filteredApps[0]]
+                  ).filter(Boolean).map((app, appIdx) => {
+                    const fd = app.formData || {} as ApplicationFormData;
+                    const fullCurrAddr = getFullAddressText(fd.address);
+                    const fullIdCardAddr = fd.isIdCardAddress ? fullCurrAddr : getFullAddressText(fd.idCardAddress);
+
+                    return (
+                      <div key={app.trackingId} className={appIdx > 0 ? 'page-break' : ''} style={{ paddingTop: appIdx > 0 ? 30 : 0, marginBottom: appIdx > 0 ? 40 : 0 }}>
+                        {/* Header */}
+                        <div style={{ textAlign: 'center', borderBottom: '2px solid #0f172a', paddingBottom: 12, marginBottom: 18 }}>
+                          <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#0f172a' }}>
+                            ใบสมัครขอรับทุนการศึกษา
+                          </h2>
+                          <h3 style={{ margin: '3px 0 0', fontSize: '1.05rem', fontWeight: 600, color: '#334155' }}>
+                            ภาควิชาคณิตศาสตร์ คณะวิทยาศาสตร์ประยุกต์ มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ
+                          </h3>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: '0.84rem', color: '#475569' }}>
+                            <span><strong>เลขที่ใบสมัคร:</strong> #{app.trackingId}</span>
+                            <span><strong>วันที่ยื่นสมัคร:</strong> {formatThaiDate(app.submissionDate)}</span>
+                          </div>
+                        </div>
+
+                        {/* Top banner: Scholarship title & Photo */}
+                        <div style={{ display: 'flex', gap: 20, marginBottom: 18, alignItems: 'flex-start', background: '#f8fafc', padding: 14, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '0.82rem', color: '#64748b' }}>ทุนการศึกษาที่ขอรับ:</div>
+                            <div style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--math-green, #077b38)', marginTop: 2 }}>
+                              {app.scholarshipName}
+                            </div>
+                            <div style={{ marginTop: 8, fontSize: '0.86rem', color: '#334155' }}>
+                              <strong>สถานะการพิจารณา:</strong> {app.status === 'submitted' ? 'ยื่นใบสมัครแล้ว (รอพิจารณา)' : app.status === 'approved' ? 'อนุมัติทุนการศึกษา' : app.status === 'rejected' ? 'ไม่ผ่านการพิจารณา' : app.status}
+                            </div>
+                          </div>
+                          <div style={{ width: 90, height: 115, border: '1px dashed #94a3b8', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', fontSize: '0.75rem', color: '#94a3b8', background: '#ffffff', overflow: 'hidden' }}>
+                            {app.profilePhoto ? (
+                              <img src={app.profilePhoto} alt="รูปถ่าย" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              'ติดรูปถ่าย 1 - 1.5 นิ้ว'
+                            )}
+                          </div>
+                        </div>
+
+                        {/* SECTION 1: Personal & Education */}
+                        <div style={{ marginBottom: 16 }}>
+                          <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a', borderBottom: '1px solid #cbd5e1', paddingBottom: 4, marginBottom: 8 }}>
+                            1. ข้อมูลส่วนบุคคลและการศึกษา
+                          </div>
+                          <table style={{ width: '100%', fontSize: '0.86rem', borderCollapse: 'collapse' }}>
+                            <tbody>
+                              <tr>
+                                <td style={{ padding: '4px 0', width: '50%' }}><strong>ชื่อ-นามสกุล:</strong> {app.fullName}</td>
+                                <td style={{ padding: '4px 0', width: '25%' }}><strong>ชื่อเล่น:</strong> {fd.nickname || '-'}</td>
+                                <td style={{ padding: '4px 0', width: '25%' }}><strong>รหัสนักศึกษา:</strong> {app.studentId}</td>
+                              </tr>
+                              <tr>
+                                <td style={{ padding: '4px 0' }}><strong>สาขาวิชา:</strong> {app.major}</td>
+                                <td style={{ padding: '4px 0' }}><strong>ชั้นปีที่:</strong> {app.year}</td>
+                                <td style={{ padding: '4px 0' }}><strong>เกรดเฉลี่ยสะสม (GPAX):</strong> {app.gpax.toFixed(2)}</td>
+                              </tr>
+                              <tr>
+                                <td style={{ padding: '4px 0' }}><strong>เบอร์โทรศัพท์:</strong> {app.phone}</td>
+                                <td colSpan={2} style={{ padding: '4px 0' }}><strong>อีเมล:</strong> {app.email}</td>
+                              </tr>
+                              <tr>
+                                <td colSpan={3} style={{ padding: '4px 0' }}><strong>ที่อยู่ปัจจุบัน:</strong> {fullCurrAddr}</td>
+                              </tr>
+                              <tr>
+                                <td colSpan={3} style={{ padding: '4px 0' }}><strong>ที่อยู่ตามบัตรประชาชน:</strong> {fullIdCardAddr}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* SECTION 2: Family & Financial */}
+                        <div style={{ marginBottom: 16 }}>
+                          <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a', borderBottom: '1px solid #cbd5e1', paddingBottom: 4, marginBottom: 8 }}>
+                            2. ข้อมูลครอบครัวและภาระทางการเงิน
+                          </div>
+                          <table style={{ width: '100%', fontSize: '0.86rem', borderCollapse: 'collapse' }}>
+                            <tbody>
+                              <tr>
+                                <td style={{ padding: '4px 0', width: '50%' }}>
+                                  <strong>ชื่อบิดา:</strong> {fd.fatherName || '-'} ({fd.fatherAlive === 'deceased' ? 'ถึงแก่กรรม' : 'ยังมีชีวิต'})
+                                </td>
+                                <td style={{ padding: '4px 0', width: '25%' }}><strong>อาชีพ:</strong> {fd.fatherJob || '-'}</td>
+                                <td style={{ padding: '4px 0', width: '25%' }}><strong>รายได้:</strong> {fd.fatherIncome ? `${fd.fatherIncome.toLocaleString()} บ./ด.` : '-'}</td>
+                              </tr>
+                              <tr>
+                                <td style={{ padding: '4px 0' }}>
+                                  <strong>ชื่อมารดา:</strong> {fd.motherName || '-'} ({fd.motherAlive === 'deceased' ? 'ถึงแก่กรรม' : 'ยังมีชีวิต'})
+                                </td>
+                                <td style={{ padding: '4px 0' }}><strong>อาชีพ:</strong> {fd.motherJob || '-'}</td>
+                                <td style={{ padding: '4px 0' }}><strong>รายได้:</strong> {fd.motherIncome ? `${fd.motherIncome.toLocaleString()} บ./ด.` : '-'}</td>
+                              </tr>
+                              <tr>
+                                <td style={{ padding: '4px 0' }}>
+                                  <strong>รายได้ครอบครัวรวม:</strong> {app.familyIncome ? `${app.familyIncome.toLocaleString()} บาท/เดือน` : '-'}
+                                </td>
+                                <td style={{ padding: '4px 0' }}><strong>จำนวนพี่น้อง:</strong> {fd.siblings || '-'} คน</td>
+                                <td style={{ padding: '4px 0' }}>
+                                  <strong>กู้ยืม กยศ./กรอ.:</strong> {fd.loanStatus === 'none' ? 'ไม่ได้กู้ยืม' : 'กู้ยืม กยศ./กรอ.'}
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* SECTION 3: Activities & Reasons */}
+                        <div style={{ marginBottom: 16 }}>
+                          <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a', borderBottom: '1px solid #cbd5e1', paddingBottom: 4, marginBottom: 8 }}>
+                            3. ประวัติกิจกรรมและเหตุผลความจำเป็น
+                          </div>
+                          <div style={{ fontSize: '0.86rem', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <div><strong>กิจกรรมที่เคยปฏิบัติ:</strong> {fd.activities || '-'}</div>
+                            <div><strong>ชั่วโมงจิตอาสา:</strong> {fd.volunteerHours || '-'} ชั่วโมง</div>
+                            <div><strong>เหตุผลความจำเป็นในการขอรับทุนการศึกษา:</strong></div>
+                            <div style={{ background: '#f8fafc', padding: '8px 12px', borderRadius: 4, border: '1px solid #e2e8f0', whiteSpace: 'pre-wrap', lineHeight: 1.5, fontSize: '0.84rem' }}>
+                              {fd.reason || 'ไม่มีข้อมูลเหตุผล'}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* SECTION 4: Signatures */}
+                        <div style={{ borderTop: '1px solid #cbd5e1', paddingTop: 14, marginTop: 18 }}>
+                          <div style={{ fontSize: '0.84rem', fontStyle: 'italic', marginBottom: 24, textAlign: 'center' }}>
+                            "ข้าพเจ้าขอรับรองว่า ข้อความดังกล่าวข้างต้นเป็นความจริงทุกประการ หากปรากฏว่าเป็นเท็จ ข้าพเจ้ายินยอมให้ยกเลิกสิทธิ์ในการรับทุนการศึกษา"
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, textAlign: 'center', fontSize: '0.88rem' }}>
+                            <div>
+                              <div style={{ marginBottom: 36 }}>ลงชื่อ ................................................................ ผู้สมัคร</div>
+                              <div>( {app.fullName} )</div>
+                              <div style={{ color: '#64748b', fontSize: '0.82rem', marginTop: 2 }}>วันที่ ......... / ......... / ...............</div>
+                            </div>
+                            <div>
+                              <div style={{ marginBottom: 36 }}>ลงชื่อ ................................................................ อาจารย์ที่ปรึกษา</div>
+                              <div>( ................................................................ )</div>
+                              <div style={{ color: '#64748b', fontSize: '0.82rem', marginTop: 2 }}>วันที่ ......... / ......... / ...............</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </section>
   );
 };

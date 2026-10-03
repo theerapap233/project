@@ -84,7 +84,9 @@ const mapRowToApplication = (row: DbScholarshipApplicationRow): Application => {
     interviewDate: (formData.interviewDate as string) || 'รอประกาศวันสัมภาษณ์',
     score: (formData.score as number | null) ?? null,
     committeeNotes: row.note || (formData.committeeNotes as string) || '',
-    documents: (formData.documents as string[]) || []
+    documents: (formData.documents as string[]) || [],
+    profilePhoto: (formData.profilePhoto as string | null) ?? null,
+    formData: formData as unknown as ApplicationFormData
   };
 };
 
@@ -268,6 +270,7 @@ export const applicationService = {
         trackingId: appObj.trackingId,
         scholarshipName: appObj.scholarshipName,
         documents: appObj.documents,
+        profilePhoto: files.profilePhoto,
         subStatus: 'submitted',
         interviewDate: 'รอการตรวจสอบเอกสาร',
         score: null,
@@ -390,8 +393,127 @@ export const applicationService = {
       }
 
       return false;
+      return false;
     } catch (err) {
       console.error('Error updating application in Supabase:', err);
+      return false;
+    }
+  },
+
+  async updateApplicationDetails(application: Application): Promise<boolean> {
+    if (!isSupabaseConfigured()) return false;
+
+    try {
+      const { data: rows, error: findError } = await supabase
+        .from('scholarship_applications')
+        .select('id, student_id, form_data')
+        .filter('form_data->>trackingId', 'eq', application.trackingId)
+        .limit(1);
+
+      if (findError) throw findError;
+      if (!rows?.length) return false;
+
+      const row = rows[0] as { id: string; student_id: string; form_data: Record<string, unknown> | null };
+      const names = application.fullName.trim().split(/\s+/);
+      const fullFormData = {
+        ...(row.form_data || {}),
+        ...(application.formData || {}),
+        trackingId: application.trackingId,
+        scholarshipId: application.scholarshipId,
+        scholarshipName: application.scholarshipName,
+        studentId: application.studentId,
+        fullName: application.fullName,
+        major: application.major,
+        year: application.year,
+        gpax: application.gpax,
+        familyIncome: application.familyIncome,
+        phone: application.phone,
+        email: application.email,
+        submissionDate: application.submissionDate,
+        subStatus: application.status,
+        interviewDate: application.interviewDate,
+        score: application.score,
+        committeeNotes: application.committeeNotes,
+        documents: application.documents,
+        profilePhoto: application.profilePhoto ?? null
+      };
+      const programIdIsUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(application.scholarshipId);
+      const applicationUpdate: Record<string, unknown> = {
+        gpa: application.gpax,
+        status: mapAppStatusToDbStatus(application.status),
+        note: application.committeeNotes,
+        reason: application.formData?.reason || '',
+        form_data: fullFormData,
+        updated_at: new Date().toISOString()
+      };
+      if (programIdIsUuid) applicationUpdate.program_id = application.scholarshipId;
+
+      const { error: applicationError } = await supabase
+        .from('scholarship_applications')
+        .update(applicationUpdate)
+        .eq('id', row.id);
+      if (applicationError) throw applicationError;
+
+      const formData = application.formData;
+      const studentUpdate: Record<string, unknown> = {
+        student_code: application.studentId,
+        first_name: names[0] || application.fullName,
+        last_name: names.slice(1).join(' ') || '-',
+        phone: application.phone,
+        email: application.email,
+        major: application.major,
+        year: Number.parseInt(application.year.replace(/[^0-9]/g, ''), 10) || 1,
+        updated_at: new Date().toISOString()
+      };
+      if (formData) {
+        studentUpdate.nickname = formData.nickname;
+        studentUpdate.address_line1 = [formData.address.houseNo, formData.address.moo && `หมู่ ${formData.address.moo}`, formData.address.soi && `ซอย ${formData.address.soi}`, formData.address.road && `ถนน ${formData.address.road}`].filter(Boolean).join(' ');
+        studentUpdate.sub_district = formData.address.subDistrict;
+        studentUpdate.district = formData.address.district;
+        studentUpdate.province = formData.address.province;
+        studentUpdate.postal_code = formData.address.zipCode;
+      }
+
+      const { error: studentError } = await supabase
+        .from('students')
+        .update(studentUpdate)
+        .eq('id', row.student_id);
+      if (studentError) throw studentError;
+
+      return true;
+    } catch (err) {
+      console.error('Error updating application details in Supabase:', err);
+      return false;
+    }
+  },
+
+  /**
+   * ลบใบสมัคร
+   */
+  async deleteApplication(trackingId: string): Promise<boolean> {
+    if (!isSupabaseConfigured()) return false;
+
+    try {
+      // ดึง application id ก่อนจาก trackingId
+      const { data: apps } = await supabase
+        .from('scholarship_applications')
+        .select('id')
+        .filter('form_data->>trackingId', 'eq', trackingId)
+        .limit(1);
+
+      if (apps && apps.length > 0) {
+        const appId = apps[0].id;
+        const { error } = await supabase
+          .from('scholarship_applications')
+          .delete()
+          .eq('id', appId);
+
+        if (error) throw error;
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Error deleting application from Supabase:', err);
       return false;
     }
   },

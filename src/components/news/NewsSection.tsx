@@ -19,8 +19,27 @@ export const NewsSection: React.FC = () => {
   };
 
   return (
-    <section className="section" id="news" style={{ background: 'var(--surface-alt)' }}>
-      <div className="container" style={{ maxWidth: '1024px' }}>
+    <section className="section" id="news" style={{ padding: '60px 20px' }}>
+      <div className="container" style={{ 
+        maxWidth: '1240px',
+        background: 'var(--surface-card)',
+        border: '1px solid var(--border-light)',
+        borderRadius: '24px',
+        padding: '48px',
+        boxShadow: 'var(--shadow-lg)',
+        position: 'relative',
+        overflow: 'hidden'
+      }}>
+        {/* Top Decorative Border for the Frame */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '6px',
+          background: 'var(--math-green, #10b981)'
+        }} />
+
         <div className="section-header">
           <span className="section-tag">News & Announcements</span>
           <h2 className="section-title">ข่าวสารและประกาศทุนการศึกษา</h2>
@@ -30,12 +49,8 @@ export const NewsSection: React.FC = () => {
         </div>
 
 
-        {/* News Grid */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
-          gap: 24
-        }}>
+        {/* News Grid - 3 Columns */}
+        <div className="news-grid">
           {announcements.map(item => {
             let badgeBg = 'var(--math-green-soft)';
             let badgeColor = 'var(--math-green-dark)';
@@ -55,11 +70,16 @@ export const NewsSection: React.FC = () => {
               <div 
                 key={item.id}
                 className="scholarship-card"
-                style={{ cursor: 'pointer' }}
+                style={{ 
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  height: '100%'
+                }}
                 onClick={() => handleOpenNews(item)}
               >
                 <div style={{ height: 4, background: item.tagType === 'warning' ? 'var(--warning)' : 'var(--math-green)' }} />
-                <div className="card-content">
+                <div className="card-content" style={{ display: 'flex', flexDirection: 'column', flex: 1, padding: '24px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 8 }}>
                     <span style={{
                       fontSize: '0.75rem',
@@ -80,11 +100,33 @@ export const NewsSection: React.FC = () => {
                     </span>
                   </div>
 
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--navy-900)', marginBottom: 10, lineHeight: 1.4 }}>
+                  <h3 style={{ 
+                    fontSize: '1.1rem', 
+                    fontWeight: 700, 
+                    color: 'var(--navy-900)', 
+                    marginBottom: 10, 
+                    lineHeight: 1.45,
+                    minHeight: '3.2rem',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden'
+                  }}>
                     {item.title}
                   </h3>
 
-                  <p style={{ fontSize: '0.9rem', color: 'var(--navy-600)', lineHeight: 1.6, marginBottom: 20, flex: 1 }}>
+                  <p style={{ 
+                    fontSize: '0.88rem', 
+                    color: 'var(--navy-600)', 
+                    lineHeight: 1.6, 
+                    marginBottom: 20, 
+                    flex: 1,
+                    display: '-webkit-box',
+                    WebkitLineClamp: 3,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    minHeight: '4.2rem'
+                  }}>
                     {item.summary}
                   </p>
 
@@ -96,7 +138,8 @@ export const NewsSection: React.FC = () => {
                     justifyContent: 'space-between',
                     fontSize: '0.88rem',
                     fontWeight: 600,
-                    color: 'var(--math-green)'
+                    color: 'var(--math-green)',
+                    marginTop: 'auto'
                   }}>
                     <span>{item.linkText}</span>
                     <span style={{ fontSize: '1.1rem', transition: 'transform 0.2s ease' }}>&rarr;</span>

@@ -2,41 +2,48 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useScholarship } from '../../context/ScholarshipContext';
 import { useTheme } from '../../context/ThemeContext';
-import { Sun, Moon } from 'lucide-react';
+import { AtSign, BriefcaseBusiness, Camera, Mail, Moon, Sun, Trash2, UserRound, X } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const {
     currentUser,
+    hasStaffCredentials,
     scrollToSection,
     isAdminActive,
     isPreviewMode,
-    setIsPreviewMode,
     openLogoutModal,
     updateCurrentUser,
+    changeStaffCredentials,
     showToast
   } = useScholarship();
   
   const { theme, setTheme } = useTheme();
 
   const isStaffMode = Boolean(currentUser && isAdminActive);
+  const staffNamePart = currentUser?.name.trim().split(/\s+/)[0] || 'Staff';
+  const staffInitials = staffNamePart.replace(/^[เแโใไ]/, '').slice(0, 1) || 'S';
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [profileForm, setProfileForm] = useState({
-    studentId: currentUser?.studentId || '',
+    username: currentUser?.username || currentUser?.studentId || '',
     name: currentUser?.name || '',
     email: currentUser?.email || '',
-    faculty: currentUser?.faculty || 'คณะวิทยาศาสตร์ประยุกต์',
-    major: currentUser?.major || 'ภาควิชาคณิตศาสตร์ (คณิตศาสตร์ประยุกต์)'
+    position: currentUser?.position || (currentUser?.role === 'admin' ? 'เจ้าหน้าที่ธุรการ/กรรมการทุน' : currentUser?.major || ''),
+    avatarUrl: currentUser?.avatarUrl || ''
   });
 
   useEffect(() => {
     if (currentUser) {
       setProfileForm({
-        studentId: currentUser.studentId,
+        username: currentUser.username || currentUser.studentId,
         name: currentUser.name,
         email: currentUser.email,
-        faculty: currentUser.faculty,
-        major: currentUser.major
+        position: currentUser.position || (currentUser.role === 'admin' ? 'เจ้าหน้าที่ธุรการ/กรรมการทุน' : currentUser.major || ''),
+        avatarUrl: currentUser.avatarUrl || ''
       });
     }
   }, [currentUser]);
@@ -44,7 +51,11 @@ export const Navbar: React.FC = () => {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      if (!target.closest('[data-profile-menu-trigger]') && !target.closest('[data-profile-menu-root]')) {
+      if (
+        !target.closest('[data-profile-menu-trigger]') &&
+        !target.closest('[data-profile-menu-root]') &&
+        !target.closest('.staff-profile-overlay')
+      ) {
         setIsProfileMenuOpen(false);
         setIsEditingProfile(false);
       }
@@ -54,29 +65,84 @@ export const Navbar: React.FC = () => {
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleProfileImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showToast('กรุณาเลือกไฟล์รูปภาพ', 'warning');
+      return;
+    }
+    if (file.size > 1024 * 1024) {
+      showToast('รูปโปรไฟล์ต้องมีขนาดไม่เกิน 1 MB', 'warning');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setProfileForm(prev => ({ ...prev, avatarUrl: reader.result as string }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return;
 
     const trimmedName = profileForm.name.trim();
     const trimmedEmail = profileForm.email.trim();
-    const trimmedStudentId = profileForm.studentId.trim();
-
-    if (!trimmedName || !trimmedEmail || !trimmedStudentId) {
-      showToast('กรุณากรอกชื่อ อีเมล และรหัสประจำตัวให้ครบถ้วน', 'warning');
+    const trimmedUsername = profileForm.username.trim();
+    if (!trimmedName || !trimmedEmail || !trimmedUsername || !profileForm.position.trim()) {
+      showToast('กรุณากรอกชื่อ อีเมล ตำแหน่ง และ username ให้ครบถ้วน', 'warning');
       return;
+    }
+
+    const credentialsChanged = trimmedUsername !== (currentUser.username || currentUser.studentId);
+    if (credentialsChanged) {
+      if (!hasStaffCredentials) {
+        showToast('กรุณาตั้งรหัสผ่านก่อนเปลี่ยน username', 'warning');
+        return;
+      }
+      const changed = await changeStaffCredentials(trimmedUsername, '');
+      if (!changed) return;
     }
 
     updateCurrentUser({
       ...profileForm,
       name: trimmedName,
       email: trimmedEmail,
-      studentId: trimmedStudentId,
-      faculty: profileForm.faculty.trim() || currentUser.faculty,
-      major: profileForm.major.trim() || currentUser.major
+      username: trimmedUsername,
+      avatarUrl: profileForm.avatarUrl || null,
+      position: profileForm.position.trim()
     });
     setIsProfileMenuOpen(false);
     setIsEditingProfile(false);
+  };
+
+  const handleChangePassword = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (hasStaffCredentials && !currentPassword) {
+      showToast('กรุณากรอกรหัสผ่านเดิมเพื่อยืนยัน', 'warning');
+      return;
+    }
+    if (newPassword.length < 8) {
+      showToast('รหัสผ่านใหม่ต้องมีอย่างน้อย 8 ตัวอักษร', 'warning');
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      showToast('รหัสผ่านใหม่และการยืนยันรหัสผ่านไม่ตรงกัน', 'warning');
+      return;
+    }
+
+    const username = currentUser?.username || currentUser?.studentId || '';
+    const changed = await changeStaffCredentials(username, newPassword, currentPassword);
+    if (!changed) return;
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmNewPassword('');
+    setIsChangingPassword(false);
   };
 
   return (
@@ -139,54 +205,9 @@ export const Navbar: React.FC = () => {
         </nav>
 
         <div className="header-actions">
-          {/* Theme Toggle Button */}
-          <button
-            onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-            style={{
-              background: 'transparent',
-              border: '1px solid var(--border-light)',
-              color: 'var(--text-main)',
-              width: 36,
-              height: 36,
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              marginRight: 10
-            }}
-            title={`เปลี่ยนธีม (ปัจจุบัน: ${theme})`}
-          >
-            {theme === 'light' ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
+
           {currentUser ? (
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 10 }}>
-              {isStaffMode && isPreviewMode ? (
-                <button
-                  onClick={() => {
-                    setIsPreviewMode(false);
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                  className="btn btn-sm"
-                  style={{
-                    background: 'var(--math-green, #077b38)',
-                    color: 'white',
-                    border: 'none',
-                    padding: '6px 14px',
-                    borderRadius: 'var(--radius-full, 9999px)',
-                    fontSize: '0.82rem',
-                    fontWeight: 600,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    cursor: 'pointer'
-                  }}
-                  title="กลับไปที่แดชบอร์ดจัดการเว็บไซต์"
-                >
-                  <span>↩</span> จัดการเว็บไซต์
-                </button>
-              ) : null}
-
               <button
                 type="button"
                 data-profile-menu-trigger="true"
@@ -194,33 +215,38 @@ export const Navbar: React.FC = () => {
                   setIsProfileMenuOpen(prev => !prev);
                   setIsEditingProfile(false);
                 }}
+                aria-label={`เปิดโปรไฟล์ ${currentUser.name}`}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  background: 'rgba(6, 136, 68, 0.08)',
-                  border: '2px solid rgba(6, 136, 68, 0.45)',
+                  background: 'rgba(100, 116, 139, 0.08)',
+                  border: '2px solid rgba(100, 116, 139, 0.35)',
                   borderRadius: '50%',
                   padding: '4px',
                   cursor: 'pointer',
-                  boxShadow: '0 4px 14px rgba(7, 123, 56, 0.12)'
+                  boxShadow: '0 4px 14px rgba(15, 23, 42, 0.08)'
                 }}
-                title="ข้อมูลส่วนตัวและออกจากระบบ"
+                title={`โปรไฟล์ ${currentUser.name}`}
               >
                 <span style={{
                   width: 34,
                   height: 34,
                   borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #1f7a4d, #0d5f37)',
+                  background: '#64748b',
                   color: 'white',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '0.9rem',
+                  fontSize: '0.72rem',
+                  letterSpacing: '0.02em',
                   fontWeight: 700,
+                  overflow: 'hidden',
                   boxShadow: 'inset 0 0 0 2px rgba(255,255,255,0.18)'
                 }}>
-                  ⚙️
+                    {currentUser.avatarUrl ? (
+                      <img src={currentUser.avatarUrl} alt="รูปโปรไฟล์เจ้าหน้าที่" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : staffInitials}
                 </span>
               </button>
 
@@ -248,6 +274,9 @@ export const Navbar: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => {
+                        setCurrentPassword('');
+                        setNewPassword('');
+                        setConfirmNewPassword('');
                         setIsEditingProfile(true);
                         setIsProfileMenuOpen(false);
                       }}
@@ -269,6 +298,34 @@ export const Navbar: React.FC = () => {
                       onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                     >
                       <span>✏️</span> แก้ไขข้อมูลส่วนตัว
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewPassword('');
+                        setConfirmNewPassword('');
+                        setIsChangingPassword(true);
+                        setIsProfileMenuOpen(false);
+                      }}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        padding: '8px 12px',
+                        textAlign: 'left',
+                        fontSize: '0.8rem',
+                        color: 'var(--text-main)',
+                        cursor: 'pointer',
+                        borderRadius: '6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        fontWeight: 600
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-alt)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <span>🔒</span> {hasStaffCredentials ? 'เปลี่ยนรหัสผ่าน' : 'ตั้งรหัสผ่าน'}
                     </button>
 
                     <button
@@ -302,114 +359,70 @@ export const Navbar: React.FC = () => {
       </div>
 
       {isEditingProfile && typeof document !== 'undefined' && createPortal(
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(15, 23, 42, 0.4)',
-          backdropFilter: 'blur(4px)',
-          zIndex: 99999,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 20
-        }}>
-          <div style={{
-            background: 'var(--surface-card)',
-            borderRadius: '20px',
-            width: '100%',
-            maxWidth: 500,
-            padding: 24,
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-              <div>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>แก้ไขข้อมูลส่วนตัว</h3>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>อัปเดตข้อมูลส่วนตัวของคุณในระบบ</p>
-              </div>
+        <div className="staff-profile-overlay">
+          <div className="staff-profile-edit-dialog" data-profile-menu-root="true">
+            <div className="staff-profile-edit-header">
+              <h3>โปรไฟล์</h3>
               <button
                 type="button"
+                className="staff-profile-close"
                 onClick={() => setIsEditingProfile(false)}
-                style={{
-                  background: 'var(--surface-ground)',
-                  border: 'none',
-                  width: 32,
-                  height: 32,
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  color: 'var(--text-muted)',
-                  fontSize: '1rem'
-                }}
+                aria-label="ปิดหน้าต่าง"
+                title="ปิด"
               >
-                ✕
+                <X size={18} />
               </button>
             </div>
 
             <form onSubmit={handleSaveProfile}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: 6 }}>ชื่อ-นามสกุล</label>
-                  <input
-                    className="form-input-light"
-                    value={profileForm.name}
-                    onChange={(e) => setProfileForm(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="กรอกชื่อ-นามสกุล"
-                    style={{ width: '100%' }}
-                  />
+              <div className="staff-profile-photo-editor staff-profile-photo-centered">
+                <div className="staff-profile-avatar-wrap">
+                <div className="staff-profile-photo-preview">
+                  {profileForm.avatarUrl ? <img src={profileForm.avatarUrl} alt="ตัวอย่างรูปโปรไฟล์เจ้าหน้าที่" /> : staffInitials}
+                </div>
+                  <label className="staff-profile-photo-upload" htmlFor="staff-profile-photo" title="เปลี่ยนรูปโปรไฟล์" aria-label="เปลี่ยนรูปโปรไฟล์">
+                    <Camera size={16} />
+                  </label>
+                  {profileForm.avatarUrl && (
+                    <button type="button" className="staff-profile-photo-remove-icon" onClick={() => setProfileForm(prev => ({ ...prev, avatarUrl: '' }))} aria-label="ลบรูปโปรไฟล์" title="ลบรูปโปรไฟล์">
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+                <input id="staff-profile-photo" className="staff-profile-file-input" type="file" accept="image/*" onChange={handleProfileImageChange} aria-label="เลือกรูปโปรไฟล์" />
+              </div>
+
+              <div className="staff-profile-edit-fields">
+                <div className="staff-profile-edit-field">
+                  <div className="staff-profile-input-wrap">
+                    <UserRound size={17} aria-hidden="true" />
+                    <input className="form-input-light" aria-label="ชื่อ-นามสกุล" value={profileForm.name} onChange={(e) => setProfileForm(prev => ({ ...prev, name: e.target.value }))} placeholder="ชื่อ-นามสกุล" />
+                  </div>
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: 6 }}>รหัสประจำตัว</label>
-                  <input
-                    className="form-input-light"
-                    value={profileForm.studentId}
-                    onChange={(e) => setProfileForm(prev => ({ ...prev, studentId: e.target.value }))}
-                    placeholder="0000000000000"
-                    style={{ width: '100%' }}
-                  />
+                <div className="staff-profile-edit-field">
+                  <div className="staff-profile-input-wrap">
+                    <AtSign size={17} aria-hidden="true" />
+                    <input className="form-input-light" aria-label="ชื่อผู้ใช้" autoComplete="username" value={profileForm.username} onChange={event => setProfileForm(prev => ({ ...prev, username: event.target.value }))} placeholder="ชื่อผู้ใช้" required />
+                  </div>
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: 6 }}>อีเมล</label>
-                  <input
-                    type="email"
-                    className="form-input-light"
-                    value={profileForm.email}
-                    onChange={(e) => setProfileForm(prev => ({ ...prev, email: e.target.value }))}
-                    placeholder="name@kmutnb.ac.th"
-                    style={{ width: '100%' }}
-                  />
+                <div className="staff-profile-edit-field">
+                  <div className="staff-profile-input-wrap">
+                    <Mail size={17} aria-hidden="true" />
+                    <input type="email" className="form-input-light" aria-label="อีเมล" value={profileForm.email} onChange={(e) => setProfileForm(prev => ({ ...prev, email: e.target.value }))} placeholder="อีเมล" />
+                  </div>
                 </div>
 
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: 6 }}>คณะ</label>
-                  <input
-                    className="form-input-light"
-                    value={profileForm.faculty}
-                    onChange={(e) => setProfileForm(prev => ({ ...prev, faculty: e.target.value }))}
-                    placeholder="คณะวิทยาศาสตร์ประยุกต์"
-                    style={{ width: '100%' }}
-                  />
-                </div>
-
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: 6 }}>สาขา / หน่วยงาน</label>
-                  <input
-                    className="form-input-light"
-                    value={profileForm.major}
-                    onChange={(e) => setProfileForm(prev => ({ ...prev, major: e.target.value }))}
-                    placeholder="ภาควิชาคณิตศาสตร์ / งานกิจการนักศึกษา"
-                    style={{ width: '100%' }}
-                  />
+                <div className="staff-profile-edit-field">
+                  <div className="staff-profile-input-wrap">
+                    <BriefcaseBusiness size={17} aria-hidden="true" />
+                    <input className="form-input-light" aria-label="ตำแหน่ง" value={profileForm.position} onChange={(e) => setProfileForm(prev => ({ ...prev, position: e.target.value }))} placeholder="ตำแหน่ง" />
+                  </div>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 24 }}>
+              <div className="staff-profile-dialog-actions">
                 <button
                   type="button"
                   className="btn btn-secondary"
@@ -418,8 +431,66 @@ export const Navbar: React.FC = () => {
                   ยกเลิก
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  บันทึกข้อมูล
+                  บันทึก
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {isChangingPassword && typeof document !== 'undefined' && createPortal(
+        <div className="staff-profile-overlay">
+          <div className="staff-profile-dialog staff-password-dialog" data-profile-menu-root="true">
+            <div className="staff-profile-dialog-header">
+              <div>
+                <h3>{hasStaffCredentials ? 'เปลี่ยนรหัสผ่าน' : 'ตั้งรหัสผ่าน'}</h3>
+                <p>กรอกรหัสผ่านใหม่และยืนยันอีกครั้ง</p>
+              </div>
+              <button type="button" className="staff-profile-close" onClick={() => setIsChangingPassword(false)} aria-label="ปิดหน้าต่าง">✕</button>
+            </div>
+            <form onSubmit={handleChangePassword}>
+              <div className="staff-password-fields">
+                <label className="staff-password-field-full">รหัสผ่านเดิม
+                  <input
+                    className="form-input-light"
+                    type="password"
+                    autoComplete="current-password"
+                    value={currentPassword}
+                    onChange={event => setCurrentPassword(event.target.value)}
+                    placeholder={hasStaffCredentials ? 'กรอกรหัสผ่านปัจจุบัน' : 'ยังไม่มีรหัสผ่านเดิมในระบบ'}
+                    required={hasStaffCredentials}
+                  />
+                  {!hasStaffCredentials && <small className="staff-password-first-setup">บัญชีนี้ยังไม่เคยตั้งรหัสผ่านในระบบ จึงไม่มีรหัสเดิมให้ตรวจ</small>}
+                </label>
+                <label>รหัสผ่านใหม่
+                  <input
+                    className="form-input-light"
+                    type="password"
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={event => setNewPassword(event.target.value)}
+                    minLength={8}
+                    required
+                  />
+                </label>
+                <label>ยืนยันรหัสผ่านใหม่
+                  <input
+                    className="form-input-light"
+                    type="password"
+                    autoComplete="new-password"
+                    value={confirmNewPassword}
+                    onChange={event => setConfirmNewPassword(event.target.value)}
+                    minLength={8}
+                    required
+                  />
+                </label>
+              </div>
+              <p className="staff-credentials-note">รหัสผ่านใหม่ต้องมีอย่างน้อย 8 ตัวอักษร</p>
+              <div className="staff-profile-dialog-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setIsChangingPassword(false)}>ยกเลิก</button>
+                <button type="submit" className="btn btn-primary">บันทึกรหัสผ่าน</button>
               </div>
             </form>
           </div>

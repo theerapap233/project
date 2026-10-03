@@ -13,29 +13,31 @@ import { PreviewBanner } from './components/ui/PreviewBanner';
 // Modals
 import { ScholarshipDetailModal } from './components/scholarships/ScholarshipDetailModal';
 import { ApplicationWizardModal } from './components/wizard/ApplicationWizardModal';
-import { ApplicationSuccessModal } from './components/wizard/ApplicationSuccessModal';
 import { LoginModal } from './components/auth/LoginModal';
 import { LogoutModal } from './components/auth/LogoutModal';
 import { ToastContainer } from './components/ui/ToastContainer';
 
 
 const MainContent: React.FC = () => {
-  const { currentUser, isAdminActive, isPreviewMode } = useScholarship();
+  const { currentUser, isAdminActive, isPreviewMode, isWizardModalOpen } = useScholarship();
   const isStaffMode = Boolean(currentUser && isAdminActive);
 
   return (
     <div className="app-root">
-      {/* Top Banner when in Preview Mode */}
-      {isStaffMode && isPreviewMode && <PreviewBanner />}
+      {/* Floating mode switcher for staff */}
+      {isStaffMode && !isWizardModalOpen && <PreviewBanner />}
 
       {/* Navigation Bar */}
-      <Navbar />
+      {!isWizardModalOpen && <Navbar />}
 
       {/* Main Content Sections */}
       <main>
         {isStaffMode && !isPreviewMode ? (
           /* เจ้าหน้าที่มีระบบจัดการเว็บไซต์และทุนการศึกษา */
           <AdminSection />
+        ) : isWizardModalOpen ? (
+          /* หน้าแบบฟอร์มรับสมัครแบบเต็มหน้า */
+          <ApplicationWizardModal />
         ) : (
           /* หน้าเว็บไซต์สำหรับนักศึกษาและบุคคลทั่วไป (รวมถึงโหมด Preview ของเจ้าหน้าที่) */
           <>
@@ -58,12 +60,9 @@ const MainContent: React.FC = () => {
       </main>
 
       {/* Footer */}
-      <Footer />
+      {!isWizardModalOpen && <Footer />}
 
-      {/* Modals & Overlays */}
       <ScholarshipDetailModal />
-      <ApplicationWizardModal />
-      <ApplicationSuccessModal />
       <LoginModal />
       <LogoutModal />
 

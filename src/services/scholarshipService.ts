@@ -194,9 +194,6 @@ export const scholarshipService = {
     }
   },
 
-  /**
-   * ปรับสถานะเปิด/ปิดรับสมัคร
-   */
   async toggleScholarshipStatus(programId: string, isOpen: boolean): Promise<boolean> {
     if (!isSupabaseConfigured()) return false;
 
@@ -210,6 +207,53 @@ export const scholarshipService = {
       return true;
     } catch (err) {
       console.error('Error updating scholarship status:', err);
+      return false;
+    }
+  },
+
+  /**
+   * แก้ไขโครงการทุนในตาราง scholarship_programs
+   */
+  async updateScholarship(programId: string, sch: Partial<Scholarship>): Promise<boolean> {
+    if (!isSupabaseConfigured()) return false;
+
+    try {
+      const updates: any = { updated_at: new Date().toISOString() };
+      if (sch.title) updates.name = `${sch.title} (${sch.code || 'MATH-SCH'})`;
+      if (sch.amount) updates.amount = parseInt(sch.amount.replace(/[^0-9]/g, '')) || 20000;
+      if (sch.totalSlots !== undefined) updates.quota = sch.totalSlots;
+      if (sch.status) updates.is_open = sch.status === 'open';
+      if (sch.description !== undefined) updates.description = sch.description;
+
+      const { error } = await supabase
+        .from('scholarship_programs')
+        .update(updates)
+        .eq('id', programId);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('Error updating scholarship in Supabase:', err);
+      return false;
+    }
+  },
+
+  /**
+   * ลบโครงการทุนจากตาราง scholarship_programs
+   */
+  async deleteScholarship(programId: string): Promise<boolean> {
+    if (!isSupabaseConfigured()) return false;
+
+    try {
+      const { error } = await supabase
+        .from('scholarship_programs')
+        .delete()
+        .eq('id', programId);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('Error deleting scholarship from Supabase:', err);
       return false;
     }
   }

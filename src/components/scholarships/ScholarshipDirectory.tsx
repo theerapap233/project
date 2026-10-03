@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { ScholarshipCard } from './ScholarshipCard';
 import { useScholarship } from '../../context/ScholarshipContext';
-import { Building2, Globe } from 'lucide-react';
+
 
 export const ScholarshipDirectory: React.FC = () => {
   const { scholarships } = useScholarship();
@@ -17,7 +17,7 @@ export const ScholarshipDirectory: React.FC = () => {
 
   return (
     <section className="section" id="scholarships">
-      <div className="container" style={{ maxWidth: '1024px' }}>
+      <div className="container" style={{ maxWidth: '1240px' }}>
         {/* Section Header */}
         <div className="section-header">
           <span className="section-tag">Scholarship Directory</span>

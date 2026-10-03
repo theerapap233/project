@@ -138,21 +138,20 @@ export const StatusTracking: React.FC = () => {
 
           {searchedApp && (
             <div>
-              {/* Stepper Timeline */}
-              <div className="status-timeline">
-                {stepsDef.map(s => {
-                  let stateClass = '';
-                  if (s.num < currentStep) stateClass = 'completed';
-                  if (s.num === currentStep) stateClass = 'active';
-
-                  return (
-                    <div key={s.num} className={`timeline-step ${stateClass}`}>
-                      <div className="step-circle">{s.num < currentStep ? '✓' : s.num}</div>
-                      <div className="step-name">{s.title}</div>
-                      <div className="step-date">{s.desc}</div>
-                    </div>
-                  );
-                })}
+              {/* Current Step Text */}
+              <div style={{ 
+                marginBottom: 24, 
+                padding: '16px 24px', 
+                background: 'var(--surface-alt)', 
+                borderLeft: '4px solid var(--kmutnb-orange)', 
+                borderRadius: '0 var(--radius-lg) var(--radius-lg) 0' 
+              }}>
+                <h3 style={{ color: 'var(--navy-900)', fontSize: '1.2rem', margin: '0 0 4px' }}>
+                  สถานะปัจจุบัน: ขั้นตอนที่ {currentStep} ({stepsDef.find(s => s.num === currentStep)?.title})
+                </h3>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', margin: 0 }}>
+                  รายละเอียด: {stepsDef.find(s => s.num === currentStep)?.desc}
+                </p>
               </div>
 
               {/* Application Summary Box */}

@@ -97,6 +97,22 @@ CREATE TABLE IF NOT EXISTS public.scholarship_programs (
   is_open BOOLEAN NOT NULL DEFAULT true,
   scholarship_type CHARACTER VARYING DEFAULT 'internal',
   description TEXT,
+  
+  -- เพิ่มฟิลด์ให้เข้ากับ Website (Scholarship Model) โดยยังคงโครงสร้างเดิม
+  code CHARACTER VARYING,
+  badge_color CHARACTER VARYING,
+  academic_year CHARACTER VARYING,
+  term CHARACTER VARYING,
+  deadline TIMESTAMP WITH TIME ZONE,
+  min_gpax NUMERIC,
+  max_family_income NUMERIC,
+  min_volunteer_hours INTEGER,
+  target_years TEXT[],
+  target_majors TEXT[],
+  requirements TEXT[],
+  documents TEXT[],
+  funding_source CHARACTER VARYING,
+
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   CONSTRAINT scholarship_programs_pkey PRIMARY KEY (id),
@@ -153,7 +169,7 @@ CREATE TABLE IF NOT EXISTS public.scholarship_applications (
   gpa NUMERIC,
   scholarship_type CHARACTER VARYING,
   status CHARACTER VARYING NOT NULL DEFAULT 'pending'::character varying 
-    CHECK (status::text = ANY (ARRAY['pending'::character varying, 'approved'::character varying, 'rejected'::character varying, 'cancelled'::character varying]::text[])),
+    CHECK (status::text = ANY (ARRAY['pending'::character varying, 'submitted'::character varying, 'doc_verified'::character varying, 'interview_scheduled'::character varying, 'approved'::character varying, 'rejected'::character varying, 'cancelled'::character varying]::text[])),
   note TEXT,
   reason TEXT,
   form_data JSONB,

@@ -4,7 +4,7 @@ import { useScholarship } from '../../context/ScholarshipContext';
 export const LoginModal: React.FC = () => {
   const { isLoginModalOpen, openLoginModal, closeLoginModal, login, showToast } = useScholarship();
   const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('••••••••••••');
+  const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [warningMsg, setWarningMsg] = useState<string | null>(null);
 
@@ -37,7 +37,7 @@ export const LoginModal: React.FC = () => {
 
   if (!isLoginModalOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setWarningMsg(null);
     const cleanUser = username.trim();
@@ -56,21 +56,17 @@ export const LoginModal: React.FC = () => {
       return;
     }
 
-    // อนุญาตเฉพาะบัญชีเจ้าหน้าที่/แอดมิน
-    const isAdminAccount = cleanUser.toLowerCase() === 'admin' || 
-                           cleanUser.toLowerCase().includes('staff') || 
-                           cleanUser.toLowerCase().includes('officer') ||
-                           cleanUser.toLowerCase().includes('committee') ||
-                           cleanUser.toLowerCase().includes('math');
-
-    if (!isAdminAccount) {
-      const msg = 'ไม่พบบัญชีเจ้าหน้าที่นี้ในระบบ กรุณาใช้ชื่อผู้ใช้ "admin" หรือติดต่อผู้ดูแลระบบภาควิชา';
-      setWarningMsg(msg);
-      showToast(msg, 'error');
+    if (!password) {
+      showToast('กรุณากรอกรหัสผ่าน', 'warning');
       return;
     }
 
-    login(cleanUser, 'เจ้าหน้าที่ธุรการ/กรรมการทุน ภาควิชาคณิตศาสตร์');
+    const success = await login(cleanUser, password, 'เจ้าหน้าที่ธุรการ/กรรมการทุน ภาควิชาคณิตศาสตร์');
+    if (!success) {
+      const msg = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
+      setWarningMsg(msg);
+      showToast(msg, 'error');
+    }
   };
 
   const handleForgotPassword = (e: React.MouseEvent) => {
@@ -78,11 +74,7 @@ export const LoginModal: React.FC = () => {
     showToast('หากลืมรหัสผ่าน กรุณาติดต่อธุรการภาควิชาคณิตศาสตร์ อาคาร 78 หรือโทร. 02-555-2000 ต่อ 4601-4602', 'info');
   };
 
-  const selectAdminAccount = () => {
-    setUsername('admin');
-    setPassword('••••••••••••');
-    setWarningMsg(null);
-  };
+
 
   return (
     <div className="modal-backdrop open">
@@ -93,7 +85,7 @@ export const LoginModal: React.FC = () => {
               width: 58, 
               height: 58, 
               borderRadius: '50%', 
-              background: 'linear-gradient(135deg, #077b38, #045a27)', 
+              background: '#077b38', 
               color: 'white',
               display: 'flex', 
               alignItems: 'center', 

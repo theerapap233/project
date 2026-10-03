@@ -46,8 +46,8 @@ export const SupabaseStatusBadge: React.FC = () => {
           padding: '8px 14px',
           borderRadius: '30px',
           background: isConnected 
-            ? 'linear-gradient(135deg, rgba(7, 123, 56, 0.95), rgba(4, 90, 40, 0.95))' 
-            : 'linear-gradient(135deg, rgba(29, 41, 57, 0.95), rgba(15, 23, 42, 0.95))',
+            ? 'rgba(7, 123, 56, 0.95)' 
+            : 'rgba(29, 41, 57, 0.95)',
           backdropFilter: 'blur(8px)',
           WebkitBackdropFilter: 'blur(8px)',
           color: 'white',

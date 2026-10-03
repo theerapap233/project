@@ -4,12 +4,7 @@ import { useScholarship } from '../../context/ScholarshipContext';
 export const HeroSection: React.FC = () => {
   const { scholarships, applications, scrollToSection, siteSettings } = useScholarship();
 
-  const stats = useMemo(() => {
-    const openCount = scholarships.filter(s => s.status === 'open' || s.status === 'closing_soon').length;
-    const totalSlots = scholarships.reduce((sum, s) => sum + s.totalSlots, 0);
-    const applicantCount = applications.length;
-    return { openCount, totalSlots, applicantCount };
-  }, [scholarships, applications]);
+
 
   return (
     <section className="hero-section" id="hero">
@@ -44,67 +39,53 @@ export const HeroSection: React.FC = () => {
             </div>
           </div>
 
-          {/* Visual Live Stats Card */}
-          <div className="hero-visual">
-            <div className="math-glass-card">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid rgba(255,255,255,0.15)' }}>
-                <img 
-                  src="/logo.png" 
-                  alt="ภาควิชาคณิตศาสตร์ มจพ." 
-                  style={{ 
-                    width: 64, 
-                    height: 64, 
-                    borderRadius: '50%', 
-                    background: 'var(--surface-card)', 
-                    padding: 2, 
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
-                    filter: 'drop-shadow(0 4px 12px rgba(11, 130, 53, 0.4))'
-                  }} 
-                />
-                <div>
-                  <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.8)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                    Department of Mathematics
-                  </div>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'white' }}>
-                    สถิติการจัดสรรทุนการศึกษา 2567
-                  </div>
-                </div>
+          {/* Hero Visual Area with Cute Minimalist Badges and Micro-Animations */}
+          <div className="hero-visual-wrapper">
+            {/* Soft Pastel Glow Backdrop */}
+            <div className="hero-glow-backdrop" />
+
+            {/* Floating Cute Math Badges */}
+            <div className="hero-chip-badge chip-1" title="Mathematics">
+              <span>π</span>
+            </div>
+            <div className="hero-chip-badge chip-2" title="Infinity">
+              <span>∞</span>
+            </div>
+            <div className="hero-chip-badge chip-3" title="Summation">
+              <span>∑</span>
+            </div>
+
+            {/* Floating Glassmorphism Status Card Top-Left */}
+            <div className="hero-floating-card card-top-left">
+              <div className="card-icon-pill card-icon-green">
+                <span>🎓</span>
               </div>
-
-              <div className="hero-stats-grid">
-                <div className="stat-box">
-                  <div className="stat-icon" style={{ background: 'rgba(232,78,15,0.1)', color: 'var(--kmutnb-orange)' }}>
-                    🎓
-                  </div>
-                  <div className="stat-num">{stats.openCount}</div>
-                  <div className="stat-label">โครงการทุนที่เปิดรับ</div>
-                </div>
-
-                <div className="stat-box">
-                  <div className="stat-icon" style={{ background: 'rgba(16,185,129,0.1)', color: 'var(--success)' }}>
-                    💰
-                  </div>
-                  <div className="stat-num">1.2M+</div>
-                  <div className="stat-label">งบประมาณสนับสนุน (บาท)</div>
-                </div>
-
-                <div className="stat-box">
-                  <div className="stat-icon" style={{ background: 'rgba(59,130,246,0.1)', color: 'var(--info)' }}>
-                    👥
-                  </div>
-                  <div className="stat-num">{stats.totalSlots}</div>
-                  <div className="stat-label">โควตาทุนทั้งหมด</div>
-                </div>
-
-                <div className="stat-box">
-                  <div className="stat-icon" style={{ background: 'rgba(245,158,11,0.1)', color: 'var(--warning)' }}>
-                    ⚡
-                  </div>
-                  <div className="stat-num">{stats.applicantCount}</div>
-                  <div className="stat-label">ผู้ยื่นสมัครในรอบนี้</div>
+              <div>
+                <div className="card-text-title">ทุนการศึกษาคณิตศาสตร์</div>
+                <div className="card-text-sub">
+                  <span className="pulse-dot"></span>
+                  <span>เปิดรับสมัครอยู่</span>
                 </div>
               </div>
             </div>
+
+            {/* Floating Glassmorphism Status Card Bottom-Right */}
+            <div className="hero-floating-card card-bottom-right">
+              <div className="card-icon-pill card-icon-orange">
+                <span>📚</span>
+              </div>
+              <div>
+                <div className="card-text-title">ครอบคลุมทุกประเภททุน</div>
+                <div className="card-text-sub">ทุนเรียนดี • ขาดแคลน </div>
+              </div>
+            </div>
+
+            {/* Cute Cartoon Student Illustration */}
+            <img
+              src="/hero-cartoon2.png"
+              alt="Cartoon Student Scholarship Hero"
+              className="hero-student-img"
+            />
           </div>
         </div>
       </div>
