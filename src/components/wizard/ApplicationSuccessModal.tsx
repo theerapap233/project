@@ -5,16 +5,10 @@ export const ApplicationSuccessModal: React.FC = () => {
   const { 
     isSuccessModalOpen, 
     closeSuccessModal, 
-    latestTrackingId, 
-    scrollToSection 
+    latestTrackingId
   } = useScholarship();
 
   if (!isSuccessModalOpen) return null;
-
-  const handleGoToTracking = () => {
-    closeSuccessModal();
-    scrollToSection('tracking');
-  };
 
   return (
     <div className="modal-backdrop open">
@@ -66,14 +60,8 @@ export const ApplicationSuccessModal: React.FC = () => {
               {latestTrackingId}
             </div>
             <div style={{ fontSize: '0.85rem', color: 'var(--navy-700)' }}>
-              กรุณาจดบันทึกหรือถ่ายภาพรหัสนี้ไว้เพื่อใช้ตรวจสอบสถานะ
+              กรุณาจดบันทึกหรือถ่ายภาพรหัสนี้ไว้สำหรับติดต่อเจ้าหน้าที่
             </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-            <button className="btn btn-primary" onClick={handleGoToTracking}>
-              🔍 ติดตามสถานะตอนนี้
-            </button>
           </div>
         </div>
 

@@ -1,8 +1,6 @@
 import React from 'react';
-import { useScholarship } from '../../context/ScholarshipContext';
 
 export const Footer: React.FC = () => {
-  const { openLoginModal, currentUser } = useScholarship();
   return (
     <footer className="site-footer">
       <div className="container">
@@ -56,17 +54,6 @@ export const Footer: React.FC = () => {
                   📋 เว็บไซต์ ทะเบียนนักศึกษา
                 </a>
               </li>
-              {!currentUser && (
-                <li>
-                  <a
-                    href="#"
-                    onClick={(e) => { e.preventDefault(); openLoginModal(); }}
-                    title="เข้าสู่ระบบสำหรับเจ้าหน้าที่ (Ctrl+Shift+A)"
-                  >
-                    🔐 เว็บไซต์ ระบบจัดการสำหรับเจ้าหน้าที่
-                  </a>
-                </li>
-              )}
             </ul>
           </div>
 

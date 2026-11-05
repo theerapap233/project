@@ -160,5 +160,73 @@ export const contentService = {
       console.error('Error deleting news from Supabase:', err);
       return false;
     }
+  },
+
+  /**
+   * เพิ่มเอกสารดาวน์โหลดใหม่ลงตาราง pdf_documents
+   */
+  async createPdfDocument(doc: DownloadDoc): Promise<boolean> {
+    if (!isSupabaseConfigured()) return false;
+
+    try {
+      const { error } = await supabase.from('pdf_documents').insert([
+        {
+          name: doc.title,
+          size: doc.size || 'PDF',
+          url: '#'
+        }
+      ]);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('Error creating pdf_document in Supabase:', err);
+      return false;
+    }
+  },
+
+  /**
+   * แก้ไขเอกสารดาวน์โหลดในตาราง pdf_documents
+   */
+  async updatePdfDocument(docId: string, doc: Partial<DownloadDoc>): Promise<boolean> {
+    if (!isSupabaseConfigured()) return false;
+
+    try {
+      const updates: Record<string, unknown> = {};
+      if (doc.title) updates.name = doc.title;
+      if (doc.size) updates.size = doc.size;
+
+      const { error } = await supabase
+        .from('pdf_documents')
+        .update(updates)
+        .eq('id', docId);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('Error updating pdf_document in Supabase:', err);
+      return false;
+    }
+  },
+
+  /**
+   * ลบเอกสารดาวน์โหลดจากตาราง pdf_documents
+   */
+  async deletePdfDocument(docId: string): Promise<boolean> {
+    if (!isSupabaseConfigured()) return false;
+
+    try {
+      const { error } = await supabase
+        .from('pdf_documents')
+        .delete()
+        .eq('id', docId);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('Error deleting pdf_document from Supabase:', err);
+      return false;
+    }
   }
 };
+

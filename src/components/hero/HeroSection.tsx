@@ -2,20 +2,38 @@ import React from 'react';
 import { useScholarship } from '../../context/ScholarshipContext';
 
 export const HeroSection: React.FC = () => {
-  const { scrollToSection, siteSettings } = useScholarship();
-
-
+  const { scrollToSection, siteSettings, currentUser } = useScholarship();
+  const isStudent = Boolean(currentUser && currentUser.role === 'student');
 
   return (
     <section className="hero-section" id="hero">
       <div className="container">
         <div className="hero-grid">
           <div className="hero-content">
-            <div className="hero-badge">
-              <svg width="14" height="14" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-              </svg>
-              ปีการศึกษา {siteSettings.semester}/{siteSettings.academicYear}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+              <div className="hero-badge">
+                <svg width="14" height="14" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                </svg>
+                ปีการศึกษา {siteSettings.semester}/{siteSettings.academicYear}
+              </div>
+              {isStudent && currentUser && (
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  background: '#ecfdf5',
+                  border: '1px solid #a7f3d0',
+                  color: '#065f46',
+                  padding: '4px 12px',
+                  borderRadius: '20px',
+                  fontSize: '0.82rem',
+                  fontWeight: 600
+                }}>
+                  <span>🎓</span>
+                  <span>สวัสดีคุณ {currentUser.name.split(' ')[0]}</span>
+                </div>
+              )}
             </div>
             <h1 className="hero-title" style={{ whiteSpace: 'pre-line' }}>
               {siteSettings.heroTitle}
@@ -29,12 +47,6 @@ export const HeroSection: React.FC = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
                 ค้นหาทุนที่เปิดรับ
-              </button>
-              <button className="btn btn-dark" onClick={() => scrollToSection('tracking')}>
-                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                ติดตามผลการสมัคร
               </button>
             </div>
           </div>

@@ -4,6 +4,7 @@ import {
   Pencil, 
   Trash2, 
   FileText, 
+  FileDown,
   GraduationCap, 
   Bell, 
   HelpCircle, 
@@ -18,16 +19,20 @@ import {
   Printer,
   RotateCcw,
   X,
-  XCircle
+  XCircle,
+  Star,
+  MessageSquare,
+  ThumbsUp
 } from 'lucide-react';
 import { useScholarship } from '../../context/ScholarshipContext';
 import { Application, ApplicationStatus, ApplicationFormData } from '../../types/application';
 import { Scholarship } from '../../types/scholarship';
-import { Announcement, FaqItem } from '../../types/common';
+import { Announcement, FaqItem, DownloadDoc } from '../../types/common';
 import { formatThaiDate } from '../../utils/dateFormatter';
 import { PROVINCES } from '../../data/provinces';
+import { compressImage } from '../../utils/imageUtils';
 
-type AdminTab = 'applications' | 'scholarships' | 'news' | 'faq' | 'settings';
+type AdminTab = 'applications' | 'scholarships' | 'news' | 'faq' | 'downloads' | 'ratings' | 'settings';
 
 const SCHOLARSHIP_YEAR_PRESETS = [
   { value: 'all', label: 'ทุกชั้นปี', years: ['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4', 'บัณฑิตศึกษา'] },
@@ -45,6 +50,7 @@ export const AdminSection: React.FC = () => {
     scholarships,
     announcements,
     faqs,
+    downloads,
     siteSettings,
     quickApprove, 
     createNewScholarship, 
@@ -56,6 +62,9 @@ export const AdminSection: React.FC = () => {
     addFaq,
     updateFaq,
     deleteFaq,
+    addDownload,
+    updateDownload,
+    deleteDownload,
     updateSiteSettings,
     updateApplicationDetails,
     updateApplicationReview,
@@ -128,6 +137,15 @@ export const AdminSection: React.FC = () => {
   const [editingFaqIndex, setEditingFaqIndex] = useState<number | null>(null);
   const [faqQuestion, setFaqQuestion] = useState('');
   const [faqAnswer, setFaqAnswer] = useState('');
+
+  // Download Docs CMS states
+  const [isDocModalOpen, setIsDocModalOpen] = useState(false);
+  const [editingDocId, setEditingDocId] = useState<string | null>(null);
+  const [docTitle, setDocTitle] = useState('');
+  const [docDesc, setDocDesc] = useState('');
+  const [docSize, setDocSize] = useState('200 KB');
+  const [docType, setDocType] = useState('PDF');
+  const [selectedDocFileName, setSelectedDocFileName] = useState('');
 
   // Site Settings Form state
   const [settingsForm, setSettingsForm] = useState(siteSettings);
@@ -327,6 +345,88 @@ export const AdminSection: React.FC = () => {
     });
   };
 
+  // Rating states & filters
+  const [ratingFilterStar, setRatingFilterStar] = useState<number | 'all'>('all');
+  const [ratingSearchTerm, setRatingSearchTerm] = useState('');
+  const [ratingFilterSch, setRatingFilterSch] = useState<string>('all');
+
+  // Pull rating data directly from applications
+  const ratingData = useMemo(() => {
+    return applications.map(app => {
+      const rating = app.systemRating || app.formData?.systemRating || 0;
+      const comment = app.systemComment || app.formData?.systemComment || '';
+      return {
+        ...app,
+        rating,
+        comment
+      };
+    });
+  }, [applications]);
+
+  const ratedApps = useMemo(() => {
+    return ratingData.filter(app => app.rating > 0);
+  }, [ratingData]);
+
+  const ratingStats = useMemo(() => {
+    const total = ratedApps.length;
+    if (total === 0) {
+      return {
+        total: 0,
+        average: 0,
+        starCounts: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } as Record<number, number>,
+        starPercentages: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } as Record<number, number>,
+        satisfactionRate: 0,
+        totalComments: 0
+      };
+    }
+
+    const sum = ratedApps.reduce((acc, a) => acc + a.rating, 0);
+    const average = sum / total;
+
+    const counts: Record<number, number> = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    let commentsCount = 0;
+    let highSatisfactionCount = 0;
+
+    ratedApps.forEach(a => {
+      const r = Math.min(5, Math.max(1, Math.round(a.rating)));
+      counts[r] = (counts[r] || 0) + 1;
+      if (a.comment && a.comment.trim() !== '') commentsCount++;
+      if (r >= 4) highSatisfactionCount++;
+    });
+
+    return {
+      total,
+      average: Number(average.toFixed(1)),
+      starCounts: counts,
+      starPercentages: {
+        5: Math.round(((counts[5] || 0) / total) * 100),
+        4: Math.round(((counts[4] || 0) / total) * 100),
+        3: Math.round(((counts[3] || 0) / total) * 100),
+        2: Math.round(((counts[2] || 0) / total) * 100),
+        1: Math.round(((counts[1] || 0) / total) * 100)
+      },
+      satisfactionRate: Math.round((highSatisfactionCount / total) * 100),
+      totalComments: commentsCount
+    };
+  }, [ratedApps]);
+
+  const filteredRatedApps = useMemo(() => {
+    return ratedApps.filter(app => {
+      if (ratingFilterStar !== 'all' && app.rating !== ratingFilterStar) return false;
+      if (ratingFilterSch !== 'all' && app.scholarshipId !== ratingFilterSch && app.scholarshipName !== ratingFilterSch) return false;
+      if (ratingSearchTerm.trim()) {
+        const q = ratingSearchTerm.toLowerCase();
+        const matches = 
+          app.fullName.toLowerCase().includes(q) ||
+          app.studentId.toLowerCase().includes(q) ||
+          app.scholarshipName.toLowerCase().includes(q) ||
+          (app.comment && app.comment.toLowerCase().includes(q));
+        if (!matches) return false;
+      }
+      return true;
+    });
+  }, [ratedApps, ratingFilterStar, ratingFilterSch, ratingSearchTerm]);
+
   // Handlers for Applications View & Edit
   const handleOpenReview = (app: Application) => {
     setSelectedApp(app);
@@ -487,17 +587,17 @@ export const AdminSection: React.FC = () => {
     setSchTitle(sch.title);
     setSchAmount(sch.amount);
     setSchSlots(sch.totalSlots);
-    setSchMinGPAX(sch.minGPAX);
-    setSchTargetYears(sch.targetYears);
-    setSchDeadline(sch.deadline.split('T')[0]);
+    setSchMinGPAX(typeof sch.minGPAX === 'number' ? sch.minGPAX : 2.0);
+    setSchTargetYears(Array.isArray(sch.targetYears) && sch.targetYears.length > 0 ? sch.targetYears : ['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4']);
+    setSchDeadline(sch.deadline ? sch.deadline.split('T')[0] : '2026-10-31');
     setSchScope(sch.scope || 'internal');
-    setSchStatus(sch.status);
-    setSchDesc(sch.description);
+    setSchStatus(sch.status || 'open');
+    setSchDesc(sch.description || '');
     setIsSchModalOpen(true);
   };
 
   const selectedSchYearPreset = SCHOLARSHIP_YEAR_PRESETS.find(
-    preset => preset.years.join('|') === schTargetYears.join('|')
+    preset => preset.years.join('|') === (schTargetYears || []).join('|')
   )?.value;
 
   const handleSaveSch = (e: React.FormEvent) => {
@@ -644,6 +744,72 @@ export const AdminSection: React.FC = () => {
     }
   };
 
+  // Handlers for Download Docs CMS
+  const handleOpenNewDoc = () => {
+    setEditingDocId(null);
+    setDocTitle('');
+    setDocDesc('');
+    setDocSize('200 KB');
+    setDocType('PDF');
+    setSelectedDocFileName('');
+    setIsDocModalOpen(true);
+  };
+
+  const handleOpenEditDoc = (doc: DownloadDoc) => {
+    setEditingDocId(doc.id);
+    setDocTitle(doc.title);
+    setDocDesc(doc.desc);
+    setDocSize(doc.size || 'PDF');
+    setDocType(doc.type || 'PDF');
+    setSelectedDocFileName('');
+    setIsDocModalOpen(true);
+  };
+
+  const handleFileChangeForDoc = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedDocFileName(file.name);
+      const sizeKb = Math.round(file.size / 1024);
+      setDocSize(sizeKb > 1024 ? `${(sizeKb / 1024).toFixed(1)} MB` : `${sizeKb} KB`);
+      const ext = file.name.split('.').pop()?.toUpperCase() || 'PDF';
+      setDocType(ext);
+      if (!docTitle) {
+        setDocTitle(file.name.replace(/\.[^/.]+$/, ''));
+      }
+    }
+  };
+
+  const handleSaveDoc = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!docTitle.trim()) {
+      showToast('กรุณาระบุชื่อเอกสาร', 'warning');
+      return;
+    }
+
+    if (editingDocId) {
+      updateDownload(editingDocId, {
+        title: docTitle.trim(),
+        desc: docDesc.trim(),
+        size: docSize.trim() || 'PDF',
+        type: docType.trim() || 'PDF'
+      });
+    } else {
+      addDownload({
+        title: docTitle.trim(),
+        desc: docDesc.trim(),
+        size: docSize.trim() || 'PDF',
+        type: docType.trim() || 'PDF'
+      });
+    }
+    setIsDocModalOpen(false);
+  };
+
+  const handleDeleteDoc = (id: string, title: string) => {
+    if (window.confirm(`ยืนยันการลบเอกสาร "${title}" ใช่หรือไม่?`)) {
+      deleteDownload(id);
+    }
+  };
+
   // Handlers for Site Settings
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
@@ -741,31 +907,14 @@ export const AdminSection: React.FC = () => {
   };
 
   return (
-    <section id="adminSection" className="admin-section" style={{ minHeight: 'calc(100vh - 160px)', background: 'var(--surface-ground)', paddingBottom: 60 }}>
-      <div className="container">
-        {/* Header Bar */}
-        <div className="admin-header" style={{ marginBottom: 20 }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-              <h2 style={{ fontSize: '1.6rem', color: 'var(--navy-900, #0f172a)', margin: 0, fontWeight: 800 }}>
-                ระบบจัดการเว็บไซต์และทุนการศึกษา
-              </h2>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0' }}>
-                Staff Portal
-              </span>
-            </div>
-            <p style={{ color: 'var(--text-muted, #64748b)', fontSize: '0.9rem', margin: 0 }}>
-              บริหารจัดการใบสมัคร ประกาศทุนการศึกษา ข่าวสารประชาสัมพันธ์ และเนื้อหาหน้าเว็บไซต์
-            </p>
-          </div>
-        </div>
-
+    <section id="adminSection" className="admin-section" style={{ minHeight: 'calc(100vh - 160px)', background: 'var(--surface-ground)', paddingTop: 14, paddingBottom: 60, borderTop: '1px solid var(--border-light, #e2e8f0)' }}>
+      <div className="container" style={{ paddingTop: 0 }}>
         {/* Navigation Tabs for CMS */}
         <div style={{
           display: 'flex',
-          gap: 6,
+          gap: 5,
           background: 'var(--surface-card)',
-          padding: '6px',
+          padding: '5px',
           borderRadius: '12px',
           border: '1px solid var(--border-light, #e2e8f0)',
           marginBottom: 24,
@@ -775,30 +924,30 @@ export const AdminSection: React.FC = () => {
             onClick={() => setActiveTab('applications')}
             style={{
               flex: 1,
-              padding: '10px 14px',
+              padding: '8px 10px',
               borderRadius: '8px',
               border: 'none',
               background: activeTab === 'applications' ? 'var(--math-green, #077b38)' : 'transparent',
               color: activeTab === 'applications' ? 'white' : 'var(--navy-700, #334155)',
               fontWeight: activeTab === 'applications' ? 700 : 500,
-              fontSize: '0.9rem',
+              fontSize: '0.84rem',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 8,
+              gap: 6,
               transition: 'all 0.2s',
               whiteSpace: 'nowrap'
             }}
           >
-            <FileText size={16} />
+            <FileText size={15} />
             <span>จัดการใบสมัคร</span>
             <span style={{
               background: activeTab === 'applications' ? 'rgba(255,255,255,0.25)' : '#E2E8F0',
               color: activeTab === 'applications' ? 'white' : '#475569',
-              padding: '1px 7px',
+              padding: '1px 6px',
               borderRadius: '10px',
-              fontSize: '0.75rem',
+              fontSize: '0.72rem',
               fontWeight: 700
             }}>
               {applications.length}
@@ -809,30 +958,30 @@ export const AdminSection: React.FC = () => {
             onClick={() => setActiveTab('scholarships')}
             style={{
               flex: 1,
-              padding: '10px 14px',
+              padding: '8px 10px',
               borderRadius: '8px',
               border: 'none',
               background: activeTab === 'scholarships' ? 'var(--math-green, #077b38)' : 'transparent',
               color: activeTab === 'scholarships' ? 'white' : 'var(--navy-700, #334155)',
               fontWeight: activeTab === 'scholarships' ? 700 : 500,
-              fontSize: '0.9rem',
+              fontSize: '0.84rem',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 8,
+              gap: 6,
               transition: 'all 0.2s',
               whiteSpace: 'nowrap'
             }}
           >
-            <GraduationCap size={16} />
+            <GraduationCap size={15} />
             <span>จัดการประกาศทุน</span>
             <span style={{
               background: activeTab === 'scholarships' ? 'rgba(255,255,255,0.25)' : '#E2E8F0',
               color: activeTab === 'scholarships' ? 'white' : '#475569',
-              padding: '1px 7px',
+              padding: '1px 6px',
               borderRadius: '10px',
-              fontSize: '0.75rem',
+              fontSize: '0.72rem',
               fontWeight: 700
             }}>
               {scholarships.length}
@@ -843,30 +992,30 @@ export const AdminSection: React.FC = () => {
             onClick={() => setActiveTab('news')}
             style={{
               flex: 1,
-              padding: '10px 14px',
+              padding: '8px 10px',
               borderRadius: '8px',
               border: 'none',
               background: activeTab === 'news' ? 'var(--math-green, #077b38)' : 'transparent',
               color: activeTab === 'news' ? 'white' : 'var(--navy-700, #334155)',
               fontWeight: activeTab === 'news' ? 700 : 500,
-              fontSize: '0.9rem',
+              fontSize: '0.84rem',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 8,
+              gap: 6,
               transition: 'all 0.2s',
               whiteSpace: 'nowrap'
             }}
           >
-            <Bell size={16} />
-            <span>จัดการข่าวสาร & ประกาศ</span>
+            <Bell size={15} />
+            <span>ข่าวสาร & ประกาศ</span>
             <span style={{
               background: activeTab === 'news' ? 'rgba(255,255,255,0.25)' : '#E2E8F0',
               color: activeTab === 'news' ? 'white' : '#475569',
-              padding: '1px 7px',
+              padding: '1px 6px',
               borderRadius: '10px',
-              fontSize: '0.75rem',
+              fontSize: '0.72rem',
               fontWeight: 700
             }}>
               {announcements.length}
@@ -877,30 +1026,30 @@ export const AdminSection: React.FC = () => {
             onClick={() => setActiveTab('faq')}
             style={{
               flex: 1,
-              padding: '10px 14px',
+              padding: '8px 10px',
               borderRadius: '8px',
               border: 'none',
               background: activeTab === 'faq' ? 'var(--math-green, #077b38)' : 'transparent',
               color: activeTab === 'faq' ? 'white' : 'var(--navy-700, #334155)',
               fontWeight: activeTab === 'faq' ? 700 : 500,
-              fontSize: '0.9rem',
+              fontSize: '0.84rem',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 8,
+              gap: 6,
               transition: 'all 0.2s',
               whiteSpace: 'nowrap'
             }}
           >
-            <HelpCircle size={16} />
-            <span>คำถามที่พบบ่อย (FAQ)</span>
+            <HelpCircle size={15} />
+            <span>คำถามที่พบบ่อย</span>
             <span style={{
               background: activeTab === 'faq' ? 'rgba(255,255,255,0.25)' : '#E2E8F0',
               color: activeTab === 'faq' ? 'white' : '#475569',
-              padding: '1px 7px',
+              padding: '1px 6px',
               borderRadius: '10px',
-              fontSize: '0.75rem',
+              fontSize: '0.72rem',
               fontWeight: 700
             }}>
               {faqs.length}
@@ -908,26 +1057,94 @@ export const AdminSection: React.FC = () => {
           </button>
 
           <button
+            onClick={() => setActiveTab('downloads')}
+            style={{
+              flex: 1,
+              padding: '8px 10px',
+              borderRadius: '8px',
+              border: 'none',
+              background: activeTab === 'downloads' ? 'var(--math-green, #077b38)' : 'transparent',
+              color: activeTab === 'downloads' ? 'white' : 'var(--navy-700, #334155)',
+              fontWeight: activeTab === 'downloads' ? 700 : 500,
+              fontSize: '0.84rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              transition: 'all 0.2s',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            <FileDown size={15} />
+            <span>เอกสาร & PDF</span>
+            <span style={{
+              background: activeTab === 'downloads' ? 'rgba(255,255,255,0.25)' : '#E2E8F0',
+              color: activeTab === 'downloads' ? 'white' : '#475569',
+              padding: '1px 6px',
+              borderRadius: '10px',
+              fontSize: '0.72rem',
+              fontWeight: 700
+            }}>
+              {downloads.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('ratings')}
+            style={{
+              flex: 1,
+              padding: '8px 10px',
+              borderRadius: '8px',
+              border: 'none',
+              background: activeTab === 'ratings' ? 'var(--math-green, #077b38)' : 'transparent',
+              color: activeTab === 'ratings' ? 'white' : 'var(--navy-700, #334155)',
+              fontWeight: activeTab === 'ratings' ? 700 : 500,
+              fontSize: '0.84rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              transition: 'all 0.2s',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            <Star size={15} />
+            <span>คะแนนประเมิน</span>
+            <span style={{
+              background: activeTab === 'ratings' ? 'rgba(255,255,255,0.25)' : '#E2E8F0',
+              color: activeTab === 'ratings' ? 'white' : '#475569',
+              padding: '1px 6px',
+              borderRadius: '10px',
+              fontSize: '0.72rem',
+              fontWeight: 700
+            }}>
+              {ratingStats.total}
+            </span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('settings')}
             style={{
               flex: 1,
-              padding: '10px 14px',
+              padding: '8px 10px',
               borderRadius: '8px',
               border: 'none',
               background: activeTab === 'settings' ? 'var(--math-green, #077b38)' : 'transparent',
               color: activeTab === 'settings' ? 'white' : 'var(--navy-700, #334155)',
               fontWeight: activeTab === 'settings' ? 700 : 500,
-              fontSize: '0.9rem',
+              fontSize: '0.84rem',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 8,
+              gap: 6,
               transition: 'all 0.2s',
               whiteSpace: 'nowrap'
             }}
           >
-            <Settings size={16} />
+            <Settings size={15} />
             <span>ตั้งค่าเว็บไซต์</span>
           </button>
         </div>
@@ -1429,13 +1646,14 @@ export const AdminSection: React.FC = () => {
                     <th style={{ padding: '12px 18px', textAlign: 'center', fontWeight: 600, fontSize: '0.82rem', color: 'var(--text-muted)' }}>GPAX</th>
                     <th style={{ padding: '12px 18px', textAlign: 'center', fontWeight: 600, fontSize: '0.82rem', color: 'var(--text-muted)' }}>วันที่ยื่น</th>
                     <th style={{ padding: '12px 18px', textAlign: 'center', fontWeight: 600, fontSize: '0.82rem', color: 'var(--text-muted)' }}>สถานะ</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'center', fontWeight: 600, fontSize: '0.82rem', color: 'var(--text-muted)' }}>Rating</th>
                     <th style={{ padding: '12px 18px', textAlign: 'right', fontWeight: 600, fontSize: '0.82rem', color: 'var(--text-muted)' }}>การดำเนินการ</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredApps.length === 0 ? (
                     <tr>
-                      <td colSpan={8} style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                      <td colSpan={9} style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
                         ไม่พบข้อมูลใบสมัครที่ตรงกับเงื่อนไขการค้นหา
                       </td>
                     </tr>
@@ -1491,6 +1709,26 @@ export const AdminSection: React.FC = () => {
                           </td>
                           <td style={{ padding: '14px 18px', textAlign: 'center' }}>
                             {getStatusBadge(app.status)}
+                          </td>
+                          <td style={{ padding: '14px 18px', textAlign: 'center' }}>
+                            {(app.systemRating && app.systemRating > 0) ? (
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 3,
+                                color: '#b45309',
+                                fontWeight: 700,
+                                fontSize: '0.8rem',
+                                background: '#fef3c7',
+                                padding: '2px 8px',
+                                borderRadius: '12px',
+                                border: '1px solid #fde68a'
+                              }} title={app.systemComment || `คะแนนประเมิน: ${app.systemRating}/5`}>
+                                ★ {app.systemRating}
+                              </span>
+                            ) : (
+                              <span style={{ color: '#cbd5e1', fontSize: '0.8rem' }}>-</span>
+                            )}
                           </td>
                           <td 
                             style={{ padding: '14px 18px', textAlign: 'right' }}
@@ -1808,14 +2046,11 @@ export const AdminSection: React.FC = () => {
 
           return (
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--navy-900)', fontWeight: 700 }}>
                     รายการประกาศทุนการศึกษาทั้งหมด ({scholarships.length} ทุน)
                   </h3>
-                  <p style={{ margin: '4px 0 0', fontSize: '0.88rem', color: 'var(--text-muted)' }}>
-                    จำแนกออกเป็น 2 ส่วนชัดเจน: ทุนการศึกษาภายใน และ ทุนการศึกษาภายนอก
-                  </p>
                 </div>
 
                 <button 
@@ -1828,24 +2063,15 @@ export const AdminSection: React.FC = () => {
               </div>
 
               {/* 2 Layers of Scholarships like Main Page */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
-                {/* ส่วนที่ 1: ทุนการศึกษาภายใน (Internal Scholarships) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                {/* ทุนการศึกษาภายใน (Internal Scholarships) */}
                 <div className="scope-block internal">
-                  <div className="scope-block-header">
-                    <div className="scope-block-title-area">
-                      <span className="scope-block-badge internal">🏛️ ทุนภายใน</span>
-                      <h3 className="scope-block-title">
-                        ส่วนที่ 1: ทุนการศึกษาภายใน ({internalSchs.length} ทุน)
-                      </h3>
-                      <p className="scope-block-desc">
-                        ทุนสนับสนุนโดยตรงจากมหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ (มจพ.), คณะวิทยาศาสตร์ประยุกต์ และกองทุนพัฒนาภาควิชาคณิตศาสตร์
-                      </p>
-                    </div>
+                  <div className="scope-block-header" style={{ alignItems: 'center', marginBottom: 16, paddingBottom: 16 }}>
+                    <span className="scope-block-badge internal" style={{ margin: 0 }}>🏛️ ทุนภายใน</span>
 
-                    <div className="scope-block-stat internal">
-                      <span className="scope-block-stat-num">{internalSchs.length}</span>
-                      <span className="scope-block-stat-label">ทุนภายใน</span>
-                    </div>
+                    <span className="scope-block-badge internal" style={{ margin: 0, fontWeight: 700, minWidth: '32px', textAlign: 'center', justifyContent: 'center' }}>
+                      {internalSchs.length}
+                    </span>
                   </div>
 
                   <div className="admin-cards-grid">
@@ -1859,23 +2085,14 @@ export const AdminSection: React.FC = () => {
                   </div>
                 </div>
 
-                {/* ส่วนที่ 2: ทุนการศึกษาภายนอก (External Scholarships) */}
+                {/* ทุนการศึกษาภายนอก (External Scholarships) */}
                 <div className="scope-block external">
-                  <div className="scope-block-header">
-                    <div className="scope-block-title-area">
-                      <span className="scope-block-badge external">🌐 ทุนภายนอก</span>
-                      <h3 className="scope-block-title">
-                        ส่วนที่ 2: ทุนการศึกษาภายนอก ({externalSchs.length} ทุน)
-                      </h3>
-                      <p className="scope-block-desc">
-                        ทุนสนับสนุนจากหน่วยงานภายนอก มูลนิธิเพื่อการศึกษา องค์กรพันธมิตรภาคอุตสาหกรรม และชมรมศิษย์เก่าภาควิชาคณิตศาสตร์ มจพ.
-                      </p>
-                    </div>
+                  <div className="scope-block-header" style={{ alignItems: 'center', marginBottom: 16, paddingBottom: 16 }}>
+                    <span className="scope-block-badge external" style={{ margin: 0 }}>🌐 ทุนภายนอก</span>
 
-                    <div className="scope-block-stat external">
-                      <span className="scope-block-stat-num">{externalSchs.length}</span>
-                      <span className="scope-block-stat-label">ทุนภายนอก</span>
-                    </div>
+                    <span className="scope-block-badge external" style={{ margin: 0, fontWeight: 700, minWidth: '32px', textAlign: 'center', justifyContent: 'center' }}>
+                      {externalSchs.length}
+                    </span>
                   </div>
 
                   <div className="admin-cards-grid">
@@ -2111,7 +2328,460 @@ export const AdminSection: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 5: SITE SETTINGS */}
+        {/* TAB 5: DOWNLOAD DOCS & PDF CMS */}
+        {activeTab === 'downloads' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--navy-900)' }}>
+                  เอกสารและแบบฟอร์มดาวน์โหลด ({downloads.length} รายการ)
+                </h3>
+                <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  จัดการแบบฟอร์มใบสมัคร ประกาศ และเอกสาร PDF ที่แสดงในหน้าหลักของเว็บไซต์
+                </p>
+              </div>
+              <button 
+                className="btn btn-primary btn-sm"
+                onClick={handleOpenNewDoc}
+                style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+              >
+                <Plus size={15} strokeWidth={2} />
+                <span>เพิ่มเอกสารใหม่</span>
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {downloads.map((doc) => (
+                <div key={doc.id} style={{
+                  background: 'var(--surface-card)',
+                  border: '1px solid var(--border-light, #e2e8f0)',
+                  borderRadius: '10px',
+                  padding: '16px 20px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 16
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1 }}>
+                    <div style={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: 8,
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      color: '#dc2626',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}>
+                      <FileDown size={22} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, color: 'var(--navy-900)', fontSize: '0.95rem', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span>{doc.title}</span>
+                        <span style={{
+                          fontSize: '0.7rem',
+                          padding: '2px 8px',
+                          borderRadius: 4,
+                          background: '#f1f5f9',
+                          color: '#475569',
+                          fontWeight: 600
+                        }}>
+                          {doc.type || 'PDF'} • {doc.size || 'PDF'}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.84rem', color: 'var(--navy-700)' }}>
+                        {doc.desc || 'ไม่มีคำอธิบายเพิ่มเติม'}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    <button 
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => handleOpenEditDoc(doc)}
+                      style={{ padding: '5px 12px', fontSize: '0.78rem' }}
+                    >
+                      แก้ไข
+                    </button>
+                    <button 
+                      className="btn btn-sm"
+                      onClick={() => handleDeleteDoc(doc.id, doc.title)}
+                      style={{ padding: '5px 10px', fontSize: '0.78rem', color: '#dc2626', borderColor: '#fca5a5', background: 'var(--danger-bg)' }}
+                    >
+                      ลบ
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 6: STUDENT RATINGS & SATISFACTION */}
+        {activeTab === 'ratings' && (
+          <div>
+            {/* KPI Cards Grid */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+              gap: 14,
+              marginBottom: 20
+            }}>
+              {/* Card 1: คะแนนเฉลี่ย */}
+              <div style={{
+                background: 'var(--surface-card, #ffffff)',
+                border: '1px solid var(--border-light, #e2e8f0)',
+                borderTop: '3px solid #eab308',
+                borderRadius: '10px',
+                padding: '16px 18px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--navy-700)' }}>คะแนนเฉลี่ยรวม</span>
+                  <div style={{ width: 32, height: 32, borderRadius: '8px', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ca8a04' }}>
+                    <Star size={16} fill="#ca8a04" />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 8 }}>
+                  <span style={{ fontSize: '1.75rem', fontWeight: 800, color: '#854d0e', lineHeight: 1 }}>
+                    {ratingStats.average.toFixed(1)}
+                  </span>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>/ 5.0</span>
+                </div>
+                <div style={{ display: 'flex', gap: 2, marginTop: 6, alignItems: 'center' }}>
+                  {[1, 2, 3, 4, 5].map(star => (
+                    <Star 
+                      key={star} 
+                      size={13} 
+                      fill={star <= Math.round(ratingStats.average) ? '#eab308' : '#e2e8f0'} 
+                      color={star <= Math.round(ratingStats.average) ? '#eab308' : '#cbd5e1'} 
+                    />
+                  ))}
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: 5 }}>
+                    ({ratingStats.total} ผู้ประเมิน)
+                  </span>
+                </div>
+              </div>
+
+              {/* Card 2: อัตราความพึงพอใจสูง */}
+              <div style={{
+                background: 'var(--surface-card, #ffffff)',
+                border: '1px solid var(--border-light, #e2e8f0)',
+                borderTop: '3px solid #10b981',
+                borderRadius: '10px',
+                padding: '16px 18px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--navy-700)' }}>ความพึงพอใจสูง (4-5 ดาว)</span>
+                  <div style={{ width: 32, height: 32, borderRadius: '8px', background: '#d1fae5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#059669' }}>
+                    <ThumbsUp size={16} />
+                  </div>
+                </div>
+                <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#065f46', marginTop: 8, lineHeight: 1 }}>
+                  {ratingStats.satisfactionRate}%
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 6 }}>
+                  {(ratingStats.starCounts[5] || 0) + (ratingStats.starCounts[4] || 0)} จาก {ratingStats.total} คน พึงพอใจมากถึงดีเยี่ยม
+                </div>
+              </div>
+
+              {/* Card 3: ข้อคิดเห็นและข้อเสนอแนะ */}
+              <div style={{
+                background: 'var(--surface-card, #ffffff)',
+                border: '1px solid var(--border-light, #e2e8f0)',
+                borderTop: '3px solid #3b82f6',
+                borderRadius: '10px',
+                padding: '16px 18px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--navy-700)' }}>ข้อเสนอแนะจากนักศึกษา</span>
+                  <div style={{ width: 32, height: 32, borderRadius: '8px', background: '#dbeafe', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
+                    <MessageSquare size={16} />
+                  </div>
+                </div>
+                <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#1e40af', marginTop: 8, lineHeight: 1 }}>
+                  {ratingStats.totalComments}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 6 }}>
+                  ข้อคิดเห็นที่ส่งผ่านระบบการประเมิน
+                </div>
+              </div>
+
+              {/* Card 4: การกระจายตัวของระดับดาว */}
+              <div style={{
+                background: 'var(--surface-card, #ffffff)',
+                border: '1px solid var(--border-light, #e2e8f0)',
+                borderTop: '3px solid var(--math-green, #077b38)',
+                borderRadius: '10px',
+                padding: '14px 18px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center'
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {[5, 4, 3, 2, 1].map(star => {
+                    const count = ratingStats.starCounts[star] || 0;
+                    const pct = ratingStats.starPercentages[star] || 0;
+                    return (
+                      <div key={star} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.74rem' }}>
+                        <span style={{ width: 30, color: 'var(--navy-800)', fontWeight: 600 }}>{star} ★</span>
+                        <div style={{ flex: 1, height: 5, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden' }}>
+                          <div style={{ width: `${pct}%`, height: '100%', background: star >= 4 ? '#eab308' : (star === 3 ? '#94a3b8' : '#cbd5e1'), borderRadius: 4 }} />
+                        </div>
+                        <span style={{ width: 24, textAlign: 'right', color: 'var(--text-muted)' }}>{count}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Filter & Search Bar */}
+            <div style={{
+              background: 'var(--surface-card, #ffffff)',
+              borderRadius: '10px',
+              border: '1px solid var(--border-light, #e2e8f0)',
+              padding: '12px 16px',
+              marginBottom: 16,
+              display: 'flex',
+              gap: 12,
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--navy-800)', marginRight: 2 }}>
+                  ระดับคะแนน:
+                </span>
+                {[
+                  { value: 'all', label: 'ทั้งหมด' },
+                  { value: 5, label: '5 ดาว (★ 5)' },
+                  { value: 4, label: '4 ดาว (★ 4)' },
+                  { value: 3, label: '3 ดาว (★ 3)' },
+                  { value: 2, label: '2 ดาว (★ 2)' },
+                  { value: 1, label: '1 ดาว (★ 1)' }
+                ].map(item => (
+                  <button
+                    key={String(item.value)}
+                    type="button"
+                    onClick={() => setRatingFilterStar(item.value as any)}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '16px',
+                      border: ratingFilterStar === item.value ? '1px solid #d97706' : '1px solid var(--border-light, #e2e8f0)',
+                      background: ratingFilterStar === item.value ? '#fef3c7' : 'transparent',
+                      color: ratingFilterStar === item.value ? '#92400e' : 'var(--navy-700)',
+                      fontSize: '0.78rem',
+                      fontWeight: ratingFilterStar === item.value ? 700 : 500,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <select
+                  value={ratingFilterSch}
+                  onChange={(e) => setRatingFilterSch(e.target.value)}
+                  style={{
+                    padding: '6px 10px',
+                    borderRadius: '7px',
+                    border: '1px solid var(--border-light, #cbd5e1)',
+                    fontSize: '0.8rem',
+                    color: 'var(--navy-800)',
+                    background: '#ffffff',
+                    cursor: 'pointer',
+                    outline: 'none',
+                    maxWidth: '200px'
+                  }}
+                >
+                  <option value="all">ทุกทุนการศึกษา</option>
+                  {scholarships.map(sch => (
+                    <option key={sch.id} value={sch.id}>{sch.title}</option>
+                  ))}
+                </select>
+
+                <div style={{ position: 'relative', minWidth: '200px' }}>
+                  <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    type="text"
+                    placeholder="ค้นหาชื่อ, รหัส, ข้อคิดเห็น..."
+                    value={ratingSearchTerm}
+                    onChange={(e) => setRatingSearchTerm(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '6px 10px 6px 30px',
+                      borderRadius: '7px',
+                      border: '1px solid var(--border-light, #cbd5e1)',
+                      fontSize: '0.8rem',
+                      outline: 'none',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Student Ratings & Feedback Cards List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {filteredRatedApps.length === 0 ? (
+                <div style={{
+                  padding: '40px 20px',
+                  textAlign: 'center',
+                  background: 'var(--surface-card, #ffffff)',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border-light, #e2e8f0)',
+                  color: 'var(--text-muted)'
+                }}>
+                  <div style={{ fontSize: '1.8rem', marginBottom: 6 }}>⭐</div>
+                  <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--navy-900)', marginBottom: 2 }}>
+                    ไม่พบข้อมูลการประเมินที่ตรงกับเงื่อนไข
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.82rem' }}>ลองปรับเปลี่ยนระดับดาวหรือคำค้นหา</p>
+                </div>
+              ) : (
+                filteredRatedApps.map((app) => (
+                  <div 
+                    key={app.trackingId}
+                    style={{
+                      background: 'var(--surface-card, #ffffff)',
+                      borderRadius: '10px',
+                      border: '1px solid var(--border-light, #e2e8f0)',
+                      padding: '14px 18px',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 10,
+                      transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10 }}>
+                      {/* Student Info */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{
+                          width: 38,
+                          height: 38,
+                          borderRadius: '50%',
+                          background: 'linear-gradient(135deg, #077b38, #059669)',
+                          color: '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 700,
+                          fontSize: '0.88rem',
+                          flexShrink: 0
+                        }}>
+                          {app.fullName.replace(/^(นาย|นางสาว|นาง)\s*/, '').charAt(0)}
+                        </div>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--navy-900)' }}>
+                              {app.fullName}
+                            </span>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                              ({app.studentId})
+                            </span>
+                            <span style={{
+                              fontSize: '0.7rem',
+                              fontWeight: 600,
+                              padding: '2px 7px',
+                              borderRadius: '10px',
+                              background: '#f1f5f9',
+                              color: '#475569'
+                            }}>
+                              {app.major} • {app.year}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--math-green-dark, #065f46)', fontWeight: 600, marginTop: 3 }}>
+                            🎓 {app.scholarshipName}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Rating & Date */}
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                          {[1, 2, 3, 4, 5].map(star => (
+                            <Star 
+                              key={star} 
+                              size={15} 
+                              fill={star <= app.rating ? '#eab308' : '#e2e8f0'} 
+                              color={star <= app.rating ? '#eab308' : '#cbd5e1'} 
+                            />
+                          ))}
+                          <span style={{
+                            marginLeft: 5,
+                            fontWeight: 800,
+                            fontSize: '0.84rem',
+                            color: '#92400e',
+                            background: '#fef3c7',
+                            padding: '1px 6px',
+                            borderRadius: '8px'
+                          }}>
+                            {app.rating}.0
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                          ยื่นเมื่อ {formatThaiDate(app.submissionDate)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Student Comment Box */}
+                    <div style={{
+                      background: '#f8fafc',
+                      borderRadius: '8px',
+                      border: '1px solid #e2e8f0',
+                      padding: '10px 14px',
+                      display: 'flex',
+                      gap: 8,
+                      alignItems: 'flex-start'
+                    }}>
+                      <MessageSquare size={15} color="#64748b" style={{ flexShrink: 0, marginTop: 2 }} />
+                      <div style={{ flex: 1 }}>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: 1 }}>
+                          ข้อคิดเห็น / ข้อเสนอแนะ:
+                        </span>
+                        <p style={{ margin: 0, fontSize: '0.84rem', color: app.comment ? 'var(--navy-900)' : 'var(--text-muted)', fontStyle: app.comment ? 'normal' : 'italic', lineHeight: 1.4 }}>
+                          {app.comment ? `“${app.comment}”` : 'ผู้สมัครไม่ได้ระบุข้อเสนอแนะเพิ่มเติม'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenReview(app)}
+                        style={{
+                          background: '#ffffff',
+                          border: '1px solid var(--border-light, #cbd5e1)',
+                          borderRadius: '6px',
+                          padding: '3px 8px',
+                          fontSize: '0.75rem',
+                          color: 'var(--navy-700)',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          flexShrink: 0
+                        }}
+                        title="ดูใบสมัครเต็ม"
+                      >
+                        <Eye size={12} />
+                        <span>ดูใบสมัคร</span>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 6: SITE SETTINGS */}
         {activeTab === 'settings' && (
           <div style={{ 
             background: 'var(--surface-white, #ffffff)', 
@@ -2595,12 +3265,11 @@ export const AdminSection: React.FC = () => {
                                   type="file"
                                   accept="image/*"
                                   style={{ display: 'none' }}
-                                  onChange={(e) => {
+                                  onChange={async (e) => {
                                     const file = e.target.files?.[0];
                                     if (file) {
-                                      const reader = new FileReader();
-                                      reader.onloadend = () => setAppProfilePhoto(reader.result as string);
-                                      reader.readAsDataURL(file);
+                                      const compressed = await compressImage(file);
+                                      setAppProfilePhoto(compressed);
                                     }
                                   }}
                                 />
@@ -3573,7 +4242,7 @@ export const AdminSection: React.FC = () => {
                       required
                     >
                       {!selectedSchYearPreset && (
-                        <option value="custom">กำหนดเอง ({schTargetYears.join(', ')})</option>
+                        <option value="custom">กำหนดเอง ({(schTargetYears || []).join(', ')})</option>
                       )}
                       {SCHOLARSHIP_YEAR_PRESETS.map(preset => (
                         <option key={preset.value} value={preset.value}>{preset.label}</option>
@@ -3821,6 +4490,115 @@ export const AdminSection: React.FC = () => {
                   className="btn btn-primary"
                 >
                   บันทึกคำถาม-คำตอบ
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ADD / EDIT DOWNLOAD DOC */}
+      {isDocModalOpen && (
+        <div className="modal-backdrop open">
+          <div className="modal-card" style={{ maxWidth: 540 }}>
+            <div className="modal-header">
+              <h3 style={{ margin: 0, fontSize: '1.25rem' }}>
+                {editingDocId ? 'แก้ไขเอกสารดาวน์โหลด' : 'เพิ่มเอกสารดาวน์โหลดใหม่'}
+              </h3>
+              <button className="modal-close-btn" onClick={() => setIsDocModalOpen(false)}>&times;</button>
+            </div>
+
+            <form onSubmit={handleSaveDoc}>
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div className="form-group">
+                  <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
+                    ชื่อเอกสาร / แบบฟอร์ม <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <input 
+                    type="text" 
+                    className="form-input-light" 
+                    placeholder="เช่น แบบฟอร์มหนังสือรับรองรายได้ครอบครัว (มจพ.ท-01)"
+                    value={docTitle}
+                    onChange={(e) => setDocTitle(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
+                    คำอธิบาย / วัตถุประสงค์การใช้งาน
+                  </label>
+                  <textarea 
+                    className="form-input-light" 
+                    rows={3}
+                    placeholder="เช่น สำหรับใช้ยื่นประกอบการสมัครทุนขาดแคลนทุนทรัพย์และทุนศิษย์เก่า"
+                    value={docDesc}
+                    onChange={(e) => setDocDesc(e.target.value)}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div className="form-group">
+                    <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
+                      ประเภทไฟล์
+                    </label>
+                    <input 
+                      type="text" 
+                      className="form-input-light" 
+                      placeholder="เช่น PDF, DOCX"
+                      value={docType}
+                      onChange={(e) => setDocType(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
+                      ขนาดไฟล์
+                    </label>
+                    <input 
+                      type="text" 
+                      className="form-input-light" 
+                      placeholder="เช่น 185 KB, 1.2 MB"
+                      value={docSize}
+                      onChange={(e) => setDocSize(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
+                    อัปโหลดไฟล์ตัวอย่าง / เอกสารใหม่ (ไม่บังคับ)
+                  </label>
+                  <input 
+                    type="file" 
+                    className="form-input-light" 
+                    accept=".pdf,.doc,.docx,.zip,.xls,.xlsx"
+                    onChange={handleFileChangeForDoc}
+                    style={{ padding: '8px' }}
+                  />
+                  {selectedDocFileName && (
+                    <div style={{ fontSize: '0.8rem', color: 'var(--math-green, #077b38)', marginTop: 4, fontWeight: 500 }}>
+                      เลือกไฟล์แล้ว: {selectedDocFileName} ({docSize})
+                    </div>
+                  )}
+                  <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: 2, display: 'block' }}>
+                    รองรับไฟล์ PDF, Word, Excel หรือ ZIP (คำนวณขนาดและประเภทให้อัตโนมัติ)
+                  </span>
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  onClick={() => setIsDocModalOpen(false)}
+                >
+                  ยกเลิก
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn btn-primary"
+                >
+                  {editingDocId ? 'บันทึกการแก้ไข' : 'เพิ่มเอกสาร'}
                 </button>
               </div>
             </form>

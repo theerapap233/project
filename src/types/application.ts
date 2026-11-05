@@ -23,6 +23,8 @@ export interface Application {
   documents: string[];
   profilePhoto?: string | null;
   formData?: ApplicationFormData;
+  systemRating?: number;
+  systemComment?: string;
 }
 
 export interface Address {

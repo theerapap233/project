@@ -20,16 +20,7 @@ export const NewsSection: React.FC = () => {
 
   return (
     <section className="section" id="news" style={{ padding: '60px 20px' }}>
-      <div className="container" style={{ 
-        maxWidth: '1240px',
-        background: 'var(--surface-card)',
-        border: '1px solid var(--border-light)',
-        borderRadius: '24px',
-        padding: '48px',
-        boxShadow: 'var(--shadow-lg)',
-        position: 'relative',
-        overflow: 'hidden'
-      }}>
+      <div className="container news-container-card">
         {/* Top Decorative Border for the Frame */}
         <div style={{
           position: 'absolute',
@@ -152,58 +143,71 @@ export const NewsSection: React.FC = () => {
 
         {/* News Detail Modal */}
         {selectedNews && (
-          <div className="modal-backdrop open">
-            <div className="modal-card" style={{ maxWidth: 620 }}>
+          <div
+            className="modal-backdrop open"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                handleCloseNews();
+              }
+            }}
+          >
+            <div className="modal-card">
               <div className="modal-header">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    padding: '3px 10px',
-                    borderRadius: 'var(--radius-full)',
-                    background: 'var(--math-green-soft)',
-                    color: 'var(--math-green-dark)'
-                  }}>
-                    {selectedNews.tag}
-                  </span>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                    📅 {selectedNews.date}
-                  </span>
-                </div>
-                <button className="modal-close-btn" onClick={handleCloseNews}>&times;</button>
+                <h3>{selectedNews.title}</h3>
+                <button
+                  type="button"
+                  className="modal-close-btn"
+                  onClick={handleCloseNews}
+                  aria-label="ปิดหน้าต่าง"
+                >
+                  &times;
+                </button>
               </div>
 
               <div className="modal-body">
-                <h3 style={{ fontSize: '1.3rem', color: 'var(--navy-900)', marginBottom: 16, lineHeight: 1.4 }}>
-                  {selectedNews.title}
-                </h3>
-                
-                <p style={{ fontSize: '0.98rem', color: 'var(--navy-700)', lineHeight: 1.8, marginBottom: 20 }}>
+                <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span className="category-tag">
+                    {selectedNews.tag}
+                  </span>
+                  <span
+                    className="scope-badge internal"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                  >
+                    <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    {selectedNews.date}
+                  </span>
+                  <span className="status-badge open">
+                    ภาควิชาคณิตศาสตร์
+                  </span>
+                </div>
+
+                <h4 style={{ fontSize: '1rem', color: 'var(--navy-900)', marginBottom: 10, fontWeight: 700 }}>
+                  รายละเอียดข่าวและประกาศ
+                </h4>
+                <p style={{ color: 'var(--navy-700)', fontSize: '0.95rem', lineHeight: 1.8, marginBottom: 24, whiteSpace: 'pre-line' }}>
                   {selectedNews.summary}
                 </p>
 
-                <div style={{
-                  background: 'var(--surface-ground)',
-                  border: '1px solid var(--border-light)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '16px',
-                  marginBottom: 16
+                <div style={{ 
+                  background: 'var(--surface-alt)', 
+                  padding: '14px 18px', 
+                  borderRadius: 'var(--radius-md)', 
+                  fontSize: '0.85rem', 
+                  color: 'var(--navy-600)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 4
                 }}>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--navy-800)', marginBottom: 6 }}>
-                    ภาควิชาคณิตศาสตร์ คณะวิทยาศาสตร์ประยุกต์ มจพ.
-                  </div>
-                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>
-                    หากมีข้อสงสัยหรือต้องการสอบถามข้อมูลเพิ่มเติม สามารถติดต่อห้องธุรการภาควิชาคณิตศาสตร์ ชั้น 7 อาคาร 78 หรือโทร. 02-555-2000 ต่อ 4601-4602
-                  </p>
+                  <strong style={{ color: 'var(--navy-800)' }}>ติดต่อสอบถามข้อมูลเพิ่มเติม:</strong>
+                  <span>ห้องธุรการภาควิชาคณิตศาสตร์ ชั้น 7 อาคาร 78 มจพ. • โทร. 02-555-2000 ต่อ 4601-4602</span>
                 </div>
               </div>
 
               <div className="modal-footer">
-                <button className="btn btn-secondary" onClick={handleCloseNews}>
-                  ปิดหน้าต่าง
-                </button>
-                <button className="btn btn-primary" onClick={() => handleDownloadDoc(selectedNews.title)}>
-                  ดาวน์โหลดเอกสารประกาศ (PDF)
+                <button type="button" className="btn btn-primary" onClick={() => handleDownloadDoc(selectedNews.title)}>
+                  ดาวน์โหลดประกาศ (PDF)
                 </button>
               </div>
             </div>

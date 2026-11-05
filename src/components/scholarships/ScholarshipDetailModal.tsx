@@ -19,75 +19,114 @@ export const ScholarshipDetailModal: React.FC = () => {
   };
 
   return (
-    <div className="modal-backdrop open">
+    <div
+      className="modal-backdrop open"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          closeScholarshipDetail();
+        }
+      }}
+    >
       <div className="modal-card">
         <div className="modal-header">
           <h3>{sch.title}</h3>
-          <button className="modal-close-btn" onClick={closeScholarshipDetail}>&times;</button>
+          <button
+            type="button"
+            className="modal-close-btn"
+            onClick={closeScholarshipDetail}
+            aria-label="ปิดหน้าต่าง"
+          >
+            &times;
+          </button>
         </div>
 
         <div className="modal-body">
-          <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {/* Metadata Badges (Scope, Category, Department - Code removed) */}
+          <div style={{ marginBottom: 18, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span className={`scope-badge ${sch.scope === 'external' ? 'external' : 'internal'}`}>
-              {sch.scope === 'external' ? '🌐 ทุนภายนอก' : '🏛️ ทุนภายใน'}
+              {sch.scope === 'external' ? 'ทุนภายนอก' : 'ทุนภายใน'}
             </span>
             <span className="category-tag">{sch.categoryName}</span>
-            <span 
-              className={`status-badge ${sch.status === 'closing_soon' ? 'closing_soon' : 'open'}`} 
-            >
-              รหัสทุน: {sch.code}
+            <span className="status-badge open">
+              ภาควิชาคณิตศาสตร์
             </span>
           </div>
 
-          <div className="card-amount-box" style={{ marginBottom: 24 }}>
-            <span className="amount-label">มูลค่าทุนและระยะเวลาสนับสนุน</span>
-            <div className="amount-val">{sch.amount}</div>
-            <div style={{ fontSize: '0.85rem', color: 'var(--navy-600)', marginTop: 4 }}>
+          {/* Amount Box - Modern Clean Design (No orange, no dashed border) */}
+          <div style={{
+            background: 'var(--surface-ground)',
+            border: '1px solid var(--border-light)',
+            borderRadius: '16px',
+            padding: '18px 20px',
+            marginBottom: 24,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 4
+          }}>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+              มูลค่าทุนสนับสนุน
+            </span>
+            <div style={{
+              fontSize: '1.45rem',
+              fontWeight: 700,
+              color: 'var(--math-green-dark, #055c29)',
+              letterSpacing: '-0.02em'
+            }}>
+              {sch.amount}
+            </div>
+            <div style={{ fontSize: '0.84rem', color: 'var(--navy-600)', marginTop: 2 }}>
               ประจำปีการศึกษา {sch.academicYear} ({sch.term})
             </div>
           </div>
 
-          <h4 style={{ fontSize: '1rem', color: 'var(--navy-900)', marginBottom: 8 }}>
+          <h4 style={{ fontSize: '1rem', color: 'var(--navy-900)', marginBottom: 8, fontWeight: 700 }}>
             วัตถุประสงค์และรายละเอียดทุน
           </h4>
-          <p style={{ color: 'var(--navy-700)', fontSize: '0.95rem', lineHeight: 1.7, marginBottom: 20 }}>
+          <p style={{ color: 'var(--navy-700)', fontSize: '0.95rem', lineHeight: 1.75, marginBottom: 24 }}>
             {sch.description}
           </p>
 
-          <h4 style={{ fontSize: '1rem', color: 'var(--navy-900)', marginBottom: 10 }}>
+          <h4 style={{ fontSize: '1rem', color: 'var(--navy-900)', marginBottom: 12, fontWeight: 700 }}>
             คุณสมบัติของผู้มีสิทธิ์สมัคร
           </h4>
-          <ul style={{ paddingLeft: 20, color: 'var(--navy-700)', fontSize: '0.92rem', lineHeight: 1.8, marginBottom: 20 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
             {sch.requirements.map((req, idx) => (
-              <li key={idx}>{req}</li>
+              <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: '0.92rem', color: 'var(--navy-700)', lineHeight: 1.6 }}>
+                <span style={{ color: 'var(--math-green)', fontWeight: 700, lineHeight: 1.4, flexShrink: 0 }}>✓</span>
+                <span>{req}</span>
+              </div>
             ))}
-          </ul>
+          </div>
 
-          <h4 style={{ fontSize: '1rem', color: 'var(--navy-900)', marginBottom: 10 }}>
+          <h4 style={{ fontSize: '1rem', color: 'var(--navy-900)', marginBottom: 12, fontWeight: 700 }}>
             เอกสารหลักฐานที่ต้องใช้ยื่น
           </h4>
-          <ul style={{ paddingLeft: 20, color: 'var(--navy-700)', fontSize: '0.92rem', lineHeight: 1.8, marginBottom: 20 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
             {sch.documents.map((doc, idx) => (
-              <li key={idx}>{doc}</li>
+              <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: '0.92rem', color: 'var(--navy-700)', lineHeight: 1.6 }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '1.1rem', lineHeight: 1.2, flexShrink: 0 }}>•</span>
+                <span>{doc}</span>
+              </div>
             ))}
-          </ul>
+          </div>
 
           <div style={{ 
             background: 'var(--surface-alt)', 
             padding: '14px 18px', 
-            borderRadius: 'var(--radius-md)', 
+            borderRadius: '12px', 
             fontSize: '0.85rem', 
-            color: 'var(--navy-600)' 
+            color: 'var(--navy-600)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 4
           }}>
-            <strong>แหล่งทุนสนับสนุน:</strong> {sch.fundingSource}
+            <strong style={{ color: 'var(--navy-800)' }}>แหล่งทุนสนับสนุน:</strong>
+            <span>{sch.fundingSource}</span>
           </div>
         </div>
 
         <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={closeScholarshipDetail}>
-            ปิดหน้าต่าง
-          </button>
-          <button className="btn btn-primary" onClick={handleApply}>
+          <button type="button" className="btn btn-primary" onClick={handleApply}>
             สมัครทุนนี้
           </button>
         </div>
