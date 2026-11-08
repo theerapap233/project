@@ -2,8 +2,7 @@ import React from 'react';
 import { useScholarship } from '../../context/ScholarshipContext';
 
 export const HeroSection: React.FC = () => {
-  const { scrollToSection, siteSettings, currentUser } = useScholarship();
-  const isStudent = Boolean(currentUser && currentUser.role === 'student');
+  const { scrollToSection, siteSettings } = useScholarship();
 
   return (
     <section className="hero-section" id="hero">
@@ -17,23 +16,6 @@ export const HeroSection: React.FC = () => {
                 </svg>
                 ปีการศึกษา {siteSettings.semester}/{siteSettings.academicYear}
               </div>
-              {isStudent && currentUser && (
-                <div style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  background: '#ecfdf5',
-                  border: '1px solid #a7f3d0',
-                  color: '#065f46',
-                  padding: '4px 12px',
-                  borderRadius: '20px',
-                  fontSize: '0.82rem',
-                  fontWeight: 600
-                }}>
-                  <span>🎓</span>
-                  <span>สวัสดีคุณ {currentUser.name.split(' ')[0]}</span>
-                </div>
-              )}
             </div>
             <h1 className="hero-title" style={{ whiteSpace: 'pre-line' }}>
               {siteSettings.heroTitle}
