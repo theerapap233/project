@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Plus, Trash2 } from 'lucide-react';
 import { useScholarship } from '../../context/ScholarshipContext';
 import { Address, ApplicationFormData, UploadedFiles } from '../../types/application';
 import { formatThaiDate } from '../../utils/dateFormatter';
@@ -10,14 +11,6 @@ const WIZARD_STEPS = [
   { id: 3, label: 'ยืนยันการสมัคร' }
 ];
 
-const QUICK_REASONS = [
-  'ครอบครัวมีภาระค่าใช้จ่ายสูง',
-  'มีพี่น้องกำลังศึกษาอยู่หลายคน',
-  'เพื่อแบ่งเบาภาระค่าครองชีพของผู้ปกครอง',
-  'ใช้เป็นค่าอุปกรณ์การเรียนและการทำวิจัย',
-  'รายได้ของผู้ปกครองไม่แน่นอนตามสภาวะเศรษฐกิจ'
-];
-
 const MAJOR_OPTIONS = [
   'คณิตศาสตร์ประยุกต์ (MA)',
   'สถิติประยุกต์ (AS)',
@@ -26,8 +19,6 @@ const MAJOR_OPTIONS = [
 ];
 
 const YEAR_OPTIONS = ['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4', 'บัณฑิตศึกษา'];
-
-const MIN_REASON_LENGTH = 20;
 
 const emptyAddress = (): Address => ({
   houseNo: '',
@@ -177,10 +168,37 @@ export const ApplicationWizardModal: React.FC = () => {
     });
   };
 
-  const appendReason = (text: string) => {
+  const reasonsList = formData.reasonsList && formData.reasonsList.length > 0
+    ? formData.reasonsList
+    : [''];
+
+  const handleReasonChange = (index: number, val: string) => {
+    const next = [...reasonsList];
+    next[index] = val;
+    const active = next.filter(r => r.trim());
     setFormData(prev => ({
       ...prev,
-      reason: prev.reason.trim() ? `${prev.reason.trim()}\n${text}` : text
+      reasonsList: next,
+      reason: active.join('\n')
+    }));
+  };
+
+  const handleAddReason = () => {
+    if (reasonsList.length >= 5) return;
+    setFormData(prev => ({
+      ...prev,
+      reasonsList: [...reasonsList, '']
+    }));
+  };
+
+  const handleRemoveReason = (index: number) => {
+    const next = reasonsList.filter((_, i) => i !== index);
+    const safeNext = next.length > 0 ? next : [''];
+    const active = safeNext.filter(r => r.trim());
+    setFormData(prev => ({
+      ...prev,
+      reasonsList: safeNext,
+      reason: active.join('\n')
     }));
   };
 
@@ -214,11 +232,9 @@ export const ApplicationWizardModal: React.FC = () => {
       }
     }
 
+    // Step 2: เหตุผลความจำเป็น (ไม่บังคับกรอก หรือไม่เกิน 5 ข้อ)
     if (currentStep === 2) {
-      if (formData.reason.trim().length < MIN_REASON_LENGTH) {
-        showToast(`กรุณาอธิบายเหตุผลความจำเป็นอย่างน้อย ${MIN_REASON_LENGTH} ตัวอักษร`, 'warning');
-        return false;
-      }
+      return true;
     }
 
     return true;
@@ -259,7 +275,8 @@ export const ApplicationWizardModal: React.FC = () => {
       return;
     }
 
-    const reason = formData.reason.trim();
+    const activeReasons = reasonsList.filter(r => r.trim());
+    const finalReason = activeReasons.join('\n');
     const gpaxNum = Number(formData.gpax);
 
     // ข้อมูลส่วนตัวที่แก้ในขั้นตอนที่ 1 จะถูกบันทึกกลับเข้าบัญชีนักศึกษา
@@ -274,8 +291,8 @@ export const ApplicationWizardModal: React.FC = () => {
       {
         ...formData,
         gpax: gpaxNum,
-        reason,
-        reasonsList: [reason],
+        reason: finalReason,
+        reasonsList: activeReasons,
         systemRating: 0,
         systemComment: ''
       },
@@ -515,40 +532,95 @@ export const ApplicationWizardModal: React.FC = () => {
           {step === 2 && (
             <div className="wizard-step-pane">
               <div className="wizard-section-card">
-                <div className="wizard-section-header">
+                <div className="wizard-section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span className="wizard-section-title-clean">เหตุผลความจำเป็นในการขอรับทุน</span>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    {reasonsList.filter(r => r.trim()).length}/5 ข้อ
+                  </span>
                 </div>
-                <p style={{ margin: '0 0 10px', fontSize: '0.84rem', color: 'var(--text-muted)' }}>
-                  อธิบายความจำเป็นและเป้าหมายในการใช้เงินทุน เพื่อให้คณะกรรมการพิจารณา
-                  (อย่างน้อย {MIN_REASON_LENGTH} ตัวอักษร)
+                <p style={{ margin: '0 0 14px', fontSize: '0.84rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                  ระบุเหตุผลความจำเป็นและเป้าหมายในการใช้เงินทุน (เป็นข้อๆ สูงสุดไม่เกิน 5 ข้อ หรือเว้นว่างได้ ไม่บังคับกรอก)
                 </p>
-                <textarea
-                  className="form-input-light"
-                  style={{ minHeight: 160, resize: 'vertical', lineHeight: 1.7 }}
-                  placeholder="เช่น ครอบครัวมีรายได้ไม่แน่นอน และมีพี่น้องกำลังศึกษาอยู่ 2 คน เงินทุนนี้จะช่วยแบ่งเบาค่าใช้จ่ายและค่าอุปกรณ์การเรียน..."
-                  value={formData.reason}
-                  onChange={(e) => updateField('reason', e.target.value)}
-                  required
-                />
-                <div style={{ textAlign: 'right', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
-                  {formData.reason.trim().length} ตัวอักษร
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {reasonsList.map((item, idx) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: '50%',
+                          background: '#f1f5f9',
+                          color: 'var(--navy-800)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '0.82rem',
+                          fontWeight: 700,
+                          flexShrink: 0
+                        }}
+                      >
+                        {idx + 1}
+                      </span>
+                      <input
+                        type="text"
+                        className="form-input-light"
+                        placeholder={`ระบุเหตุผลข้อที่ ${idx + 1} (เช่น ครอบครัวมีภาระค่าใช้จ่ายสูง...)`}
+                        value={item}
+                        onChange={(e) => handleReasonChange(idx, e.target.value)}
+                        style={{ flex: 1 }}
+                      />
+                      {reasonsList.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveReason(idx)}
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 8,
+                            border: '1px solid #fee2e2',
+                            background: '#fff5f5',
+                            color: '#ef4444',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            flexShrink: 0
+                          }}
+                          title="ลบข้อนี้"
+                          aria-label="ลบข้อนี้"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
                 </div>
 
-                <div style={{ marginTop: 12 }}>
-                  <div className="sub-label" style={{ marginBottom: 8 }}>เลือกเหตุผลสำเร็จรูปเพื่อเพิ่มในคำตอบ</div>
-                  <div className="wizard-pill-group">
-                    {QUICK_REASONS.map(reason => (
-                      <button
-                        key={reason}
-                        type="button"
-                        className="wizard-quick-chip"
-                        onClick={() => appendReason(reason)}
-                      >
-                        + {reason}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                {reasonsList.length < 5 && (
+                  <button
+                    type="button"
+                    onClick={handleAddReason}
+                    style={{
+                      marginTop: 14,
+                      padding: '8px 16px',
+                      borderRadius: 8,
+                      border: '1px dashed var(--math-green)',
+                      background: 'rgba(7, 123, 56, 0.05)',
+                      color: 'var(--math-green)',
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      alignSelf: 'flex-start'
+                    }}
+                  >
+                    <Plus size={16} />
+                    <span>เพิ่มข้อ ({reasonsList.length}/5)</span>
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -624,9 +696,19 @@ export const ApplicationWizardModal: React.FC = () => {
                       แก้ไข
                     </button>
                   </div>
-                  <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--navy-800)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
-                    {formData.reason.trim() || 'ยังไม่ได้ระบุเหตุผล'}
-                  </p>
+                  {reasonsList.filter(r => r.trim()).length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {reasonsList.filter(r => r.trim()).map((r, i) => (
+                        <div key={i} style={{ fontSize: '0.88rem', color: 'var(--navy-800)', lineHeight: 1.6 }}>
+                          <strong>{i + 1}.</strong> {r.trim()}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                      (ไม่ได้ระบุเหตุผลความจำเป็น)
+                    </p>
+                  )}
                 </div>
 
                 <label className="wizard-consent-card">
