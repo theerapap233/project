@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useScholarship } from '../../context/ScholarshipContext';
 import { Address, ApplicationFormData, UploadedFiles } from '../../types/application';
 import { formatThaiDate } from '../../utils/dateFormatter';
-import { hasFilledPersonalInfo, normalizePersonalInfo } from '../../utils/studentProfile';
+import { calculateStudentYear, hasFilledPersonalInfo, normalizePersonalInfo } from '../../utils/studentProfile';
 
 const WIZARD_STEPS = [
   { id: 1, label: 'ข้อมูลนักศึกษา' },
@@ -148,7 +148,7 @@ export const ApplicationWizardModal: React.FC = () => {
       email: currentUser?.email || '',
       phone: currentUser?.phone || '',
       major: currentUser?.major || '',
-      year: currentUser?.year || '',
+      year: calculateStudentYear(currentUser?.studentId, currentUser?.year || 'ปี 1'),
       gpax: currentUser?.gpax !== undefined ? currentUser.gpax : ''
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -168,7 +168,13 @@ export const ApplicationWizardModal: React.FC = () => {
   const personalInfoReady = hasFilledPersonalInfo(currentUser?.personalInfo);
 
   const updateField = <K extends keyof ApplicationFormData>(key: K, value: ApplicationFormData[K]) => {
-    setFormData(prev => ({ ...prev, [key]: value }));
+    setFormData(prev => {
+      const next = { ...prev, [key]: value };
+      if (key === 'studentId' && typeof value === 'string' && value.replace(/\D/g, '').length >= 2) {
+        next.year = calculateStudentYear(value, prev.year);
+      }
+      return next;
+    });
   };
 
   const appendReason = (text: string) => {

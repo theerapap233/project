@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useScholarship } from '../../context/ScholarshipContext';
 import { StudentPersonalInfoForm } from '../profile/StudentPersonalInfoForm';
-import { createEmptyPersonalInfo, hasFilledPersonalInfo, normalizePersonalInfo } from '../../utils/studentProfile';
+import { calculateStudentYear, createEmptyPersonalInfo, hasFilledPersonalInfo, normalizePersonalInfo } from '../../utils/studentProfile';
 import {
   AtSign,
   BriefcaseBusiness,
@@ -52,7 +52,7 @@ export const Navbar: React.FC = () => {
     email: currentUser?.email || '',
     phone: currentUser?.phone || '',
     major: currentUser?.major || '',
-    year: currentUser?.year || 'ปี 2',
+    year: calculateStudentYear(currentUser?.studentId, currentUser?.year),
     gpax: currentUser?.gpax !== undefined ? String(currentUser.gpax) : '3.00',
     position: currentUser?.position || (currentUser?.role === 'admin' ? 'เจ้าหน้าที่ธุรการ/กรรมการทุน' : currentUser?.major || ''),
     avatarUrl: currentUser?.avatarUrl || ''
@@ -70,7 +70,7 @@ export const Navbar: React.FC = () => {
         email: currentUser.email,
         phone: currentUser.phone || '',
         major: currentUser.major || '',
-        year: currentUser.year || 'ปี 2',
+        year: calculateStudentYear(currentUser.studentId, currentUser.year),
         gpax: currentUser.gpax !== undefined ? String(currentUser.gpax) : '3.00',
         position: currentUser.position || (currentUser.role === 'admin' ? 'เจ้าหน้าที่ธุรการ/กรรมการทุน' : currentUser.major || ''),
         avatarUrl: currentUser.avatarUrl || ''
@@ -413,11 +413,12 @@ export const Navbar: React.FC = () => {
                         <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
                           {currentUser.major}
                         </span>
-                        {currentUser.gpax !== undefined && (
-                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                            GPAX: <strong>{Number(currentUser.gpax).toFixed(2)}</strong> • {currentUser.year || 'ปี 2'}
-                          </span>
-                        )}
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                          {currentUser.gpax !== undefined ? (
+                            <>GPAX: <strong>{Number(currentUser.gpax).toFixed(2)}</strong> • </>
+                          ) : null}
+                          {calculateStudentYear(currentUser.studentId, currentUser.year)}
+                        </span>
                       </div>
                     ) : (
                       <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: 2 }}>
@@ -466,7 +467,7 @@ export const Navbar: React.FC = () => {
                           border: 'none',
                           padding: '8px 12px',
                           textAlign: 'left',
-                          fontSize: '0.82rem',
+                           fontSize: '0.82rem',
                           color: 'var(--text-main)',
                           cursor: 'pointer',
                           borderRadius: '8px',
@@ -479,21 +480,7 @@ export const Navbar: React.FC = () => {
                         onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                       >
                         <span>📋</span>
-                        <span style={{ flex: 1 }}>ข้อมูลประกอบการพิจารณาทุน</span>
-                        <span
-                          style={{
-                            fontSize: '0.62rem',
-                            fontWeight: 700,
-                            padding: '1px 6px',
-                            borderRadius: 999,
-                            whiteSpace: 'nowrap',
-                            background: hasFilledPersonalInfo(personalForm) ? '#ecfdf5' : '#fef3c7',
-                            color: hasFilledPersonalInfo(personalForm) ? '#047857' : '#92400e',
-                            border: `1px solid ${hasFilledPersonalInfo(personalForm) ? '#a7f3d0' : '#fde68a'}`
-                          }}
-                        >
-                          {hasFilledPersonalInfo(personalForm) ? 'ครบแล้ว' : 'ยังว่าง'}
-                        </span>
+                        <span>ข้อมูลประกอบการพิจารณาทุน</span>
                       </button>
                     )}
 

@@ -93,3 +93,52 @@ export const hasFilledPersonalInfo = (value?: Partial<StudentPersonalInfo> | nul
     info.sponsor.length > 0
   );
 };
+
+/**
+ * คำนวณชั้นปีนักศึกษา (เช่น 'ปี 1', 'ปี 2', 'ปี 3', 'ปี 4') อัตโนมัติตามเวลาจริง
+ * โดยเปรียบเทียบกับรหัสนักศึกษา 2 ตัวแรก (ปี พ.ศ. ที่เข้าศึกษา)
+ * 
+ * - รหัสนักศึกษา มจพ. ขึ้นต้นด้วยเลข 2 หลักของปี พ.ศ. เช่น '6604062610099' => 2566
+ * - ภาคการศึกษาที่ 1 ของมหาวิทยาลัยไทยเริ่มประมาณเดือนมิถุนายน
+ *   - ถ้าเดือนปัจจุบัน >= 6 (มิ.ย. - ธ.ค.) => ปีการศึกษาปัจจุบัน = พ.ศ. ปัจจุบัน
+ *   - ถ้าเดือนปัจจุบัน < 6 (ม.ค. - พ.ค.) => ปีการศึกษาปัจจุบัน = พ.ศ. ปัจจุบัน - 1
+ */
+export const calculateStudentYear = (
+  studentId?: string | null,
+  fallbackYear?: string | null
+): string => {
+  if (!studentId) return fallbackYear || 'ปี 1';
+
+  // ดึงเฉพาะตัวเลขจากรหัสนักศึกษา (รองรับ 's6604062610099' หรือ '66-040626-1009-9')
+  const digits = String(studentId).replace(/\D/g, '');
+  if (digits.length < 2) {
+    return fallbackYear || 'ปี 1';
+  }
+
+  const entryYearShort = parseInt(digits.slice(0, 2), 10);
+  if (isNaN(entryYearShort)) {
+    return fallbackYear || 'ปี 1';
+  }
+
+  // แปลงเป็นปี พ.ศ. 4 หลัก (เช่น 66 -> 2566, หากต่ำกว่า 50 เป็น 26xx เพื่อรองรับปีข้างหน้า)
+  const entryYearBE = entryYearShort < 50 ? 2600 + entryYearShort : 2500 + entryYearShort;
+
+  const now = new Date();
+  const currentYearBE = now.getFullYear() + 543;
+  const currentMonth = now.getMonth() + 1; // 1 - 12
+
+  // ปีการศึกษา (Academic Year) ตามปฏิทินการศึกษา
+  const currentAcademicYearBE = currentMonth >= 6 ? currentYearBE : currentYearBE - 1;
+
+  const diff = currentAcademicYearBE - entryYearBE;
+  const calculatedYearNumber = diff + 1;
+
+  if (calculatedYearNumber <= 1) {
+    return 'ปี 1';
+  } else if (calculatedYearNumber <= 6) {
+    return `ปี ${calculatedYearNumber}`;
+  } else {
+    return 'ปี 4+';
+  }
+};
+
