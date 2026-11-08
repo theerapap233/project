@@ -3373,10 +3373,10 @@ export const AdminSection: React.FC = () => {
                           onChange={(e) => setAppEditData({ ...appEditData, major: e.target.value })}
                           required
                         >
-                          <option value="MA โครงการปกติ">MA โครงการปกติ</option>
-                          <option value="MA โครงการสมทบ">MA โครงการสมทบ</option>
-                          <option value="MC โครงการปกติ">MC โครงการปกติ</option>
-                          <option value="MC โครงการสมทบ">MC โครงการสมทบ</option>
+                          <option value="วท.บ. คณิตศาสตร์ประยุกต์ (MA) - โครงการปกติ">วท.บ. คณิตศาสตร์ประยุกต์ (MA) - โครงการปกติ</option>
+                          <option value="วท.บ. คณิตศาสตร์ประยุกต์ (MA) - โครงการสมทบพิเศษ">วท.บ. คณิตศาสตร์ประยุกต์ (MA) - โครงการสมทบพิเศษ</option>
+                          <option value="วท.บ. คณิตศาสตร์เชิงคอมพิวเตอร์ (MC) - โครงการปกติ">วท.บ. คณิตศาสตร์เชิงคอมพิวเตอร์ (MC) - โครงการปกติ</option>
+                          <option value="วท.บ. คณิตศาสตร์เชิงคอมพิวเตอร์ (MC) - โครงการสมทบพิเศษ">วท.บ. คณิตศาสตร์เชิงคอมพิวเตอร์ (MC) - โครงการสมทบพิเศษ</option>
                         </select>
                       </div>
 

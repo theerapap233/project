@@ -142,3 +142,32 @@ export const calculateStudentYear = (
   }
 };
 
+/**
+ * สาขาวิชาของภาควิชาคณิตศาสตร์ (เฉพาะ MA และ MC โดยมีโครงการปกติและสมทบพิเศษ)
+ */
+export const DEPARTMENT_MAJOR_OPTIONS = [
+  'วท.บ. คณิตศาสตร์ประยุกต์ (MA) - โครงการปกติ',
+  'วท.บ. คณิตศาสตร์ประยุกต์ (MA) - โครงการสมทบพิเศษ',
+  'วท.บ. คณิตศาสตร์เชิงคอมพิวเตอร์ (MC) - โครงการปกติ',
+  'วท.บ. คณิตศาสตร์เชิงคอมพิวเตอร์ (MC) - โครงการสมทบพิเศษ'
+] as const;
+
+export type DepartmentMajor = (typeof DEPARTMENT_MAJOR_OPTIONS)[number];
+
+/**
+ * ปรับชื่อสาขาวิชาเดิมให้ตรงกับตัวเลือกมาตรฐาน MA / MC
+ */
+export const normalizeMajorName = (major?: string | null): string => {
+  if (!major) return DEPARTMENT_MAJOR_OPTIONS[0];
+  const text = major.trim();
+  if ((DEPARTMENT_MAJOR_OPTIONS as readonly string[]).includes(text)) {
+    return text;
+  }
+  const isSpecial = text.includes('สมทบ');
+  if (text.includes('MC') || text.includes('คอมพิวเตอร์') || text.includes('เชิงคำนวณ')) {
+    return isSpecial ? DEPARTMENT_MAJOR_OPTIONS[3] : DEPARTMENT_MAJOR_OPTIONS[2];
+  }
+  return isSpecial ? DEPARTMENT_MAJOR_OPTIONS[1] : DEPARTMENT_MAJOR_OPTIONS[0];
+};
+
+

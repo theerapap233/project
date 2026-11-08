@@ -3,7 +3,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useScholarship } from '../../context/ScholarshipContext';
 import { Address, ApplicationFormData, UploadedFiles } from '../../types/application';
 import { formatThaiDate } from '../../utils/dateFormatter';
-import { calculateStudentYear, hasFilledPersonalInfo, normalizePersonalInfo } from '../../utils/studentProfile';
+import { calculateStudentYear, hasFilledPersonalInfo, normalizeMajorName, normalizePersonalInfo } from '../../utils/studentProfile';
 
 const WIZARD_STEPS = [
   { id: 1, label: 'ข้อมูลนักศึกษา' },
@@ -12,10 +12,10 @@ const WIZARD_STEPS = [
 ];
 
 const MAJOR_OPTIONS = [
-  'คณิตศาสตร์ประยุกต์ (MA)',
-  'สถิติประยุกต์ (AS)',
-  'สถิติธุรกิจและการประกันภัย (BS)',
-  'คณิตศาสตร์ประยุกต์ (ปริญญาโท/เอก)'
+  'วท.บ. คณิตศาสตร์ประยุกต์ (MA) - โครงการปกติ',
+  'วท.บ. คณิตศาสตร์ประยุกต์ (MA) - โครงการสมทบพิเศษ',
+  'วท.บ. คณิตศาสตร์เชิงคอมพิวเตอร์ (MC) - โครงการปกติ',
+  'วท.บ. คณิตศาสตร์เชิงคอมพิวเตอร์ (MC) - โครงการสมทบพิเศษ'
 ];
 
 const YEAR_OPTIONS = ['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4', 'บัณฑิตศึกษา'];
@@ -138,7 +138,7 @@ export const ApplicationWizardModal: React.FC = () => {
       lastName: names.slice(1).join(' '),
       email: currentUser?.email || '',
       phone: currentUser?.phone || '',
-      major: currentUser?.major || '',
+      major: normalizeMajorName(currentUser?.major),
       year: calculateStudentYear(currentUser?.studentId, currentUser?.year || 'ปี 1'),
       gpax: currentUser?.gpax !== undefined ? currentUser.gpax : ''
     });

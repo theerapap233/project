@@ -2,7 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useScholarship } from '../../context/ScholarshipContext';
 import { StudentPersonalInfoForm } from '../profile/StudentPersonalInfoForm';
-import { calculateStudentYear, createEmptyPersonalInfo, hasFilledPersonalInfo, normalizePersonalInfo } from '../../utils/studentProfile';
+import {
+  calculateStudentYear,
+  createEmptyPersonalInfo,
+  DEPARTMENT_MAJOR_OPTIONS,
+  hasFilledPersonalInfo,
+  normalizeMajorName,
+  normalizePersonalInfo
+} from '../../utils/studentProfile';
 import {
   AtSign,
   BriefcaseBusiness,
@@ -51,7 +58,7 @@ export const Navbar: React.FC = () => {
     name: currentUser?.name || '',
     email: currentUser?.email || '',
     phone: currentUser?.phone || '',
-    major: currentUser?.major || '',
+    major: isStudent ? normalizeMajorName(currentUser?.major) : (currentUser?.major || ''),
     year: calculateStudentYear(currentUser?.studentId, currentUser?.year),
     gpax: currentUser?.gpax !== undefined ? String(currentUser.gpax) : '3.00',
     position: currentUser?.position || (currentUser?.role === 'admin' ? 'เจ้าหน้าที่ธุรการ/กรรมการทุน' : currentUser?.major || ''),
@@ -69,7 +76,7 @@ export const Navbar: React.FC = () => {
         name: currentUser.name,
         email: currentUser.email,
         phone: currentUser.phone || '',
-        major: currentUser.major || '',
+        major: isStudent ? normalizeMajorName(currentUser.major) : (currentUser.major || ''),
         year: calculateStudentYear(currentUser.studentId, currentUser.year),
         gpax: currentUser.gpax !== undefined ? String(currentUser.gpax) : '3.00',
         position: currentUser.position || (currentUser.role === 'admin' ? 'เจ้าหน้าที่ธุรการ/กรรมการทุน' : currentUser.major || ''),
@@ -637,10 +644,12 @@ export const Navbar: React.FC = () => {
                         onChange={(e) => setProfileForm(prev => ({ ...prev, major: e.target.value }))}
                         required
                       >
-                        <option value="ภาควิชาคณิตศาสตร์ (คณิตศาสตร์ประยุกต์)">วท.บ. คณิตศาสตร์ประยุกต์ (MA)</option>
-                        <option value="ภาควิชาคณิตศาสตร์ (สถิติประยุกต์)">วท.บ. สถิติประยุกต์ (AS)</option>
-                        <option value="ภาควิชาคณิตศาสตร์ (สถิติธุรกิจและการประกันภัย)">วท.บ. สถิติธุรกิจและการประกันภัย (BS)</option>
-                        <option value="ภาควิชาคณิตศาสตร์ (ปริญญาโท/เอก)">วท.ม./ปร.ด. คณิตศาสตร์ประยุกต์</option>
+                        {profileForm.major && !(DEPARTMENT_MAJOR_OPTIONS as readonly string[]).includes(profileForm.major) && (
+                          <option value={profileForm.major}>{profileForm.major}</option>
+                        )}
+                        {DEPARTMENT_MAJOR_OPTIONS.map(opt => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
                       </select>
                     </div>
 

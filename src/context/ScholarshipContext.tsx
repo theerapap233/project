@@ -12,7 +12,7 @@ import { settingsService, DEFAULT_SITE_SETTINGS } from '../services/settingsServ
 import { contentService } from '../services/contentService';
 import { studentAuthService } from '../services/studentAuthService';
 import { StudentAccount, StudentLoginLogInput, StudentPersonalInfo, StudentRegistrationData } from '../types/studentAccount';
-import { calculateStudentYear, normalizePersonalInfo } from '../utils/studentProfile';
+import { calculateStudentYear, normalizeMajorName, normalizePersonalInfo } from '../utils/studentProfile';
 
 export type { StudentAccount, StudentPersonalInfo, StudentRegistrationData };
 
@@ -159,7 +159,7 @@ const INITIAL_STUDENT_ACCOUNTS: StudentAccount[] = [
     email: 's6604062610099@email.kmutnb.ac.th',
     phone: '089-123-4567',
     faculty: 'คณะวิทยาศาสตร์ประยุกต์',
-    major: 'ภาควิชาคณิตศาสตร์ (คณิตศาสตร์ประยุกต์)',
+    major: 'วท.บ. คณิตศาสตร์ประยุกต์ (MA) - โครงการปกติ',
     year: calculateStudentYear('6604062610099', 'ปี 2'),
     gpax: 3.45,
     passwordHash: '0868c0b2cc7537d69f6853bd13f7a43996902c426b1378a9683b463e91ff6309',
@@ -291,6 +291,7 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
           : parsed;
         if (normalized.role === 'student' && normalized.studentId) {
           normalized.year = calculateStudentYear(normalized.studentId, normalized.year);
+          normalized.major = normalizeMajorName(normalized.major);
         }
         return normalized;
       } catch (e) { console.error(e); }
@@ -641,7 +642,7 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
           email: matchedApp.email,
           phone: matchedApp.phone,
           faculty: 'คณะวิทยาศาสตร์ประยุกต์',
-          major: matchedApp.major ? `ภาควิชาคณิตศาสตร์ (${matchedApp.major})` : 'ภาควิชาคณิตศาสตร์ (คณิตศาสตร์ประยุกต์)',
+          major: normalizeMajorName(matchedApp.major),
           year: calculateStudentYear(matchedApp.studentId, matchedApp.year),
           gpax: matchedApp.gpax || 3.00,
           passwordHash: hash,
@@ -707,7 +708,7 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
       email: account.email,
       phone: account.phone,
       faculty: account.faculty,
-      major: account.major,
+      major: normalizeMajorName(account.major),
       year: calculateStudentYear(account.studentId, account.year),
       gpax: account.gpax,
       avatarUrl: account.avatarUrl,
@@ -769,7 +770,7 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
       email: data.email.trim(),
       phone: data.phone?.trim() || '',
       faculty: data.faculty || 'คณะวิทยาศาสตร์ประยุกต์',
-      major: data.major || '',
+      major: normalizeMajorName(data.major),
       year: calculateStudentYear(cleanId, data.year),
       gpax: data.gpax !== undefined && !isNaN(Number(data.gpax)) ? Number(data.gpax) : undefined,
       passwordHash,
@@ -799,7 +800,7 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
       email: newAcc.email,
       phone: newAcc.phone,
       faculty: newAcc.faculty,
-      major: newAcc.major,
+      major: normalizeMajorName(newAcc.major),
       year: calculateStudentYear(newAcc.studentId, newAcc.year),
       gpax: newAcc.gpax,
       role: 'student'
