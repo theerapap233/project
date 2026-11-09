@@ -5227,3 +5227,393 @@ body:has(.modal-backdrop.open) .preview-mode-dock {
   transform: translateX(18px);
 }
 
+
+/* Staff Portal: student multi-select (card view) */
+.applications-view-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface-ground);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+}
+
+.applications-view-toggle button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.applications-view-toggle button.is-active {
+  background: var(--math-green);
+  color: #ffffff;
+}
+
+.student-select {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+  align-items: start;
+}
+
+.student-select-panel {
+  background: var(--surface-card);
+  border: 1px solid var(--border-light);
+  border-radius: 14px;
+  padding: 18px;
+}
+
+.student-select-side {
+  position: sticky;
+  top: 96px; /* พ้นความสูงของ site-header ที่ติดอยู่ด้านบน */
+}
+
+.student-select-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.student-select-heading h3 {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: var(--navy-900);
+}
+
+.student-select-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--math-green);
+  color: #ffffff;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.student-select-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  padding: 3px 10px;
+  border: 1px solid var(--border-light);
+  border-radius: 999px;
+  color: var(--navy-800);
+  font-size: 0.8rem;
+}
+
+.student-select-tip {
+  margin-bottom: 14px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: var(--math-green-soft);
+  color: var(--math-green-dark);
+  font-size: 0.84rem;
+}
+
+.student-select-empty {
+  padding: 48px 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.student-select-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+}
+
+.student-card {
+  position: relative;
+}
+
+.student-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+  padding: 12px;
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  background: var(--surface-card);
+  color: var(--navy-900);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.student-card-main:hover {
+  border-color: var(--math-green-border);
+}
+
+.student-card-main:focus-visible,
+.student-card-view:focus-visible,
+.student-select-quick button:focus-visible,
+.student-select-print:focus-visible,
+.applications-view-toggle button:focus-visible {
+  outline: 2px solid var(--math-green);
+  outline-offset: 2px;
+}
+
+.student-card.is-selected .student-card-main {
+  border-color: var(--math-green);
+  background: var(--math-green-soft);
+}
+
+.student-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.student-card-number {
+  min-width: 26px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--surface-ground);
+  border: 1px solid var(--border-light);
+  color: var(--navy-800);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.student-card-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 50%;
+  color: #ffffff;
+}
+
+.student-card.is-selected .student-card-number {
+  background: var(--math-green);
+  border-color: var(--math-green);
+  color: #ffffff;
+}
+
+.student-card.is-selected .student-card-check {
+  background: var(--math-green);
+  border-color: var(--math-green);
+}
+
+.student-card-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.student-card-meta {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+}
+
+.student-card-scholarship {
+  display: -webkit-box;
+  min-height: 2.8em;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.student-card-status {
+  margin-top: auto;
+  padding-top: 6px;
+  padding-right: 36px;
+  font-size: 0.76rem;
+}
+
+.student-card-view {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border-light);
+  border-radius: 7px;
+  background: var(--surface-card);
+  color: var(--navy-800);
+  cursor: pointer;
+}
+
+.student-card-view:hover {
+  background: var(--surface-ground);
+}
+
+.student-select-description {
+  margin: 0 0 14px;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.student-select-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--navy-900);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.student-select-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  background: var(--surface-card);
+  color: var(--navy-900);
+  font: inherit;
+  font-size: 0.95rem;
+}
+
+.student-select-input:focus {
+  outline: none;
+  border-color: var(--math-green);
+}
+
+.student-select-input.has-error {
+  border-color: #dc2626;
+}
+
+.student-select-hint {
+  margin: 6px 0 12px;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.student-select-hint.is-error {
+  color: #b91c1c;
+}
+
+.student-select-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.student-select-quick button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: 1px solid var(--border-light);
+  border-radius: 999px;
+  background: var(--surface-card);
+  color: var(--navy-800);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.student-select-quick button:hover {
+  border-color: var(--math-green-border);
+  background: var(--math-green-soft);
+}
+
+.student-select-summary {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--surface-ground);
+}
+
+.student-select-summary div {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+  font-size: 0.85rem;
+}
+
+.student-select-summary dt {
+  color: var(--text-muted);
+}
+
+.student-select-summary dd {
+  margin: 0;
+  color: var(--navy-900);
+  font-weight: 600;
+}
+
+.student-select-summary .is-total dd {
+  color: var(--math-green);
+  font-weight: 800;
+}
+
+.student-select-hidden-note {
+  margin: 0 0 12px;
+  color: #b45309;
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.student-select-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.student-select-print {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--math-green);
+  border-radius: 10px;
+  background: var(--surface-card);
+  color: var(--math-green);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.student-select-print.is-primary {
+  background: var(--math-green);
+  color: #ffffff;
+}
+
+.student-select-print:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 960px) {
+  .student-select {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .student-select-side {
+    position: static;
+  }
+}

@@ -22,7 +22,9 @@ import {
   XCircle,
   Star,
   MessageSquare,
-  ThumbsUp
+  ThumbsUp,
+  LayoutGrid,
+  List
 } from 'lucide-react';
 import { useScholarship } from '../../context/ScholarshipContext';
 import { Application, ApplicationStatus, ApplicationFormData } from '../../types/application';
@@ -31,6 +33,7 @@ import { Announcement, FaqItem, DownloadDoc } from '../../types/common';
 import { formatThaiDate } from '../../utils/dateFormatter';
 import { PROVINCES } from '../../data/provinces';
 import { compressImage } from '../../utils/imageUtils';
+import { StudentSelectionView } from './StudentSelectionView';
 
 type AdminTab = 'applications' | 'scholarships' | 'news' | 'faq' | 'downloads' | 'ratings' | 'settings';
 
@@ -272,6 +275,12 @@ export const AdminSection: React.FC = () => {
   // Multi-select state
   const [selectedAppIds, setSelectedAppIds] = useState<Set<string>>(new Set());
   const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [applicationsView, setApplicationsView] = useState<'table' | 'cards'>('table');
+
+  const handleSelectionChange = (next: Set<string>) => {
+    setSelectedAppIds(next);
+    setIsSelectionMode(next.size > 0);
+  };
 
   const selectedAppsList = useMemo(() => {
     return filteredApps.filter(app => selectedAppIds.has(app.trackingId));
@@ -1504,8 +1513,41 @@ export const AdminSection: React.FC = () => {
                 </div>
               </div>
 
+              <div className="applications-view-toggle" role="group" aria-label="รูปแบบการแสดงรายการใบสมัคร">
+                <button
+                  type="button"
+                  className={applicationsView === 'table' ? 'is-active' : ''}
+                  aria-pressed={applicationsView === 'table'}
+                  onClick={() => setApplicationsView('table')}
+                >
+                  <List size={15} />
+                  <span>ตาราง</span>
+                </button>
+                <button
+                  type="button"
+                  className={applicationsView === 'cards' ? 'is-active' : ''}
+                  aria-pressed={applicationsView === 'cards'}
+                  onClick={() => setApplicationsView('cards')}
+                >
+                  <LayoutGrid size={15} />
+                  <span>เลือกแบบการ์ด</span>
+                </button>
+              </div>
             </div>
 
+            {applicationsView === 'cards' ? (
+              <StudentSelectionView
+                apps={filteredApps}
+                selectedIds={selectedAppIds}
+                onSelectionChange={handleSelectionChange}
+                onViewApp={handleOpenReview}
+                onPrintList={handlePrintList}
+                onPrintApplications={() => handlePrintApplications('selected')}
+                renderStatusBadge={getStatusBadge}
+                formatMajor={formatMajorAbbr}
+              />
+            ) : (
+            <>
             {/* Helper Tip & Multi-Select Action Bar */}
             {selectedAppIds.size > 0 ? (
               <div style={{
@@ -1871,6 +1913,8 @@ export const AdminSection: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            </>
+            )}
           </div>
         )}
 
