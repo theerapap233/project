@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS public.feedbacks_categories (
 CREATE TABLE IF NOT EXISTS public.staff_users (
   id UUID NOT NULL DEFAULT gen_random_uuid(),
   username CHARACTER VARYING NOT NULL UNIQUE,
-  password CHARACTER VARYING NOT NULL,
+  password TEXT NOT NULL,
   name CHARACTER VARYING NOT NULL,
   email CHARACTER VARYING NOT NULL UNIQUE,
   department CHARACTER VARYING,
@@ -305,6 +305,8 @@ CREATE POLICY "Public read news" ON public.news FOR SELECT USING (true);
 CREATE POLICY "Public read pdf_document_categories" ON public.pdf_document_categories FOR SELECT USING (true);
 CREATE POLICY "Public read pdf_documents" ON public.pdf_documents FOR SELECT USING (true);
 CREATE POLICY "Public read staff_roles" ON public.staff_roles FOR SELECT USING (true);
+CREATE POLICY "Public select staff_users" ON public.staff_users FOR SELECT USING (true);
+CREATE POLICY "Public update staff_users" ON public.staff_users FOR UPDATE USING (true) WITH CHECK (true);
 
 -- 6.2 นโยบายสำหรับนักศึกษา (Public Insert & Select สำหรับยื่นและตรวจสอบสถานะ)
 CREATE POLICY "Public insert students" ON public.students FOR INSERT WITH CHECK (true);

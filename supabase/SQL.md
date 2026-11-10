@@ -11,7 +11,7 @@ CREATE TABLE public.staff_roles (
 CREATE TABLE public.staff_users (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   username character varying NOT NULL UNIQUE,
-  password character varying NOT NULL,
+  password text NOT NULL,
   name character varying NOT NULL,
   email character varying NOT NULL UNIQUE,
   department character varying,
@@ -22,6 +22,15 @@ CREATE TABLE public.staff_users (
   CONSTRAINT staff_users_pkey PRIMARY KEY (id),
   CONSTRAINT staff_users_role_id_fkey FOREIGN KEY (role_id) REFERENCES public.staff_roles(id)
 );
+ALTER TABLE public.staff_users ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public select staff_users" ON public.staff_users;
+DROP POLICY IF EXISTS "Public update staff_users" ON public.staff_users;
+CREATE POLICY "Public select staff_users" ON public.staff_users FOR SELECT USING (true);
+CREATE POLICY "Public update staff_users" ON public.staff_users FOR UPDATE USING (true) WITH CHECK (true);
+
+-- Direct-password login reads the password value from this table.
+-- Reset a staff member's password with:
+-- UPDATE public.staff_users SET password = 'your-password' WHERE username = 'admin';
 CREATE TABLE public.students (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   student_code character varying UNIQUE,

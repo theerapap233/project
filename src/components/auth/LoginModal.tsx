@@ -172,9 +172,9 @@ export const LoginModal: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      const success = await login(cleanUser, staffPassword, 'เจ้าหน้าที่ธุรการ/กรรมการทุน ภาควิชาคณิตศาสตร์');
-      if (!success) {
-        const msg = 'ชื่อผู้ใช้หรือรหัสผ่านเจ้าหน้าที่ไม่ถูกต้อง';
+      const result = await login(cleanUser, staffPassword, 'เจ้าหน้าที่ธุรการ/กรรมการทุน ภาควิชาคณิตศาสตร์');
+      if (!result.success) {
+        const msg = result.message || 'ชื่อผู้ใช้หรือรหัสผ่านเจ้าหน้าที่ไม่ถูกต้อง';
         setWarningMsg(msg);
         showToast(msg, 'error');
       }

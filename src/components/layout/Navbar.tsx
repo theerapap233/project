@@ -314,6 +314,7 @@ export const Navbar: React.FC = () => {
             <button
               type="button"
               className="btn btn-primary btn-sm btn-header-login"
+              aria-label="เข้าสู่ระบบ"
               onClick={openLoginModal}
               style={{
                 display: 'inline-flex',

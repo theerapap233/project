@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { Scholarship, ScholarshipCategory } from '../types/scholarship';
 import { INITIAL_SCHOLARSHIPS } from '../data/scholarshipData';
+import { getCurrentAcademicYear } from '../utils/academicCalendar';
 
 interface DbScholarshipProgram {
   id: string;
@@ -10,6 +11,8 @@ interface DbScholarshipProgram {
   quota: number | null;
   is_open: boolean;
   deadline: string | null;
+  academic_year: string | null;
+  term: string | null;
   min_gpax: number | null;
   target_years: string[] | null;
   description: string | null;
@@ -76,8 +79,8 @@ const mapProgramToScholarship = (row: DbScholarshipProgram, index: number): Scho
     amount: row.amount ? `${Number(row.amount).toLocaleString()} บาท / ภาคการศึกษา` : 'ตามประกาศภาควิชา',
     totalSlots: row.quota || 10,
     remainingSlots: Math.max(1, Math.floor((row.quota || 10) * 0.4)),
-    academicYear: '2567',
-    term: 'ภาคการศึกษาที่ 1',
+    academicYear: row.academic_year || getCurrentAcademicYear(),
+    term: row.term || 'ภาคการศึกษาที่ 1',
     deadline: row.deadline?.slice(0, 10) || '2026-10-31',
     status: row.is_open ? 'open' : 'closed',
     minGPAX: row.min_gpax ?? (categorySlug === 'academic' ? 3.00 : 2.00),
@@ -118,6 +121,8 @@ export const scholarshipService = {
           quota,
           is_open,
           deadline,
+          academic_year,
+          term,
           min_gpax,
           target_years,
           description,
@@ -190,6 +195,8 @@ export const scholarshipService = {
           is_open: sch.status === 'open',
           description: sch.description,
           deadline: sch.deadline ? `${sch.deadline}T00:00:00.000Z` : null,
+          academic_year: sch.academicYear,
+          term: sch.term,
           min_gpax: sch.minGPAX,
           target_years: sch.targetYears,
         }
@@ -234,6 +241,8 @@ export const scholarshipService = {
       if (sch.status) updates.is_open = sch.status === 'open';
       if (sch.description !== undefined) updates.description = sch.description;
       if (sch.deadline !== undefined) updates.deadline = `${sch.deadline}T00:00:00.000Z`;
+      if (sch.academicYear !== undefined) updates.academic_year = sch.academicYear;
+      if (sch.term !== undefined) updates.term = sch.term;
       if (sch.minGPAX !== undefined) updates.min_gpax = sch.minGPAX;
       if (sch.targetYears !== undefined) updates.target_years = sch.targetYears;
 

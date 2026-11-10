@@ -10,60 +10,62 @@ interface ScholarshipCardProps {
 export const ScholarshipCard: React.FC<ScholarshipCardProps> = ({ scholarship }) => {
   const { openScholarshipDetail, openApplicationModal } = useScholarship();
 
-
+  const isClosed = scholarship.status === 'closed';
+  const isClosing = scholarship.status === 'closing_soon';
 
   return (
-    <div className="scholarship-card">
-      <div className={`card-top-bar ${scholarship.badgeColor}`} />
-      <div className="card-content">
+    <div className="scholarship-card-minimal">
+      <div className="card-top-meta">
+        <span className="card-category-pill">
+          {scholarship.categoryName || (scholarship.scope === 'internal' ? 'ทุนภายใน' : 'ทุนภายนอก')}
+        </span>
+        <span className={`card-status-dot ${isClosed ? 'closed' : isClosing ? 'closing' : 'open'}`}>
+          {isClosed ? 'ปิดรับแล้ว' : isClosing ? 'ใกล้ปิดรับ' : 'เปิดรับสมัคร'}
+        </span>
+      </div>
 
+      <h3 className="card-title-minimal" title={scholarship.title}>
+        {scholarship.title}
+      </h3>
 
-        <h3 className="card-title">{scholarship.title}</h3>
+      <div className="card-amount-clean">
+        <span className="amount-label">มูลค่าทุนสนับสนุน</span>
+        <div className="amount-val">{scholarship.amount}</div>
+      </div>
 
-        <div className="card-amount-box">
-          <span className="amount-label">มูลค่าทุนสนับสนุน</span>
-          <div className="amount-val">{scholarship.amount}</div>
+      <ul className="card-criteria-clean">
+        <li>
+          <span>เกรดขั้นต่ำ: <strong>GPAX ≥ {(typeof scholarship.minGPAX === 'number' ? scholarship.minGPAX : 2.0).toFixed(2)}</strong></span>
+        </li>
+        <li>
+          <span>กลุ่มเป้าหมาย: <strong>{(Array.isArray(scholarship.targetYears) && scholarship.targetYears.length > 0 ? scholarship.targetYears : ['ทุกชั้นปี']).join(', ')}</strong></span>
+        </li>
+        <li>
+          <span>จำนวนโควตา: <strong>{scholarship.totalSlots ?? 0} ทุน</strong></span>
+        </li>
+      </ul>
+
+      <div className="card-footer-clean">
+        <div className="card-deadline-text">
+          <span>ปิดรับ:</span> <strong>{scholarship.deadline ? formatThaiDate(scholarship.deadline) : 'ตามประกาศ'}</strong>
         </div>
-
-        <ul className="card-criteria-list">
-          <li>
-            <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-            </svg>
-            <span>เกรดเฉลี่ยสะสม (GPAX) ไม่ต่ำกว่า <strong>{(typeof scholarship.minGPAX === 'number' ? scholarship.minGPAX : 2.0).toFixed(2)}</strong></span>
-          </li>
-          <li>
-            <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-            </svg>
-            <span>สำหรับ: {(Array.isArray(scholarship.targetYears) && scholarship.targetYears.length > 0 ? scholarship.targetYears : ['ทุกชั้นปี']).join(', ')}</span>
-          </li>
-          <li>
-            <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-            </svg>
-            <span>จำนวนโควตาที่เปิดรับ: <strong>{scholarship.totalSlots ?? 0} ทุน</strong></span>
-          </li>
-        </ul>
-
-        <div className="card-footer">
-          <div className="deadline-text">
-            ปิดรับสมัคร: <strong>{scholarship.deadline ? formatThaiDate(scholarship.deadline) : 'ตามประกาศ'}</strong>
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button 
-              className="btn btn-secondary btn-sm" 
-              onClick={() => openScholarshipDetail(scholarship)}
-            >
-              รายละเอียด
-            </button>
-            <button 
-              className="btn btn-primary btn-sm" 
-              onClick={() => openApplicationModal(scholarship.id)}
-            >
-              สมัครทุน
-            </button>
-          </div>
+        <div className="card-btns">
+          <button
+            type="button"
+            className="btn-card-detail"
+            onClick={() => openScholarshipDetail(scholarship)}
+          >
+            รายละเอียด
+          </button>
+          <button
+            type="button"
+            className="btn-card-apply"
+            onClick={() => openApplicationModal(scholarship.id)}
+            disabled={isClosed}
+            style={isClosed ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+          >
+            {isClosed ? 'ปิดรับ' : 'สมัครทุน'}
+          </button>
         </div>
       </div>
     </div>

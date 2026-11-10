@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
-  ChevronDown, 
   Pencil, 
   Trash2, 
   FileText, 
@@ -8,7 +7,7 @@ import {
   GraduationCap, 
   Bell, 
   HelpCircle, 
-  Settings, 
+  LayoutDashboard,
   Clock, 
   CheckCircle2, 
   Search,
@@ -29,10 +28,11 @@ import { Application, ApplicationStatus, ApplicationFormData } from '../../types
 import { Scholarship } from '../../types/scholarship';
 import { Announcement, FaqItem, DownloadDoc } from '../../types/common';
 import { formatThaiDate } from '../../utils/dateFormatter';
+import { getCurrentAcademicYear } from '../../utils/academicCalendar';
 import { PROVINCES } from '../../data/provinces';
 import { compressImage } from '../../utils/imageUtils';
 
-type AdminTab = 'applications' | 'scholarships' | 'news' | 'faq' | 'downloads' | 'ratings' | 'settings';
+type AdminTab = 'applications' | 'scholarships' | 'news' | 'faq' | 'downloads' | 'ratings';
 
 const SCHOLARSHIP_YEAR_PRESETS = [
   { value: 'all', label: 'ทุกชั้นปี', years: ['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4', 'บัณฑิตศึกษา'] },
@@ -65,7 +65,6 @@ export const AdminSection: React.FC = () => {
     addDownload,
     updateDownload,
     deleteDownload,
-    updateSiteSettings,
     updateApplicationDetails,
     updateApplicationReview,
     deleteApplication,
@@ -119,6 +118,7 @@ export const AdminSection: React.FC = () => {
   const [schMinGPAX, setSchMinGPAX] = useState(2.75);
   const [schTargetYears, setSchTargetYears] = useState<string[]>(['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4']);
   const [schDeadline, setSchDeadline] = useState('2026-10-31');
+  const [schTerm, setSchTerm] = useState('ภาคการศึกษาที่ 1');
   const [schScope, setSchScope] = useState<'internal' | 'external'>('internal');
   const [schStatus, setSchStatus] = useState<'open' | 'closed' | 'closing_soon'>('open');
   const [schDesc, setSchDesc] = useState('');
@@ -146,13 +146,6 @@ export const AdminSection: React.FC = () => {
   const [docSize, setDocSize] = useState('200 KB');
   const [docType, setDocType] = useState('PDF');
   const [selectedDocFileName, setSelectedDocFileName] = useState('');
-
-  // Site Settings Form state
-  const [settingsForm, setSettingsForm] = useState(siteSettings);
-
-  useEffect(() => {
-    setSettingsForm(siteSettings);
-  }, [siteSettings]);
 
   // Statistics
   const totalApps = applications.length;
@@ -556,13 +549,13 @@ export const AdminSection: React.FC = () => {
     const target = applications.find(a => a.trackingId === trackingId);
     if (!target || target.status !== 'approved') return;
 
-    if (window.confirm(`ยืนยันการย้อนกลับสถานะของ "${target.fullName}" จาก "อนุมัติทุนแล้ว" เป็น "ยื่นใบสมัครแล้ว (รอพิจารณา)" ใช่หรือไม่?`)) {
+    if (window.confirm(`ยืนยันการย้อนกลับสถานะของ "${target.fullName}" จาก "อนุมัติทุนแล้ว" เป็น "รอตรวจสอบ" ใช่หรือไม่?`)) {
       updateApplicationReview(
         trackingId,
         'submitted',
         null,
         '',
-        'ย้อนกลับสถานะจากอนุมัติทุนแล้วเป็นยื่นใบสมัครแล้ว (รอพิจารณา)'
+        'ย้อนกลับสถานะจากอนุมัติทุนแล้วเป็นรอตรวจสอบ'
       );
     }
   };
@@ -576,6 +569,7 @@ export const AdminSection: React.FC = () => {
     setSchMinGPAX(2.75);
     setSchTargetYears(['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4']);
     setSchDeadline('2026-10-31');
+    setSchTerm('ภาคการศึกษาที่ 1');
     setSchScope('internal');
     setSchStatus('open');
     setSchDesc('ทุนการศึกษาสำหรับนักศึกษาภาควิชาคณิตศาสตร์ คณะวิทยาศาสตร์ประยุกต์ มจพ.');
@@ -590,6 +584,7 @@ export const AdminSection: React.FC = () => {
     setSchMinGPAX(typeof sch.minGPAX === 'number' ? sch.minGPAX : 2.0);
     setSchTargetYears(Array.isArray(sch.targetYears) && sch.targetYears.length > 0 ? sch.targetYears : ['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4']);
     setSchDeadline(sch.deadline ? sch.deadline.split('T')[0] : '2026-10-31');
+    setSchTerm(sch.term || 'ภาคการศึกษาที่ 1');
     setSchScope(sch.scope || 'internal');
     setSchStatus(sch.status || 'open');
     setSchDesc(sch.description || '');
@@ -627,6 +622,8 @@ export const AdminSection: React.FC = () => {
         minGPAX: Number(schMinGPAX),
         targetYears: schTargetYears,
         deadline: schDeadline,
+        academicYear: getCurrentAcademicYear(),
+        term: schTerm,
         scope: schScope,
         status: schStatus,
         description: schDesc.trim()
@@ -635,7 +632,9 @@ export const AdminSection: React.FC = () => {
       createNewScholarship(schTitle.trim(), schAmount.trim(), Number(schSlots), {
         minGPAX: Number(schMinGPAX),
         targetYears: schTargetYears,
-        deadline: schDeadline
+        deadline: schDeadline,
+        academicYear: getCurrentAcademicYear(),
+        term: schTerm
       });
     }
     setIsSchModalOpen(false);
@@ -810,12 +809,6 @@ export const AdminSection: React.FC = () => {
     }
   };
 
-  // Handlers for Site Settings
-  const handleSaveSettings = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateSiteSettings(settingsForm);
-  };
-
   const formatMajorAbbr = (major: string): string => {
     if (!major) return 'MA';
     const text = major.trim();
@@ -856,7 +849,7 @@ export const AdminSection: React.FC = () => {
             }}
           >
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#2563eb' }} />
-            ยื่นใบสมัครแล้ว
+            รอตรวจสอบ
           </span>
         );
       case 'approved':
@@ -907,8 +900,17 @@ export const AdminSection: React.FC = () => {
   };
 
   return (
-    <section id="adminSection" className="admin-section" style={{ minHeight: 'calc(100vh - 160px)', background: 'var(--surface-ground)', paddingTop: 14, paddingBottom: 60, borderTop: '1px solid var(--border-light, #e2e8f0)' }}>
+    <section id="adminSection" className="admin-section admin-dashboard" style={{ minHeight: 'calc(100vh - 160px)', background: 'var(--surface-ground)', paddingTop: 14, paddingBottom: 60, borderTop: '1px solid var(--border-light, #e2e8f0)' }}>
       <div className="container" style={{ paddingTop: 0 }}>
+        <header className="admin-page-heading">
+          <div className="admin-page-mark"><LayoutDashboard size={20} strokeWidth={1.8} /></div>
+          <div>
+            <span className="admin-page-eyebrow">ADMIN CONSOLE</span>
+            <h1>ระบบจัดการเว็บไซต์</h1>
+            <p>จัดการใบสมัครทุนและเนื้อหาสำหรับนักศึกษาในที่เดียว</p>
+          </div>
+        </header>
+
         {/* Navigation Tabs for CMS */}
         <div style={{
           display: 'flex',
@@ -919,8 +921,12 @@ export const AdminSection: React.FC = () => {
           border: '1px solid var(--border-light, #e2e8f0)',
           marginBottom: 24,
           overflowX: 'auto'
-        }}>
+        }} className="admin-tabs" role="tablist" aria-label="เมนูจัดการเว็บไซต์">
           <button
+            className="admin-tab-button"
+            role="tab"
+            aria-selected={activeTab === 'applications'}
+            data-active={activeTab === 'applications'}
             onClick={() => setActiveTab('applications')}
             style={{
               flex: 1,
@@ -955,6 +961,10 @@ export const AdminSection: React.FC = () => {
           </button>
 
           <button
+            className="admin-tab-button"
+            role="tab"
+            aria-selected={activeTab === 'scholarships'}
+            data-active={activeTab === 'scholarships'}
             onClick={() => setActiveTab('scholarships')}
             style={{
               flex: 1,
@@ -989,6 +999,10 @@ export const AdminSection: React.FC = () => {
           </button>
 
           <button
+            className="admin-tab-button"
+            role="tab"
+            aria-selected={activeTab === 'news'}
+            data-active={activeTab === 'news'}
             onClick={() => setActiveTab('news')}
             style={{
               flex: 1,
@@ -1023,6 +1037,10 @@ export const AdminSection: React.FC = () => {
           </button>
 
           <button
+            className="admin-tab-button"
+            role="tab"
+            aria-selected={activeTab === 'faq'}
+            data-active={activeTab === 'faq'}
             onClick={() => setActiveTab('faq')}
             style={{
               flex: 1,
@@ -1057,6 +1075,10 @@ export const AdminSection: React.FC = () => {
           </button>
 
           <button
+            className="admin-tab-button"
+            role="tab"
+            aria-selected={activeTab === 'downloads'}
+            data-active={activeTab === 'downloads'}
             onClick={() => setActiveTab('downloads')}
             style={{
               flex: 1,
@@ -1091,6 +1113,10 @@ export const AdminSection: React.FC = () => {
           </button>
 
           <button
+            className="admin-tab-button"
+            role="tab"
+            aria-selected={activeTab === 'ratings'}
+            data-active={activeTab === 'ratings'}
             onClick={() => setActiveTab('ratings')}
             style={{
               flex: 1,
@@ -1124,34 +1150,11 @@ export const AdminSection: React.FC = () => {
             </span>
           </button>
 
-          <button
-            onClick={() => setActiveTab('settings')}
-            style={{
-              flex: 1,
-              padding: '8px 10px',
-              borderRadius: '8px',
-              border: 'none',
-              background: activeTab === 'settings' ? 'var(--math-green, #077b38)' : 'transparent',
-              color: activeTab === 'settings' ? 'white' : 'var(--navy-700, #334155)',
-              fontWeight: activeTab === 'settings' ? 700 : 500,
-              fontSize: '0.84rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 6,
-              transition: 'all 0.2s',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            <Settings size={15} />
-            <span>ตั้งค่าเว็บไซต์</span>
-          </button>
         </div>
 
         {/* TAB 1: APPLICATIONS MANAGEMENT */}
         {activeTab === 'applications' && (
-          <div>
+          <div className="admin-applications-minimal">
             {/* KPI Grid */}
             <div className="admin-kpi-grid">
               {/* Card 1: ใบสมัครทั้งหมด */}
@@ -1203,7 +1206,7 @@ export const AdminSection: React.FC = () => {
                   </div>
                 </div>
                 <div className="kpi-value" style={{ fontSize: '1.75rem', fontWeight: 800, color: '#2563eb', marginTop: 8 }}>{submittedCount}</div>
-                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 4 }}>ยื่นใบสมัครแล้ว</div>
+                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 4 }}>รอตรวจสอบ</div>
               </div>
 
 
@@ -1261,7 +1264,7 @@ export const AdminSection: React.FC = () => {
             </div>
 
             {/* Search & Combobox Filters (ปีการศึกษา, สถานะ) */}
-            <div style={{ 
+            <div className="application-filters-minimal" style={{
               background: 'var(--surface-card)', 
               padding: '12px 16px', 
               borderRadius: '12px', 
@@ -1273,7 +1276,7 @@ export const AdminSection: React.FC = () => {
               marginBottom: 14
             }}>
               {/* Search Input */}
-              <div style={{ position: 'relative', flex: '1 1 260px' }}>
+              <div className="application-filter-search" style={{ position: 'relative', flex: '1 1 260px' }}>
                 <Search size={16} strokeWidth={1.8} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                 <input 
                   type="text" 
@@ -1286,7 +1289,7 @@ export const AdminSection: React.FC = () => {
               </div>
 
               {/* Combobox: ประเภททุน (ทุนภายใน / ทุนภายนอก) */}
-              <div style={{ position: 'relative', minWidth: 165 }}>
+              <div className="application-filter-scope" style={{ position: 'relative', minWidth: 165 }}>
                 <select
                   value={filterScope}
                   onChange={(e) => handleScopeChange(e.target.value as any)}
@@ -1314,7 +1317,7 @@ export const AdminSection: React.FC = () => {
               </div>
 
               {/* Combobox: ชื่อข้อมูลทุน (เชื่อมโยงตามประเภททุนที่เลือก) */}
-              <div style={{ position: 'relative', minWidth: 190, maxWidth: 320 }}>
+              <div className="application-filter-scholarship" style={{ position: 'relative', minWidth: 190, maxWidth: 320 }}>
                 <select
                   value={filterType}
                   onChange={(e) => setFilterType(e.target.value)}
@@ -1385,7 +1388,7 @@ export const AdminSection: React.FC = () => {
             </div>
 
             {/* Filter: สถานะใบสมัคร & ปุ่มพิมพ์รายงาน (1. รายชื่อ 2. ใบสมัคร) */}
-            <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <div className="application-status-filters-minimal" style={{ marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 <span style={{ 
                   fontSize: '0.85rem', 
@@ -1418,7 +1421,7 @@ export const AdminSection: React.FC = () => {
                   },
                   { 
                     value: 'submitted', 
-                    label: 'ยื่นใบสมัครแล้ว', 
+                    label: 'รอตรวจสอบ',
                     count: applications.filter(a => a.status === 'submitted').length,
                     activeBg: '#2563eb',
                     activeBorder: '#2563eb',
@@ -1470,6 +1473,7 @@ export const AdminSection: React.FC = () => {
                     <button
                       key={opt.value}
                       type="button"
+                      className={`application-status-option status-${opt.value}${isActive ? ' is-active' : ''}`}
                       onClick={() => setFilterStatus(opt.value)}
                       style={{
                         padding: '6px 14px',
@@ -1488,13 +1492,14 @@ export const AdminSection: React.FC = () => {
                       }}
                     >
                       <span>{opt.label}</span>
-                      <span style={{
+                      <span className="application-status-count" style={{
                         fontSize: '0.72rem',
                         padding: '1px 6px',
                         borderRadius: '10px',
                         background: isActive ? opt.activeBadgeBg : opt.badgeBg,
                         color: isActive ? opt.activeBadgeText : opt.badgeText,
-                        fontWeight: 700
+                        fontWeight: 700,
+                        fontVariantNumeric: 'tabular-nums'
                       }}>
                         {opt.count}
                       </span>
@@ -1508,7 +1513,7 @@ export const AdminSection: React.FC = () => {
 
             {/* Helper Tip & Multi-Select Action Bar */}
             {selectedAppIds.size > 0 ? (
-              <div style={{
+              <div className="application-selection-toolbar-minimal" style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
@@ -1627,7 +1632,7 @@ export const AdminSection: React.FC = () => {
             )}
 
             {/* Applications Table */}
-            <div className="table-responsive" style={{ background: 'var(--surface-card)', borderRadius: '12px', border: '1px solid var(--border-light, #e2e8f0)', overflow: 'hidden' }}>
+            <div className="table-responsive admin-applications-table" style={{ background: 'var(--surface-card)', borderRadius: '12px', border: '1px solid var(--border-light, #e2e8f0)', overflow: 'hidden' }}>
               <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: 'var(--surface-ground, #f8fafc)', borderBottom: '1px solid var(--border-light, #e2e8f0)' }}>
@@ -2045,7 +2050,7 @@ export const AdminSection: React.FC = () => {
           };
 
           return (
-            <div>
+            <div className="admin-tab-pane admin-scholarship-pane">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--navy-900)', fontWeight: 700 }}>
@@ -2112,7 +2117,7 @@ export const AdminSection: React.FC = () => {
 
         {/* TAB 3: NEWS & ANNOUNCEMENTS CMS */}
         {activeTab === 'news' && (
-          <div>
+          <div className="admin-tab-pane admin-news-pane">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--navy-900)', fontWeight: 700 }}>
@@ -2265,7 +2270,7 @@ export const AdminSection: React.FC = () => {
 
         {/* TAB 4: FAQ & HELP CMS */}
         {activeTab === 'faq' && (
-          <div>
+          <div className="admin-tab-pane admin-faq-pane">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--navy-900)' }}>
@@ -2287,7 +2292,7 @@ export const AdminSection: React.FC = () => {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {faqs.map((faq, index) => (
-                <div key={index} style={{
+                <div key={index} className="admin-faq-card" style={{
                   background: 'var(--surface-card)',
                   border: '1px solid var(--border-light, #e2e8f0)',
                   borderRadius: '10px',
@@ -2330,7 +2335,7 @@ export const AdminSection: React.FC = () => {
 
         {/* TAB 5: DOWNLOAD DOCS & PDF CMS */}
         {activeTab === 'downloads' && (
-          <div>
+          <div className="admin-tab-pane admin-downloads-pane">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--navy-900)' }}>
@@ -2352,7 +2357,7 @@ export const AdminSection: React.FC = () => {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {downloads.map((doc) => (
-                <div key={doc.id} style={{
+                <div key={doc.id} className="admin-download-card" style={{
                   background: 'var(--surface-card)',
                   border: '1px solid var(--border-light, #e2e8f0)',
                   borderRadius: '10px',
@@ -2419,7 +2424,7 @@ export const AdminSection: React.FC = () => {
 
         {/* TAB 6: STUDENT RATINGS & SATISFACTION */}
         {activeTab === 'ratings' && (
-          <div>
+          <div className="admin-tab-pane admin-ratings-pane">
             {/* KPI Cards Grid */}
             <div style={{
               display: 'grid',
@@ -2781,288 +2786,6 @@ export const AdminSection: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 6: SITE SETTINGS */}
-        {activeTab === 'settings' && (
-          <div style={{ 
-            background: 'var(--surface-white, #ffffff)', 
-            borderRadius: '16px', 
-            border: '1px solid var(--border-light, #e2e8f0)',
-            padding: '32px 40px', 
-            width: '100%', 
-            boxSizing: 'border-box',
-            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)' 
-          }}>
-            <div style={{ marginBottom: 32, borderBottom: '1px solid var(--border-light)', paddingBottom: 20 }}>
-              <h3 style={{ margin: '0 0 8px', fontSize: '1.4rem', fontWeight: 600, color: 'var(--navy-900)', letterSpacing: '-0.01em' }}>
-                ตั้งค่าเว็บไซต์ทั่วไป
-              </h3>
-              <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-muted)' }}>
-                ปรับแต่งข้อมูลหลักของเว็บไซต์ ปีการศึกษา ข้อความหัวเรื่อง และข้อมูลติดต่อ
-              </p>
-            </div>
-
-            <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-
-              {/* Section: ข้อมูลทั่วไป */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                <h4 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--navy-800)', fontWeight: 600 }}>ข้อมูลทั่วไป</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)', marginBottom: 6, display: 'block' }}>
-                      ปีการศึกษา (Academic Year)
-                    </label>
-                    <input
-                      type="text"
-                      list="academic-years"
-                      className="form-input-light"
-                      value={settingsForm.academicYear}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, academicYear: e.target.value })}
-                      required
-                      style={{
-                        width: '100%',
-                        height: '46px',
-                        padding: '0 16px',
-                        borderRadius: '8px',
-                        border: '1px solid var(--border-light)',
-                        background: 'var(--surface-ground)',
-                        boxSizing: 'border-box',
-                        fontSize: '0.95rem'
-                      }}
-                    />
-                    <datalist id="academic-years">
-                      <option value={new Date().getFullYear() + 543 - 1} />
-                      <option value={new Date().getFullYear() + 543} />
-                      <option value={new Date().getFullYear() + 543 + 1} />
-                    </datalist>
-                  </div>
-
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)', marginBottom: 6, display: 'block' }}>
-                      ภาคการศึกษา (Semester)
-                    </label>
-                    <div style={{ position: 'relative', width: '100%' }}>
-                      <select
-                        className="form-input-light"
-                        value={settingsForm.semester}
-                        onChange={(e) => setSettingsForm({ ...settingsForm, semester: e.target.value })}
-                        required
-                        style={{
-                          width: '100%',
-                          height: '46px',
-                          padding: '0 38px 0 16px',
-                          borderRadius: '8px',
-                          border: '1px solid var(--border-light)',
-                          background: 'var(--surface-ground)',
-                          WebkitAppearance: 'none',
-                          MozAppearance: 'none',
-                          appearance: 'none',
-                          cursor: 'pointer',
-                          boxSizing: 'border-box',
-                          fontSize: '0.95rem',
-                          color: 'var(--text-main)'
-                        }}
-                      >
-                        <option value="" disabled>เลือกภาคการศึกษา</option>
-                        <option value="1">1 (ภาคเรียนที่ 1)</option>
-                        <option value="2">2 (ภาคเรียนที่ 2)</option>
-                        <option value="3">3 (ภาคฤดูร้อน)</option>
-                      </select>
-                      <div style={{
-                        position: 'absolute',
-                        right: 14,
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        pointerEvents: 'none',
-                        color: 'var(--text-muted)',
-                        display: 'flex',
-                        alignItems: 'center'
-                      }}>
-                        <ChevronDown size={18} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ height: 1, background: 'var(--border-light)' }} />
-
-              {/* Section: เนื้อหาหน้าแรก */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                <h4 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--navy-800)', fontWeight: 600 }}>เนื้อหาหน้าแรก</h4>
-
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)', marginBottom: 6, display: 'block' }}>
-                    ข้อความพาดหัว (Hero Title)
-                  </label>
-                  <input
-                    type="text"
-                    className="form-input-light"
-                    value={settingsForm.heroTitle}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, heroTitle: e.target.value })}
-                    required
-                    style={{
-                      width: '100%',
-                      height: '46px',
-                      padding: '0 16px',
-                      borderRadius: '8px',
-                      border: '1px solid var(--border-light)',
-                      background: 'var(--surface-ground)',
-                      boxSizing: 'border-box'
-                    }}
-                  />
-                </div>
-
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)', marginBottom: 6, display: 'block' }}>
-                    คำอธิบาย (Hero Subtitle)
-                  </label>
-                  <textarea
-                    className="form-input-light"
-                    rows={2}
-                    value={settingsForm.heroSubtitle}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, heroSubtitle: e.target.value })}
-                    required
-                    style={{
-                      width: '100%',
-                      padding: '12px 16px',
-                      borderRadius: '8px',
-                      border: '1px solid var(--border-light)',
-                      background: 'var(--surface-ground)',
-                      resize: 'none',
-                      boxSizing: 'border-box',
-                      lineHeight: 1.5
-                    }}
-                  />
-                </div>
-
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)', marginBottom: 6, display: 'block' }}>
-                    แถบวิ่งประชาสัมพันธ์ (Marquee Ticker Text)
-                  </label>
-                  <input
-                    type="text"
-                    className="form-input-light"
-                    value={settingsForm.tickerText || ''}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, tickerText: e.target.value })}
-                    placeholder="เช่น เปิดรับสมัครทุนการศึกษา..."
-                    style={{
-                      width: '100%',
-                      height: '46px',
-                      padding: '0 16px',
-                      borderRadius: '8px',
-                      border: '1px solid var(--border-light)',
-                      background: 'var(--surface-ground)',
-                      boxSizing: 'border-box'
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ height: 1, background: 'var(--border-light)' }} />
-
-              {/* Section: ข้อมูลติดต่อ */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                <h4 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--navy-800)', fontWeight: 600 }}>ข้อมูลติดต่อ</h4>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)', marginBottom: 6, display: 'block' }}>
-                      เบอร์โทรศัพท์
-                    </label>
-                    <input
-                      type="text"
-                      className="form-input-light"
-                      value={settingsForm.contactPhone}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, contactPhone: e.target.value })}
-                      required
-                      style={{
-                        width: '100%',
-                        height: '46px',
-                        padding: '0 16px',
-                        borderRadius: '8px',
-                        border: '1px solid var(--border-light)',
-                        background: 'var(--surface-ground)',
-                        boxSizing: 'border-box'
-                      }}
-                    />
-                  </div>
-
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)', marginBottom: 6, display: 'block' }}>
-                      อีเมล
-                    </label>
-                    <input
-                      type="email"
-                      className="form-input-light"
-                      value={settingsForm.contactEmail}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, contactEmail: e.target.value })}
-                      required
-                      style={{
-                        width: '100%',
-                        height: '46px',
-                        padding: '0 16px',
-                        borderRadius: '8px',
-                        border: '1px solid var(--border-light)',
-                        background: 'var(--surface-ground)',
-                        boxSizing: 'border-box'
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)', marginBottom: 6, display: 'block' }}>
-                    ที่ตั้งสำนักงาน
-                  </label>
-                  <input
-                    type="text"
-                    className="form-input-light"
-                    value={settingsForm.contactAddress || ''}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, contactAddress: e.target.value })}
-                    placeholder="เช่น อาคาร 78 ชั้น 7..."
-                    style={{
-                      width: '100%',
-                      height: '46px',
-                      padding: '0 16px',
-                      borderRadius: '8px',
-                      border: '1px solid var(--border-light)',
-                      background: 'var(--surface-ground)',
-                      boxSizing: 'border-box'
-                    }}
-                  />
-                </div>
-
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)', marginBottom: 6, display: 'block' }}>
-                    ลิงก์ Facebook
-                  </label>
-                  <input
-                    type="url"
-                    className="form-input-light"
-                    value={settingsForm.facebookUrl || ''}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, facebookUrl: e.target.value })}
-                    placeholder="https://facebook.com/..."
-                    style={{
-                      width: '100%',
-                      height: '46px',
-                      padding: '0 16px',
-                      borderRadius: '8px',
-                      border: '1px solid var(--border-light)',
-                      background: 'var(--surface-ground)',
-                      boxSizing: 'border-box'
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12, paddingTop: 24, borderTop: '1px solid var(--border-light)' }}>
-                <button type="submit" className="btn btn-primary" style={{ minWidth: 160, borderRadius: '8px', padding: '12px 24px', fontWeight: 600, boxShadow: '0 4px 14px rgba(7, 123, 56, 0.25)' }}>
-                  บันทึกการตั้งค่า
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
       </div>
 
       {/* MODAL: VIEW / EDIT APPLICATION DATA */}
@@ -3104,7 +2827,7 @@ export const AdminSection: React.FC = () => {
                     }}
                     title="คลิกเพื่อเปลี่ยนสถานะใบสมัคร"
                   >
-                    <option value="submitted">ยื่นใบสมัครแล้ว (รอพิจารณา)</option>
+                    <option value="submitted">รอตรวจสอบ</option>
                     <option value="approved">อนุมัติทุนการศึกษา</option>
                     <option value="rejected">ไม่ผ่านการพิจารณา</option>
                   </select>
@@ -4282,6 +4005,37 @@ export const AdminSection: React.FC = () => {
                   </div>
                 </div>
 
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                  <div className="form-group">
+                    <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
+                      ปีการศึกษา (อิงตามปีปฏิทิน)
+                    </label>
+                    <input
+                      type="text"
+                      className="form-input-light"
+                      value={getCurrentAcademicYear()}
+                      readOnly
+                      aria-readonly="true"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
+                      ภาคการศึกษา / เทอม
+                    </label>
+                    <select
+                      className="form-input-light"
+                      value={schTerm}
+                      onChange={(e) => setSchTerm(e.target.value)}
+                      required
+                    >
+                      <option value="ภาคการศึกษาที่ 1">ภาคการศึกษาที่ 1</option>
+                      <option value="ภาคการศึกษาที่ 2">ภาคการศึกษาที่ 2</option>
+                      <option value="ภาคฤดูร้อน">ภาคฤดูร้อน</option>
+                      <option value="ตลอดปีการศึกษา">ตลอดปีการศึกษา</option>
+                    </select>
+                  </div>
+                </div>
+
                 <div className="form-group">
                   <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
                     กำหนดการปิดรับสมัคร
@@ -4753,7 +4507,7 @@ export const AdminSection: React.FC = () => {
                             <td style={{ border: '1px solid #cbd5e1', padding: '7px 6px', textAlign: 'center', fontWeight: 700 }}>{app.gpax.toFixed(2)}</td>
                             <td style={{ border: '1px solid #cbd5e1', padding: '7px 8px', textAlign: 'center', fontSize: '0.8rem' }}>{formatThaiDate(app.submissionDate)}</td>
                             <td style={{ border: '1px solid #cbd5e1', padding: '7px 8px', textAlign: 'center', fontSize: '0.8rem' }}>
-                              {app.status === 'submitted' ? 'ยื่นใบสมัครแล้ว' : app.status === 'approved' ? 'อนุมัติทุนแล้ว' : app.status === 'rejected' ? 'ไม่ผ่านการคัดเลือก' : app.status}
+                              {app.status === 'submitted' ? 'รอตรวจสอบ' : app.status === 'approved' ? 'อนุมัติทุนแล้ว' : app.status === 'rejected' ? 'ไม่ผ่านการคัดเลือก' : app.status}
                             </td>
                           </tr>
                         ))

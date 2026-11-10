@@ -16,33 +16,27 @@ export const ScholarshipDirectory: React.FC = () => {
   }, [scholarships]);
 
   return (
-    <section className="section" id="scholarships">
-      <div className="container" style={{ maxWidth: '1240px' }}>
+    <section className="section scholarship-section-minimal" id="scholarships">
+      <div className="container" style={{ maxWidth: '1024px' }}>
         {/* Section Header */}
         <div className="section-header">
-          <span className="section-tag">Scholarship Directory</span>
+          <span className="section-tag-minimal">Scholarship Directory</span>
           <h2 className="section-title">ทุนการศึกษา ภาควิชาคณิตศาสตร์</h2>
           <p className="section-subtitle">
-            จำแนกออกเป็น 2 ส่วนชัดเจน: <strong>ส่วนที่ 1 ทุนการศึกษาภายใน</strong> (มหาวิทยาลัย / คณะ / ภาควิชา) และ <strong>ส่วนที่ 2 ทุนการศึกษาภายนอก</strong> (มูลนิธิ / องค์กรเอกชน / ชมรมศิษย์เก่า)
+            รวมรายการทุนการศึกษาของภาควิชาคณิตศาสตร์ มจพ. ทั้งทุนภายในมหาวิทยาลัยและทุนสนับสนุนจากองค์กรภายนอก
           </p>
         </div>
 
-
-        {/* ========================================================= */}
-        {/* ส่วนที่ 1: ทุนภายใน (Internal Scholarships)               */}
-        {/* ========================================================= */}
-        <div className="scope-block internal" id="internal-scholarships">
-          <div className="scope-block-header">
-            <div className="scope-block-title-area">
-
-              <h3 className="scope-block-title">
-                ทุนการศึกษาภายใน
-              </h3>
-              <p className="scope-block-desc">
-                ทุนสนับสนุนโดยตรงจากมหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ (มจพ.), คณะวิทยาศาสตร์ประยุกต์ และกองทุนพัฒนาภาควิชาคณิตศาสตร์ เช่น ทุนเรียนดีเด่น, ทุนช่วยเหลือนักศึกษาขาดแคลนทุนทรัพย์, ทุนผู้ช่วยสอน (TA) และทุนกิจกรรมจิตสาธารณะ
-              </p>
+        {/* ส่วนที่ 1: ทุนภายใน */}
+        <div className="scholarship-scope-group" id="internal-scholarships">
+          <div className="scope-group-header">
+            <div className="scope-badge-pill internal">
+              <span>🏛️ ทุนการศึกษาภายใน (มจพ. / คณะ / ภาควิชา)</span>
+              <span className="scope-count">{internalScholarships.length} ทุน</span>
             </div>
-
+            <p className="scope-group-desc">
+              ทุนสนับสนุนโดยตรงจากมหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ, คณะวิทยาศาสตร์ประยุกต์ และกองทุนพัฒนาภาควิชาคณิตศาสตร์
+            </p>
           </div>
 
           <div className="scholarship-grid">
@@ -52,21 +46,16 @@ export const ScholarshipDirectory: React.FC = () => {
           </div>
         </div>
 
-        {/* ========================================================= */}
-        {/* ส่วนที่ 2: ทุนภายนอก (External Scholarships)               */}
-        {/* ========================================================= */}
-        <div className="scope-block external" id="external-scholarships">
-          <div className="scope-block-header">
-            <div className="scope-block-title-area">
-
-              <h3 className="scope-block-title">
-                ทุนการศึกษาภายนอก
-              </h3>
-              <p className="scope-block-desc">
-                ทุนสนับสนุนจากหน่วยงานภายนอก มูลนิธิเพื่อการศึกษา องค์กรพันธมิตรภาคอุตสาหกรรม และชมรมศิษย์เก่าภาควิชาคณิตศาสตร์ มจพ. เพื่อขยายโอกาสทางการศึกษา พัฒนาทักษะวิชาชีพ และส่งเสริมนักศึกษาในมิติต่าง ๆ
-              </p>
+        {/* ส่วนที่ 2: ทุนภายนอก */}
+        <div className="scholarship-scope-group" id="external-scholarships" style={{ marginTop: 44 }}>
+          <div className="scope-group-header">
+            <div className="scope-badge-pill external">
+              <span>🤝 ทุนการศึกษาภายนอก (มูลนิธิ / องค์กรเอกชน / ศิษย์เก่า)</span>
+              <span className="scope-count">{externalScholarships.length} ทุน</span>
             </div>
-
+            <p className="scope-group-desc">
+              ทุนสนับสนุนจากหน่วยงานภายนอก มูลนิธิเพื่อการศึกษา และชมรมศิษย์เก่าภาควิชาคณิตศาสตร์ มจพ.
+            </p>
           </div>
 
           <div className="scholarship-grid">

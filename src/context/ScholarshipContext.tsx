@@ -13,6 +13,7 @@ import { contentService } from '../services/contentService';
 import { studentAuthService } from '../services/studentAuthService';
 import { StudentAccount, StudentLoginLogInput, StudentPersonalInfo, StudentRegistrationData } from '../types/studentAccount';
 import { calculateStudentYear, normalizeMajorName, normalizePersonalInfo } from '../utils/studentProfile';
+import { getCurrentAcademicYear } from '../utils/academicCalendar';
 
 export type { StudentAccount, StudentPersonalInfo, StudentRegistrationData };
 
@@ -110,7 +111,11 @@ interface ScholarshipContextType {
     title: string,
     amount: string,
     totalSlots: number,
-    criteria?: Pick<Scholarship, 'minGPAX' | 'targetYears'> & { deadline?: string }
+    criteria?: Pick<Scholarship, 'minGPAX' | 'targetYears'> & {
+      deadline?: string;
+      academicYear?: string;
+      term?: string;
+    }
   ) => void;
   updateScholarship: (id: string, data: Partial<Scholarship>) => void;
   deleteScholarship: (id: string) => void;
@@ -124,7 +129,7 @@ interface ScholarshipContextType {
   closeChatbot: () => void;
   toggleChatbot: () => void;
   updateCurrentUser: (updates: Partial<UserProfile>) => void;
-  login: (identifier: string, password: string, customName?: string) => Promise<boolean>;
+  login: (identifier: string, password: string, customName?: string) => Promise<{ success: boolean; message?: string }>;
   changeStaffCredentials: (username: string, newPassword: string, currentPassword?: string) => Promise<boolean>;
   logout: () => void;
 
@@ -138,7 +143,6 @@ interface ScholarshipContextType {
   addDownload: (doc: Omit<DownloadDoc, 'id'>) => void;
   updateDownload: (id: string, doc: Partial<DownloadDoc>) => void;
   deleteDownload: (id: string) => void;
-  updateSiteSettings: (settings: Partial<SiteSettings>) => void;
 }
 
 const ScholarshipContext = createContext<ScholarshipContextType | undefined>(undefined);
@@ -289,6 +293,12 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
         const normalized = parsed.personalInfo
           ? { ...parsed, personalInfo: normalizePersonalInfo(parsed.personalInfo) }
           : parsed;
+        if (
+          isSupabaseConfigured() &&
+          (normalized.role === 'admin' || normalized.role === 'officer')
+        ) {
+          return null;
+        }
         if (normalized.role === 'student' && normalized.studentId) {
           normalized.year = calculateStudentYear(normalized.studentId, normalized.year);
           normalized.major = normalizeMajorName(normalized.major);
@@ -300,6 +310,7 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
   });
 
   const [isAdminActive, setIsAdminActive] = useState<boolean>(() => {
+    if (isSupabaseConfigured()) return false;
     const saved = localStorage.getItem('KMUTNB_SCH_USER');
     if (saved) {
       try {
@@ -544,6 +555,42 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const changeStaffCredentials = async (username: string, newPassword: string, currentPassword = ''): Promise<boolean> => {
     if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'officer')) return false;
     const cleanUsername = username.trim();
+
+    if (isSupabaseConfigured()) {
+      const oldUsername = currentUser.username || currentUser.studentId;
+      const updates: { username: string; password?: string } = { username: cleanUsername };
+      if (newPassword) {
+        if (!currentPassword) {
+          showToast('กรุณากรอกรหัสผ่านเดิมเพื่อยืนยัน', 'warning');
+          return false;
+        }
+        updates.password = newPassword;
+      }
+
+      let update = supabase
+        .from('staff_users')
+        .update(updates)
+        .eq('username', oldUsername);
+      if (newPassword) update = update.eq('password', currentPassword);
+
+      const { data, error } = await update.select('username');
+      if (error) {
+        console.error('ไม่สามารถเปลี่ยนรหัสผ่านเจ้าหน้าที่ได้:', error.message);
+        showToast(`เปลี่ยนข้อมูลเจ้าหน้าที่ไม่สำเร็จ (${error.code || 'database error'})`, 'error');
+        return false;
+      }
+      if (!data?.length) {
+        showToast('รหัสผ่านเดิมไม่ถูกต้อง หรือบัญชีไม่สามารถใช้งานได้', 'error');
+        return false;
+      }
+
+      const updatedUser = { ...currentUser, username: cleanUsername, studentId: cleanUsername };
+      setCurrentUser(updatedUser);
+      safeSetLocalStorage('KMUTNB_SCH_USER', JSON.stringify(updatedUser));
+      showToast(newPassword ? 'เปลี่ยนรหัสผ่านเจ้าหน้าที่เรียบร้อยแล้ว' : 'เปลี่ยนชื่อผู้ใช้เจ้าหน้าที่เรียบร้อยแล้ว', 'success');
+      return true;
+    }
+
     if (!cleanUsername || (!staffCredentials && !newPassword)) return false;
 
     try {
@@ -900,24 +947,80 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
     return res.success;
   };
 
-  const login = async (identifier: string, password: string, customName?: string): Promise<boolean> => {
+  const login = async (identifier: string, password: string, customName?: string): Promise<{ success: boolean; message?: string }> => {
     const cleanId = (identifier || '').trim();
-    if (!cleanId || !password) return false;
+    if (!cleanId || !password) return { success: false, message: 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน' };
+
+    if (isSupabaseConfigured()) {
+      const { data, error } = await supabase
+        .from('staff_users')
+        .select('username, name, email, department, role_id, staff_roles(role_name, role_title)')
+        .eq('username', cleanId)
+        .eq('password', password)
+        .eq('is_active', true)
+        .maybeSingle();
+      if (error) {
+        console.error('ไม่สามารถตรวจสอบบัญชี staff_users ได้:', error.message);
+        return {
+          success: false,
+          message: `อ่านบัญชี staff_users ไม่สำเร็จ (${error.code || 'database error'}) กรุณาตรวจ policy ใน supabase/schema.sql`
+        };
+      }
+
+      const role = Array.isArray(data?.staff_roles) ? data.staff_roles[0] : data?.staff_roles;
+      if (
+        !data ||
+        typeof data.username !== 'string' ||
+        typeof data.name !== 'string' ||
+        typeof data.email !== 'string' ||
+        !role ||
+        (role.role_name !== 'admin' && role.role_name !== 'committee')
+      ) {
+        return {
+          success: false,
+          message: 'ไม่พบบัญชีที่ใช้งานได้ หรือ username/รหัสผ่านไม่ตรงกับ staff_users กรุณาตรวจ username, password, is_active และ role'
+        };
+      }
+
+      const user: UserProfile = {
+        studentId: data.username,
+        username: data.username,
+        name: data.name,
+        email: data.email,
+        faculty: 'คณะวิทยาศาสตร์ประยุกต์',
+        major: typeof data.department === 'string' ? data.department : 'งานกิจการนักศึกษาและทุนการศึกษา',
+        position: typeof role.role_title === 'string' ? role.role_title : 'เจ้าหน้าที่',
+        role: role.role_name === 'admin' ? 'admin' : 'officer'
+      };
+
+      setCurrentUser(user);
+      setIsAdminActive(true);
+      safeSetLocalStorage('KMUTNB_SCH_USER', JSON.stringify(user));
+      setIsLoginModalOpen(false);
+      showToast(`เข้าสู่ระบบสำเร็จ: ยินดีต้อนรับ ${user.name}`, 'success');
+      return { success: true };
+    }
 
     const legacyStaffName = cleanId.toLowerCase() === 'admin' || cleanId.toLowerCase().includes('staff') || cleanId.toLowerCase().includes('officer') || cleanId.toLowerCase().includes('committee') || cleanId.toLowerCase().includes('math');
     const isStudentFormat = /^s?[0-9]{8,13}$/i.test(cleanId) || cleanId.includes('@email.kmutnb.ac.th') || (!legacyStaffName && (!staffCredentials || cleanId.toLowerCase() !== staffCredentials.username.toLowerCase()));
 
     if (isStudentFormat) {
       const studentRes = await loginStudent(cleanId, password);
-      return studentRes.success;
+      return { success: studentRes.success, message: studentRes.message };
     }
 
     if (staffCredentials) {
-      if (cleanId.toLowerCase() !== staffCredentials.username.toLowerCase() || !password) return false;
+      if (cleanId.toLowerCase() !== staffCredentials.username.toLowerCase() || !password) {
+        return { success: false, message: 'ชื่อผู้ใช้หรือรหัสผ่านเจ้าหน้าที่ไม่ถูกต้อง' };
+      }
       const submittedHash = await createPasswordHash(password, staffCredentials.salt);
-      if (submittedHash !== staffCredentials.passwordHash) return false;
+      if (submittedHash !== staffCredentials.passwordHash) {
+        return { success: false, message: 'ชื่อผู้ใช้หรือรหัสผ่านเจ้าหน้าที่ไม่ถูกต้อง' };
+      }
     } else {
-      if (!legacyStaffName || !password) return false;
+      if (!legacyStaffName || !password) {
+        return { success: false, message: 'ชื่อผู้ใช้หรือรหัสผ่านเจ้าหน้าที่ไม่ถูกต้อง' };
+      }
       const salt = createPasswordSalt();
       const credentials = { username: cleanId, salt, passwordHash: await createPasswordHash(password, salt) };
       safeSetLocalStorage(LOCAL_STORAGE_STAFF_CREDENTIALS_KEY, JSON.stringify(credentials));
@@ -940,7 +1043,7 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
     safeSetLocalStorage('KMUTNB_SCH_USER', JSON.stringify(user));
     setIsLoginModalOpen(false);
     showToast(`เข้าสู่ระบบสำเร็จ: ยินดีต้อนรับ ${user.name}`, 'success');
-    return true;
+    return { success: true };
   };
 
   const logout = () => {
@@ -953,10 +1056,6 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setIsLogoutModalOpen(false);
     setIsPreviewMode(false);
     localStorage.removeItem('KMUTNB_SCH_USER');
-
-    if (isSupabaseConfigured()) {
-      supabase.auth.signOut().catch(console.error);
-    }
 
     if (window.location.hash === '#admin' || window.location.hash === '#login') {
       window.history.replaceState(null, '', window.location.pathname + window.location.search);
@@ -1110,28 +1209,12 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   };
 
-  const updateSiteSettings = (settings: Partial<SiteSettings>) => {
-    setSiteSettings(prev => {
-      const updated = { ...prev, ...settings };
-      localStorage.setItem(LOCAL_STORAGE_SETTINGS_KEY, JSON.stringify(updated));
-      return updated;
-    });
-
-    if (isSupabaseConfigured()) {
-      settingsService.updateSiteSettings(settings).then(res => {
-        if (res.source === 'supabase' && res.success) {
-          showToast('บันทึกการตั้งค่าเว็บไซต์ลง Supabase สำเร็จ', 'success');
-        } else {
-          showToast('บันทึกการตั้งค่าเว็บไซต์ในเครื่องเรียบร้อยแล้ว', 'info');
-        }
-      });
-    } else {
-      showToast('บันทึกการตั้งค่าเว็บไซต์สำเร็จ', 'success');
-    }
-  };
-
   const scrollToSection = (id: string) => {
-    if (id === 'adminSection' && !isAdminActive) {
+    if (
+      id === 'adminSection' &&
+      !isAdminActive &&
+      (currentUser?.role === 'admin' || currentUser?.role === 'officer')
+    ) {
       setIsAdminActive(true);
     }
     setTimeout(() => {
@@ -1183,6 +1266,10 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const toggleAdminView = (forceOpen?: boolean) => {
+    if (currentUser?.role !== 'admin' && currentUser?.role !== 'officer') {
+      showToast('เฉพาะเจ้าหน้าที่ที่เข้าสู่ระบบแล้วเท่านั้นที่เปิดโหมดกรรมการได้', 'warning');
+      return;
+    }
     setIsAdminActive(prev => {
       const nextState = forceOpen !== undefined ? forceOpen : !prev;
       showToast(nextState ? 'เปิดโหมดกรรมการพิจารณาทุนการศึกษา' : 'ปิดโหมดกรรมการ', 'info');
@@ -1351,7 +1438,11 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
     title: string,
     amount: string,
     totalSlots: number,
-    criteria?: Pick<Scholarship, 'minGPAX' | 'targetYears'> & { deadline?: string }
+    criteria?: Pick<Scholarship, 'minGPAX' | 'targetYears'> & {
+      deadline?: string;
+      academicYear?: string;
+      term?: string;
+    }
   ) => {
     const newSch: Scholarship = {
       id: `sch-${Date.now()}`,
@@ -1365,14 +1456,14 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
       amount: amount || '20,000 บาท / ภาคการศึกษา',
       totalSlots,
       remainingSlots: totalSlots,
-      academicYear: '2567',
-      term: 'ภาคการศึกษาที่ 1',
+      academicYear: criteria?.academicYear ?? getCurrentAcademicYear(),
+      term: criteria?.term ?? 'ภาคการศึกษาที่ 1',
       deadline: criteria?.deadline ?? '2026-11-15',
       status: 'open',
       minGPAX: criteria?.minGPAX ?? 2.75,
       targetYears: criteria?.targetYears ?? ['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4'],
       targetMajors: ['ทุกสาขาวิชาในภาควิชาคณิตศาสตร์'],
-      description: `ประกาศทุนการศึกษาใหม่ของภาควิชาคณิตศาสตร์ มจพ. เพื่อส่งเสริมนักศึกษาตามนโยบายสนับสนุนทุนปี 2567`,
+      description: `ประกาศทุนการศึกษาใหม่ของภาควิชาคณิตศาสตร์ มจพ. เพื่อส่งเสริมนักศึกษาตามนโยบายสนับสนุนทุนปี ${criteria?.academicYear ?? getCurrentAcademicYear()}`,
       requirements: [
         'เป็นนักศึกษาภาควิชาคณิตศาสตร์ มจพ.',
         `มีเกรดเฉลี่ยสะสมไม่ต่ำกว่า ${(criteria?.minGPAX ?? 2.75).toFixed(2)}`,
@@ -1461,7 +1552,10 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
         latestTrackingId,
         toasts,
         currentUser,
-        hasStaffCredentials: Boolean(staffCredentials),
+        hasStaffCredentials: Boolean(
+          staffCredentials ||
+          (isSupabaseConfigured() && (currentUser?.role === 'admin' || currentUser?.role === 'officer'))
+        ),
         isLoginModalOpen,
         isLogoutModalOpen,
         isChatbotOpen,
@@ -1503,7 +1597,6 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
         deleteDownload,
         updateScholarship,
         deleteScholarship,
-        updateSiteSettings,
         openScholarshipDetail,
         closeScholarshipDetail,
         openApplicationModal,
