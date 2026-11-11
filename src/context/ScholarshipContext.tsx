@@ -51,6 +51,7 @@ interface ScholarshipContextType {
   isDetailModalOpen: boolean;
   isWizardModalOpen: boolean;
   isSuccessModalOpen: boolean;
+  isMyApplicationsOpen: boolean;
   isCommitteeModalOpen: boolean;
   reviewingApplication: Application | null;
   latestTrackingId: string;
@@ -91,6 +92,8 @@ interface ScholarshipContextType {
   openApplicationModal: (schId?: string) => void;
   closeApplicationModal: () => void;
   closeSuccessModal: () => void;
+  openMyApplications: () => void;
+  closeMyApplications: () => void;
   openCommitteeReview: (trackingId: string) => void;
   closeCommitteeReview: () => void;
   toggleAdminView: (forceOpen?: boolean) => void;
@@ -105,6 +108,7 @@ interface ScholarshipContextType {
     notes: string
   ) => void;
   updateApplicationDetails: (application: Application) => void;
+  bulkUpdateApplicationStatus: (trackingIds: string[], status: ApplicationStatus) => void;
   deleteApplication: (trackingId: string) => void;
   quickApprove: (trackingId: string) => void;
   createNewScholarship: (
@@ -326,6 +330,7 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
   const [isWizardModalOpen, setIsWizardModalOpen] = useState<boolean>(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState<boolean>(false);
+  const [isMyApplicationsOpen, setIsMyApplicationsOpen] = useState<boolean>(false);
   const [isCommitteeModalOpen, setIsCommitteeModalOpen] = useState<boolean>(false);
   const [reviewingApplication, setReviewingApplication] = useState<Application | null>(null);
   const [latestTrackingId, setLatestTrackingId] = useState<string>('6504062630012');
@@ -1054,6 +1059,7 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setCurrentUser(null);
     setIsAdminActive(false);
     setIsLogoutModalOpen(false);
+    setIsMyApplicationsOpen(false);
     setIsPreviewMode(false);
     localStorage.removeItem('KMUTNB_SCH_USER');
 
@@ -1252,6 +1258,15 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setIsSuccessModalOpen(false);
   };
 
+  // หน้าต่าง "ใบสมัครของฉัน" สำหรับนักศึกษาติดตามสถานะ
+  const openMyApplications = useCallback(() => {
+    setIsMyApplicationsOpen(true);
+  }, []);
+
+  const closeMyApplications = useCallback(() => {
+    setIsMyApplicationsOpen(false);
+  }, []);
+
   const openCommitteeReview = (trackingId: string) => {
     const app = applications.find(a => a.trackingId === trackingId);
     if (app) {
@@ -1370,6 +1385,37 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
       });
     } else {
       showToast(`บันทึกผลการพิจารณาสำหรับ ${trackingId} เรียบร้อยแล้ว`, 'success');
+    }
+  };
+
+  // เปลี่ยนสถานะหลายใบสมัครพร้อมกัน (เก็บคะแนน วันสัมภาษณ์ และบันทึกกรรมการเดิมไว้) แจ้งผลครั้งเดียว
+  const bulkUpdateApplicationStatus = (trackingIds: string[], status: ApplicationStatus) => {
+    const ids = new Set(trackingIds);
+    const targets = applications.filter(a => ids.has(a.trackingId) && a.status !== status);
+    const label = status === 'approved' ? 'อนุมัติทุน' : status === 'rejected' ? 'ไม่ผ่านการพิจารณา' : 'รอตรวจสอบ';
+
+    if (targets.length === 0) {
+      showToast(`ใบสมัครที่เลือกเป็น "${label}" อยู่แล้ว`, 'info');
+      return;
+    }
+
+    setApplications(prev => prev.map(app => (ids.has(app.trackingId) ? { ...app, status } : app)));
+
+    if (isSupabaseConfigured()) {
+      Promise.all(
+        targets.map(app =>
+          applicationService.updateApplicationReview(app.trackingId, status, app.score, '', app.committeeNotes || '')
+        )
+      ).then(results => {
+        const failed = results.filter(ok => !ok).length;
+        if (failed === 0) {
+          showToast(`บันทึกผล "${label}" ให้ ${targets.length} ใบสมัครลงฐานข้อมูลแล้ว`, 'success');
+        } else {
+          showToast(`บันทึกสำเร็จ ${targets.length - failed} ใบ ไม่สำเร็จ ${failed} ใบ กรุณาลองใหม่`, 'warning');
+        }
+      });
+    } else {
+      showToast(`บันทึกผล "${label}" ให้ ${targets.length} ใบสมัครแล้ว`, 'success');
     }
   };
 
@@ -1547,6 +1593,7 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
         isDetailModalOpen,
         isWizardModalOpen,
         isSuccessModalOpen,
+        isMyApplicationsOpen,
         isCommitteeModalOpen,
         reviewingApplication,
         latestTrackingId,
@@ -1602,6 +1649,8 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
         openApplicationModal,
         closeApplicationModal,
         closeSuccessModal,
+        openMyApplications,
+        closeMyApplications,
         openCommitteeReview,
         closeCommitteeReview,
         toggleAdminView,
@@ -1610,6 +1659,7 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
         submitApplication,
         updateApplicationReview,
         updateApplicationDetails,
+        bulkUpdateApplicationStatus,
         deleteApplication,
         quickApprove,
         createNewScholarship,

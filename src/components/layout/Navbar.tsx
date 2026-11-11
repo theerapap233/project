@@ -37,7 +37,8 @@ export const Navbar: React.FC = () => {
     updateCurrentUser,
     changeStaffCredentials,
     changeStudentPassword,
-    showToast
+    showToast,
+    openMyApplications
   } = useScholarship();
 
   const isStaffMode = Boolean(currentUser && isAdminActive);
@@ -285,6 +286,9 @@ export const Navbar: React.FC = () => {
                 <li><button className="nav-item" onClick={() => { scrollToSection('news'); document.querySelector('.nav-links')?.classList.remove('mobile-open'); }}>ข่าวสาร</button></li>
                 <li><button className="nav-item" onClick={() => { scrollToSection('scholarships'); document.querySelector('.nav-links')?.classList.remove('mobile-open'); }}>ทุนการศึกษา</button></li>
                 <li><button className="nav-item" onClick={() => { scrollToSection('downloads'); document.querySelector('.nav-links')?.classList.remove('mobile-open'); }}>เอกสารดาวน์โหลด</button></li>
+                {isStudent && (
+                  <li><button className="nav-item" onClick={() => { openMyApplications(); document.querySelector('.nav-links')?.classList.remove('mobile-open'); }}>สถานะใบสมัคร</button></li>
+                )}
               </ul>
             </>
           )}
@@ -436,6 +440,35 @@ export const Navbar: React.FC = () => {
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {isStudent && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsProfileMenuOpen(false);
+                          openMyApplications();
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          padding: '8px 12px',
+                          textAlign: 'left',
+                          fontSize: '0.82rem',
+                          color: 'var(--math-green, #077b38)',
+                          cursor: 'pointer',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          fontWeight: 700
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-alt)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <span>📨</span>
+                        <span>ใบสมัครของฉัน / ติดตามสถานะ</span>
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       onClick={() => {

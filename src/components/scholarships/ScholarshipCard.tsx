@@ -2,13 +2,18 @@ import React from 'react';
 import { Scholarship } from '../../types/scholarship';
 import { formatThaiDate } from '../../utils/dateFormatter';
 import { useScholarship } from '../../context/ScholarshipContext';
+import { useMyApplications } from '../../hooks/useMyApplications';
+import { STATUS_META } from '../../utils/applicationStatus';
 
 interface ScholarshipCardProps {
   scholarship: Scholarship;
 }
 
 export const ScholarshipCard: React.FC<ScholarshipCardProps> = ({ scholarship }) => {
-  const { openScholarshipDetail, openApplicationModal } = useScholarship();
+  const { openScholarshipDetail, openApplicationModal, openMyApplications } = useScholarship();
+  const { findByScholarship } = useMyApplications();
+  const myApplication = findByScholarship(scholarship.id);
+  const myStatus = myApplication ? (STATUS_META[myApplication.status] ?? STATUS_META.submitted) : null;
 
   const isClosed = scholarship.status === 'closed';
   const isClosing = scholarship.status === 'closing_soon';
@@ -57,15 +62,28 @@ export const ScholarshipCard: React.FC<ScholarshipCardProps> = ({ scholarship })
           >
             รายละเอียด
           </button>
-          <button
-            type="button"
-            className="btn-card-apply"
-            onClick={() => openApplicationModal(scholarship.id)}
-            disabled={isClosed}
-            style={isClosed ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-          >
-            {isClosed ? 'ปิดรับ' : 'สมัครทุน'}
-          </button>
+          {myStatus ? (
+            /* สมัครทุนนี้แล้ว: แสดงสถานะแทนปุ่มสมัคร เพื่อกันการสมัครซ้ำ */
+            <button
+              type="button"
+              className="btn-card-apply"
+              onClick={openMyApplications}
+              title="ดูสถานะใบสมัครของคุณ"
+              style={{ background: myStatus.bg, color: myStatus.color, border: `1px solid ${myStatus.border}`, boxShadow: 'none' }}
+            >
+              ✓ สมัครแล้ว · {myStatus.short}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn-card-apply"
+              onClick={() => openApplicationModal(scholarship.id)}
+              disabled={isClosed}
+              style={isClosed ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+            >
+              {isClosed ? 'ปิดรับ' : 'สมัครทุน'}
+            </button>
+          )}
         </div>
       </div>
     </div>

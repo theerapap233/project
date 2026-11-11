@@ -5,7 +5,9 @@ export const ApplicationSuccessModal: React.FC = () => {
   const { 
     isSuccessModalOpen, 
     closeSuccessModal, 
-    latestTrackingId
+    latestTrackingId,
+    currentUser,
+    openMyApplications
   } = useScholarship();
 
   if (!isSuccessModalOpen) return null;
@@ -65,10 +67,21 @@ export const ApplicationSuccessModal: React.FC = () => {
           </div>
         </div>
 
-        <div className="modal-footer" style={{ justifyContent: 'center' }}>
+        <div className="modal-footer" style={{ justifyContent: 'center', gap: 10 }}>
           <button className="btn btn-secondary btn-sm" onClick={closeSuccessModal}>
             ปิดหน้าต่าง
           </button>
+          {currentUser?.role === 'student' && (
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => {
+                closeSuccessModal();
+                openMyApplications();
+              }}
+            >
+              ดูสถานะใบสมัคร
+            </button>
+          )}
         </div>
       </div>
     </div>

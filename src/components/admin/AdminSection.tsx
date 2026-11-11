@@ -16,7 +16,8 @@ import {
   Eye,
   Check,
   Printer,
-  RotateCcw,
+  LayoutGrid,
+  List,
   X,
   XCircle,
   Star,
@@ -24,6 +25,9 @@ import {
   ThumbsUp
 } from 'lucide-react';
 import { useScholarship } from '../../context/ScholarshipContext';
+import { DecisionPicker, type Decision } from './DecisionPicker';
+import { StudentHistoryModal } from './StudentHistoryModal';
+import { normalizeStudentId } from '../../hooks/useMyApplications';
 import { Application, ApplicationStatus, ApplicationFormData } from '../../types/application';
 import { Scholarship } from '../../types/scholarship';
 import { Announcement, FaqItem, DownloadDoc } from '../../types/common';
@@ -52,7 +56,6 @@ export const AdminSection: React.FC = () => {
     faqs,
     downloads,
     siteSettings,
-    quickApprove, 
     createNewScholarship, 
     updateScholarship,
     deleteScholarship,
@@ -67,6 +70,7 @@ export const AdminSection: React.FC = () => {
     deleteDownload,
     updateApplicationDetails,
     updateApplicationReview,
+    bulkUpdateApplicationStatus,
     deleteApplication,
     showToast
   } = useScholarship();
@@ -266,6 +270,23 @@ export const AdminSection: React.FC = () => {
   const [selectedAppIds, setSelectedAppIds] = useState<Set<string>>(new Set());
   const [isSelectionMode, setIsSelectionMode] = useState(false);
 
+  // มุมมองรายการใบสมัคร: 'list' = ตาราง, 'grid' = การ์ด (จำค่าไว้ในเบราว์เซอร์)
+  const [appViewMode, setAppViewMode] = useState<'list' | 'grid'>(() => {
+    try {
+      return localStorage.getItem('KMUTNB_ADMIN_APP_VIEW') === 'grid' ? 'grid' : 'list';
+    } catch {
+      return 'list';
+    }
+  });
+  const changeAppViewMode = (mode: 'list' | 'grid') => {
+    setAppViewMode(mode);
+    try {
+      localStorage.setItem('KMUTNB_ADMIN_APP_VIEW', mode);
+    } catch {
+      /* ignore: storage อาจถูกปิดไว้ */
+    }
+  };
+
   const selectedAppsList = useMemo(() => {
     return filteredApps.filter(app => selectedAppIds.has(app.trackingId));
   }, [filteredApps, selectedAppIds]);
@@ -313,6 +334,16 @@ export const AdminSection: React.FC = () => {
     if (isSelectionMode || selectedAppIds.size > 0) {
       handleToggleApp(app.trackingId);
     }
+  };
+
+  // อนุมัติ / ไม่ผ่าน ทั้งหมดที่เลือกไว้
+  const handleBulkDecision = (decision: Decision) => {
+    const targets = selectedAppsList;
+    if (targets.length === 0) return;
+    const label = decision === 'approved' ? 'ผ่าน (อนุมัติทุน)' : 'ไม่ผ่าน';
+    if (!window.confirm(`ยืนยันตั้งผลพิจารณา "${label}" ให้ใบสมัครที่เลือกทั้งหมด ${targets.length} ใบ ใช่หรือไม่?`)) return;
+    bulkUpdateApplicationStatus(targets.map(app => app.trackingId), decision);
+    handleClearSelection();
   };
 
   const handlePrintList = () => {
@@ -545,19 +576,95 @@ export const AdminSection: React.FC = () => {
     }
   };
 
-  const handleRevertStatus = (trackingId: string) => {
-    const target = applications.find(a => a.trackingId === trackingId);
-    if (!target || target.status !== 'approved') return;
+  // ประวัติการสมัครของนักศึกษา: นับจำนวนใบสมัคร/ได้ทุนต่อรหัสนักศึกษา
+  const [historyStudentId, setHistoryStudentId] = useState<string | null>(null);
+  const applicationCountsByStudent = useMemo(() => {
+    const map = new Map<string, { total: number; approved: number }>();
+    applications.forEach(app => {
+      const id = normalizeStudentId(app.studentId);
+      const entry = map.get(id) || { total: 0, approved: 0 };
+      entry.total += 1;
+      if (app.status === 'approved') entry.approved += 1;
+      map.set(id, entry);
+    });
+    return map;
+  }, [applications]);
 
-    if (window.confirm(`ยืนยันการย้อนกลับสถานะของ "${target.fullName}" จาก "อนุมัติทุนแล้ว" เป็น "รอตรวจสอบ" ใช่หรือไม่?`)) {
-      updateApplicationReview(
-        trackingId,
-        'submitted',
-        null,
-        '',
-        'ย้อนกลับสถานะจากอนุมัติทุนแล้วเป็นรอตรวจสอบ'
-      );
-    }
+  // ชื่อผู้สมัคร (กดเพื่อดูประวัติ) + รหัส + ป้ายจำนวนครั้งที่เคยสมัคร
+  const renderApplicantName = (app: Application, variant: 'table' | 'card') => {
+    const counts = applicationCountsByStudent.get(normalizeStudentId(app.studentId));
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setHistoryStudentId(app.studentId);
+          }}
+          title="ดูประวัติการสมัครทุนของนักศึกษาคนนี้"
+          style={{
+            padding: 0,
+            border: 'none',
+            background: 'none',
+            cursor: 'pointer',
+            textAlign: 'left',
+            fontFamily: 'inherit',
+            fontSize: variant === 'card' ? '1rem' : 'inherit',
+            fontWeight: variant === 'card' ? 700 : 600,
+            lineHeight: 1.35,
+            color: 'var(--navy-900)',
+            textDecoration: 'underline',
+            textDecorationColor: 'rgba(7, 123, 56, 0.35)',
+            textUnderlineOffset: 3
+          }}
+        >
+          {app.fullName}
+        </button>
+        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 2 }}>
+          {variant === 'card' ? `${app.studentId} · ${formatMajorAbbr(app.major)} ${app.year}` : app.studentId}
+        </div>
+        {counts && counts.total > 1 && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setHistoryStudentId(app.studentId);
+            }}
+            title="ดูประวัติการสมัครทุน"
+            style={{
+              marginTop: 5,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '1px 8px',
+              borderRadius: 999,
+              border: '1px solid #c7d2fe',
+              background: '#eef2ff',
+              color: '#4338ca',
+              fontSize: '0.7rem',
+              fontWeight: 700,
+              fontFamily: 'inherit',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            สมัคร {counts.total} ครั้ง{counts.approved > 0 ? ` · ได้ทุน ${counts.approved}` : ''}
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  // เปลี่ยนผลพิจารณาจากเมนูในตาราง (อนุมัติ <-> ไม่ผ่าน) โดยเก็บคะแนน/วันสัมภาษณ์/บันทึกเดิมไว้
+  const handleSetDecision = (app: Application, decision: Decision) => {
+    if (app.status === decision) return;
+    updateApplicationReview(
+      app.trackingId,
+      decision,
+      app.score ?? null,
+      '',
+      app.committeeNotes || ''
+    );
   };
 
   // Handlers for Scholarships CMS
@@ -1509,6 +1616,53 @@ export const AdminSection: React.FC = () => {
                 </div>
               </div>
 
+              {/* ปุ่มสลับมุมมอง: การ์ด / ตาราง */}
+              <div
+                role="group"
+                aria-label="เลือกมุมมองรายการใบสมัคร"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: 3,
+                  gap: 2,
+                  borderRadius: 10,
+                  border: '1px solid var(--border-light, #e2e8f0)',
+                  background: 'var(--surface-card, #ffffff)',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                }}
+              >
+                {([
+                  { mode: 'grid', label: 'มุมมองการ์ด', Icon: LayoutGrid },
+                  { mode: 'list', label: 'มุมมองตาราง', Icon: List }
+                ] as const).map(({ mode, label, Icon }) => {
+                  const active = appViewMode === mode;
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => changeAppViewMode(mode)}
+                      aria-pressed={active}
+                      title={label}
+                      aria-label={label}
+                      style={{
+                        width: 34,
+                        height: 30,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: 7,
+                        border: 'none',
+                        cursor: 'pointer',
+                        background: active ? 'var(--math-green, #077b38)' : 'transparent',
+                        color: active ? '#ffffff' : 'var(--text-muted, #64748b)',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <Icon size={17} strokeWidth={2} />
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Helper Tip & Multi-Select Action Bar */}
@@ -1538,11 +1692,54 @@ export const AdminSection: React.FC = () => {
                     {selectedAppIds.size}
                   </span>
                   <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>
-                    เลือกอยู่ {selectedAppIds.size} คน จากทั้งหมด {filteredApps.length} คน (พร้อมสำหรับสั่งพิมพ์)
+                    เลือกอยู่ {selectedAppIds.size} คน จากทั้งหมด {filteredApps.length} คน
                   </span>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  {/* ผ่าน / ไม่ผ่าน ทั้งหมดที่เลือก */}
+                  <button
+                    type="button"
+                    onClick={() => handleBulkDecision('approved')}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '6px 14px',
+                      borderRadius: '7px',
+                      background: 'var(--math-green, #077b38)',
+                      color: '#ffffff',
+                      fontWeight: 700,
+                      fontSize: '0.84rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Check size={15} strokeWidth={2.4} />
+                    <span>ผ่านทั้งหมดที่เลือก ({selectedAppIds.size})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleBulkDecision('rejected')}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '6px 14px',
+                      borderRadius: '7px',
+                      background: '#fef2f2',
+                      color: '#b91c1c',
+                      fontWeight: 700,
+                      fontSize: '0.84rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <XCircle size={15} strokeWidth={2.2} />
+                    <span>ไม่ผ่านทั้งหมดที่เลือก ({selectedAppIds.size})</span>
+                  </button>
+
+                  <span aria-hidden="true" style={{ width: 1, height: 24, background: 'rgba(7, 123, 56, 0.25)', margin: '0 2px' }} />
+
                   <button
                     type="button"
                     onClick={handlePrintList}
@@ -1593,10 +1790,11 @@ export const AdminSection: React.FC = () => {
                     style={{
                       padding: '6px 12px',
                       borderRadius: '7px',
-                      background: 'rgba(255, 255, 255, 0.18)',
-                      color: '#ffffff',
-                      border: '1px solid rgba(255, 255, 255, 0.35)',
+                      background: '#ffffff',
+                      color: 'var(--math-green-dark, #166534)',
+                      border: '1px solid rgba(7, 123, 56, 0.35)',
                       fontSize: '0.82rem',
+                      fontWeight: 600,
                       cursor: 'pointer'
                     }}
                   >
@@ -1613,9 +1811,10 @@ export const AdminSection: React.FC = () => {
                       padding: '6px 10px',
                       borderRadius: '7px',
                       background: 'transparent',
-                      color: '#fed7aa',
+                      color: '#64748b',
                       border: 'none',
                       fontSize: '0.82rem',
+                      fontWeight: 600,
                       cursor: 'pointer'
                     }}
                     title="ล้างการเลือกทั้งหมด"
@@ -1627,11 +1826,150 @@ export const AdminSection: React.FC = () => {
               </div>
             ) : (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, padding: '0 4px', fontSize: '0.78rem', color: '#64748b' }}>
-                <span>💡 คลิกกล่องเลือกด้านหน้า หรือคลิกที่แถวเมื่ออยู่ในโหมดเลือก เพื่อสั่งพิมพ์รายงานทีละหลายคน</span>
+                <span>💡 กดชื่อนักศึกษาเพื่อดูประวัติการสมัครทุน · ติ๊กกล่องเลือกหลายคน เพื่อกดผ่าน / ไม่ผ่านพร้อมกัน หรือสั่งพิมพ์</span>
               </div>
             )}
 
-            {/* Applications Table */}
+            {/* Applications: มุมมองการ์ด */}
+            {appViewMode === 'grid' ? (
+              filteredApps.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-muted)', fontSize: '0.9rem', background: 'var(--surface-card)', borderRadius: 12, border: '1px solid var(--border-light, #e2e8f0)' }}>
+                  ไม่พบข้อมูลใบสมัครที่ตรงกับเงื่อนไขการค้นหา
+                </div>
+              ) : (
+                <div
+                  className="admin-applications-grid"
+                  style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 16 }}
+                >
+                  {filteredApps.map((app) => {
+                    const isSelected = selectedAppIds.has(app.trackingId);
+                    const initials = (app.fullName || '?').replace(/^(นาย|นางสาว|นาง)\s*/, '').trim().charAt(0) || '?';
+                    const stop = {
+                      onClick: (e: React.MouseEvent) => e.stopPropagation(),
+                      onMouseDown: (e: React.MouseEvent) => e.stopPropagation(),
+                      onTouchStart: (e: React.TouchEvent) => e.stopPropagation()
+                    };
+
+                    return (
+                      <article
+                        key={app.trackingId}
+                        onClick={() => handleRowClick(app)}
+                        style={{
+                          position: 'relative',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          background: 'var(--surface-card, #ffffff)',
+                          borderRadius: 14,
+                          border: isSelected ? '2px solid var(--math-green, #077b38)' : '1px solid var(--border-light, #e2e8f0)',
+                          boxShadow: isSelected ? '0 0 0 3px rgba(7, 123, 56, 0.12)' : '0 1px 3px rgba(15, 23, 42, 0.05)',
+                          overflow: 'hidden',
+                          cursor: (isSelectionMode || selectedAppIds.size > 0) ? 'pointer' : 'default',
+                          transition: 'box-shadow 0.15s ease, border-color 0.15s ease'
+                        }}
+                      >
+                        {/* ส่วนบน: รูป/ตัวอักษรย่อ + checkbox + สถานะ */}
+                        <div
+                          style={{
+                            position: 'relative',
+                            height: 120,
+                            background: 'var(--surface-ground, #f8fafc)',
+                            borderBottom: '1px solid var(--border-light, #f1f5f9)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          {app.profilePhoto ? (
+                            <img
+                              src={app.profilePhoto}
+                              alt={`รูปของ ${app.fullName}`}
+                              style={{ width: 78, height: 78, borderRadius: '50%', objectFit: 'cover', border: '3px solid #ffffff', boxShadow: '0 2px 8px rgba(15,23,42,0.12)' }}
+                            />
+                          ) : (
+                            <div
+                              aria-hidden="true"
+                              style={{ width: 78, height: 78, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(7, 123, 56, 0.12)', color: 'var(--math-green, #077b38)', fontSize: '1.9rem', fontWeight: 700, border: '3px solid #ffffff', boxShadow: '0 2px 8px rgba(15,23,42,0.08)' }}
+                            >
+                              {initials}
+                            </div>
+                          )}
+                          <label
+                            {...stop}
+                            style={{ position: 'absolute', top: 10, left: 10, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: 'rgba(255,255,255,0.92)', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', cursor: 'pointer' }}
+                            title={isSelected ? 'ยกเลิกการเลือก' : 'เลือกรายชื่อนี้'}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => handleToggleApp(app.trackingId)}
+                              style={{ cursor: 'pointer', width: 16, height: 16, accentColor: 'var(--math-green, #077b38)' }}
+                            />
+                          </label>
+                          <div style={{ position: 'absolute', top: 10, right: 10, transform: 'scale(0.9)', transformOrigin: 'top right' }}>
+                            {getStatusBadge(app.status)}
+                          </div>
+                        </div>
+
+                        {/* ส่วนข้อมูล */}
+                        <div style={{ padding: '14px 16px 12px', display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+                          {renderApplicantName(app, 'card')}
+                          <div
+                            title={app.scholarshipName}
+                            style={{ fontSize: '0.84rem', color: 'var(--navy-800)', lineHeight: 1.45, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: '2.9em' }}
+                          >
+                            {app.scholarshipName}
+                          </div>
+                          <div style={{ display: 'flex', gap: 14, fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 'auto' }}>
+                            <span>GPAX <strong style={{ color: 'var(--navy-900)', fontSize: '0.86rem' }}>{app.gpax.toFixed(2)}</strong></span>
+                            <span>ยื่น {formatThaiDate(app.submissionDate)}</span>
+                            {(app.systemRating && app.systemRating > 0) ? (
+                              <span style={{ color: '#b45309', fontWeight: 700 }} title={app.systemComment || `คะแนนประเมิน: ${app.systemRating}/5`}>★ {app.systemRating}</span>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        {/* ส่วนปุ่ม */}
+                        <div
+                          {...stop}
+                          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px 14px', borderTop: '1px solid var(--border-light, #f1f5f9)' }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleOpenReview(app)}
+                            title="ดูข้อมูลใบสมัคร"
+                            aria-label={`ดูข้อมูลใบสมัครของ ${app.fullName}`}
+                            style={{ width: 32, height: 32, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: '1px solid var(--border-light, #e2e8f0)', background: 'var(--surface-card, #ffffff)', color: 'var(--navy-800, #1e293b)', cursor: 'pointer' }}
+                          >
+                            <Eye size={15} strokeWidth={1.8} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบใบสมัครของ "${app.fullName}" (${app.trackingId}) ออกจากระบบ?`)) {
+                                deleteApplication(app.trackingId);
+                              }
+                            }}
+                            title="ลบใบสมัคร"
+                            aria-label={`ลบใบสมัครของ ${app.fullName}`}
+                            style={{ width: 32, height: 32, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: '1px solid #fecaca', background: '#fef2f2', color: '#dc2626', cursor: 'pointer' }}
+                          >
+                            <Trash2 size={14} strokeWidth={1.8} />
+                          </button>
+                          <div style={{ marginLeft: 'auto' }}>
+                            <DecisionPicker
+                              status={app.status}
+                              applicantName={app.fullName}
+                              onChange={(decision) => handleSetDecision(app, decision)}
+                            />
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )
+            ) : (
+            /* Applications: มุมมองตาราง */
             <div className="table-responsive admin-applications-table" style={{ background: 'var(--surface-card)', borderRadius: '12px', border: '1px solid var(--border-light, #e2e8f0)', overflow: 'hidden' }}>
               <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
@@ -1692,8 +2030,7 @@ export const AdminSection: React.FC = () => {
                             />
                           </td>
                           <td style={{ padding: '14px 18px' }}>
-                            <div style={{ fontWeight: 600, color: 'var(--navy-900)' }}>{app.fullName}</div>
-                            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 2 }}>{app.studentId}</div>
+                            {renderApplicantName(app, 'table')}
                           </td>
                           <td style={{ padding: '14px 18px' }}>
                             <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--navy-900)' }}>
@@ -1804,69 +2141,12 @@ export const AdminSection: React.FC = () => {
                                 <Trash2 size={14} strokeWidth={1.8} />
                               </button>
 
-                              {/* ปุ่มอนุมัติทุนทันที (ย้ายมาไว้ขวา เมื่อยังไม่อนุมัติ) */}
-                              {app.status !== 'approved' && (
-                                <button 
-                                  type="button"
-                                  onClick={() => quickApprove(app.trackingId)}
-                                  style={{ 
-                                    width: '32px', 
-                                    height: '32px', 
-                                    display: 'inline-flex', 
-                                    alignItems: 'center', 
-                                    justifyContent: 'center', 
-                                    borderRadius: '6px', 
-                                    border: '1px solid var(--math-green, #077b38)', 
-                                    background: 'var(--math-green, #077b38)', 
-                                    color: '#ffffff', 
-                                    cursor: 'pointer',
-                                    transition: 'all 0.15s ease'
-                                  }}
-                                  title="อนุมัติทุนทันที"
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = '#05622d';
-                                    e.currentTarget.style.borderColor = '#05622d';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = 'var(--math-green, #077b38)';
-                                    e.currentTarget.style.borderColor = 'var(--math-green, #077b38)';
-                                  }}
-                                >
-                                  <Check size={15} strokeWidth={2.2} />
-                                </button>
-                              )}
-
-                              {/* ปุ่มย้อนกลับ (ขวาสุด - แสดงเฉพาะเมื่อสถานะเป็นอนุมัติทุนแล้ว) */}
-                              {app.status === 'approved' && (
-                                <button 
-                                  type="button"
-                                  onClick={() => handleRevertStatus(app.trackingId)}
-                                  style={{ 
-                                    width: '32px', 
-                                    height: '32px', 
-                                    display: 'inline-flex', 
-                                    alignItems: 'center', 
-                                    justifyContent: 'center', 
-                                    borderRadius: '6px', 
-                                    border: '1px solid #fed7aa', 
-                                    background: '#fff7ed', 
-                                    color: '#ea580c', 
-                                    cursor: 'pointer',
-                                    transition: 'all 0.15s ease'
-                                  }}
-                                  title="ย้อนกลับสถานะเป็นรอพิจารณา"
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = '#ffedd5';
-                                    e.currentTarget.style.borderColor = '#fb923c';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = '#fff7ed';
-                                    e.currentTarget.style.borderColor = '#fed7aa';
-                                  }}
-                                >
-                                  <RotateCcw size={14} strokeWidth={2} />
-                                </button>
-                              )}
+                              {/* เลือกผลพิจารณา: อนุมัติ / ไม่ผ่าน (สลับไปมาได้) */}
+                              <DecisionPicker
+                                status={app.status}
+                                applicantName={app.fullName}
+                                onChange={(decision) => handleSetDecision(app, decision)}
+                              />
                             </div>
                           </td>
                         </tr>
@@ -1876,6 +2156,18 @@ export const AdminSection: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            )}
+
+            {/* ประวัติการสมัครทุนของนักศึกษา */}
+            <StudentHistoryModal
+              studentId={historyStudentId}
+              applications={applications}
+              onClose={() => setHistoryStudentId(null)}
+              onOpenApplication={(app) => {
+                setHistoryStudentId(null);
+                handleOpenReview(app);
+              }}
+            />
           </div>
         )}
 

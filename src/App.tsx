@@ -13,6 +13,8 @@ import { PreviewBanner } from './components/ui/PreviewBanner';
 import { ScholarshipDetailModal } from './components/scholarships/ScholarshipDetailModal';
 import { ApplicationWizardModal } from './components/wizard/ApplicationWizardModal';
 import { ApplicationSuccessModal } from './components/wizard/ApplicationSuccessModal';
+import { MyApplicationsModal } from './components/applications/MyApplicationsModal';
+import { MyApplicationsBanner } from './components/applications/MyApplicationsBanner';
 import { LoginModal } from './components/auth/LoginModal';
 import { LogoutModal } from './components/auth/LogoutModal';
 import { ToastContainer } from './components/ui/ToastContainer';
@@ -20,7 +22,7 @@ import { AiChatBot } from './components/chatbot/AiChatBot';
 
 
 const MainContent: React.FC = () => {
-  const { currentUser, isAdminActive, isPreviewMode } = useScholarship();
+  const { currentUser, isAdminActive, isPreviewMode, isMyApplicationsOpen } = useScholarship();
   const isStaffMode = Boolean(currentUser && isAdminActive);
 
   return (
@@ -39,6 +41,9 @@ const MainContent: React.FC = () => {
         ) : (
           /* หน้าเว็บไซต์สำหรับนักศึกษาและบุคคลทั่วไป (รวมถึงโหมด Preview ของเจ้าหน้าที่) */
           <>
+            {/* แถบสรุปสถานะใบสมัคร (แสดงเฉพาะนักศึกษาที่มีใบสมัคร) */}
+            <MyApplicationsBanner />
+
             {/* Section 0: Hero Section (หน้าหลัก) */}
             <HeroSection />
 
@@ -61,6 +66,7 @@ const MainContent: React.FC = () => {
       <ScholarshipDetailModal />
       <ApplicationWizardModal />
       <ApplicationSuccessModal />
+      <MyApplicationsModal />
       <LoginModal />
       <LogoutModal />
 
@@ -68,7 +74,12 @@ const MainContent: React.FC = () => {
       <ToastContainer />
 
       {/* AI Chatbot (ผู้ช่วยตอบคำถามแทนส่วน FAQ) */}
-      {(!isStaffMode || isPreviewMode) && <AiChatBot />}
+      {(!isStaffMode || isPreviewMode) && (
+        /* ซ่อนปุ่มแชตชั่วคราวขณะเปิดหน้าต่างใบสมัครของฉัน (ไม่ unmount เพื่อเก็บประวัติแชตไว้) */
+        <div style={isMyApplicationsOpen ? { display: 'none' } : undefined}>
+          <AiChatBot />
+        </div>
+      )}
 
       {/* Supabase Status Indicator & Setup Helper */}
 
