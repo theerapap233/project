@@ -12,7 +12,6 @@ export type ScholarshipStatus = 'open' | 'closing_soon' | 'closed';
 
 export interface Scholarship {
   id: string;
-  code: string;
   title: string;
   scope: 'internal' | 'external'; // 'internal' = ทุนภายใน, 'external' = ทุนภายนอก
   scopeName: string;

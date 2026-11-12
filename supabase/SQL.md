@@ -1,6 +1,7 @@
 -- ✅ SCHEMA HAS BEEN TUNED & ORDERED
 -- สคริปต์ที่จัดลำดับตาราง Foreign Keys, Indexes, RLS Policies และ Seed Data เรียบร้อยแล้ว
 -- สามารถนำไฟล์ `supabase/schema.sql` ไปกด Run ใน Supabase SQL Editor ได้ทันที 100%
+-- สำหรับฐานข้อมูลเดิม ให้รัน `supabase/remove_scholarship_codes.sql` หนึ่งครั้ง
 
 CREATE TABLE public.staff_roles (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -64,7 +65,6 @@ CREATE TABLE public.scholarship_programs (
   is_open boolean NOT NULL DEFAULT true,
   scholarship_type character varying DEFAULT 'internal',
   description text,
-  code character varying,
   badge_color character varying,
   academic_year character varying,
   term character varying,

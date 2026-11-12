@@ -80,7 +80,6 @@ const openScholarships = (kb: ChatbotKnowledge): Scholarship[] =>
 
 const findScholarship = (text: string, kb: ChatbotKnowledge): Scholarship | undefined =>
   kb.scholarships.find(scholarship => {
-    if (normalize(scholarship.code) && text.includes(normalize(scholarship.code))) return true;
     return similarity(text, normalize(scholarship.title)) >= 0.42;
   });
 

@@ -3,7 +3,6 @@ import { Scholarship } from '../types/scholarship';
 export const INITIAL_SCHOLARSHIPS: Scholarship[] = [
   {
     id: "sch-01",
-    code: "MATH-EXC-2567",
     title: "ทุนเรียนดีเด่นและสร้างชื่อเสียงทางคณิตศาสตร์",
     scope: "internal",
     scopeName: "ทุนภายใน (ภาควิชา/มจพ.)",
@@ -37,7 +36,6 @@ export const INITIAL_SCHOLARSHIPS: Scholarship[] = [
   },
   {
     id: "sch-02",
-    code: "MATH-AID-2567",
     title: "ทุนช่วยเหลือนักศึกษาขาดแคลนทุนทรัพย์",
     scope: "internal",
     scopeName: "ทุนภายใน (มจพ./มูลนิธิพัฒนามหาวิทยาลัย)",
@@ -73,7 +71,6 @@ export const INITIAL_SCHOLARSHIPS: Scholarship[] = [
   },
   {
     id: "sch-03",
-    code: "MATH-TA-2567",
     title: "ทุนผู้ช่วยสอนประจำรายวิชาพื้นฐาน (Teaching Assistant - TA)",
     scope: "internal",
     scopeName: "ทุนภายใน (คณะวิทยาศาสตร์ประยุกต์)",
@@ -106,7 +103,6 @@ export const INITIAL_SCHOLARSHIPS: Scholarship[] = [
   },
   {
     id: "sch-04",
-    code: "MATH-ALUMNI-2567",
     title: "ทุนศิษย์เก่าคณิตศาสตร์ มจพ. เพื่อการพัฒนาศักยภาพ",
     scope: "external",
     scopeName: "ทุนภายนอก (ชมรมศิษย์เก่า/ภาคเอกชน)",
@@ -139,7 +135,6 @@ export const INITIAL_SCHOLARSHIPS: Scholarship[] = [
   },
   {
     id: "sch-05",
-    code: "MATH-VOLUNTEER-2567",
     title: "ทุนจิตสาธารณะและส่งเสริมกิจกรรมนักศึกษา",
     scope: "internal",
     scopeName: "ทุนภายใน (กองทุนพัฒนานักศึกษาภาควิชา)",
@@ -173,7 +168,6 @@ export const INITIAL_SCHOLARSHIPS: Scholarship[] = [
   },
   {
     id: "sch-06",
-    code: "MATH-INNOV-2567",
     title: "ทุนส่งเสริมการแข่งขันและการวิจัยคณิตศาสตร์ระดับชาติ/นานาชาติ",
     scope: "external",
     scopeName: "ทุนภายนอก (องค์กรพันธมิตร/นวัตกรรม)",
@@ -205,7 +199,6 @@ export const INITIAL_SCHOLARSHIPS: Scholarship[] = [
   },
   {
     id: "sch-07",
-    code: "MATH-CORP-2567",
     title: "ทุนสนับสนุนการศึกษาจากมูลนิธิและองค์กรพันธมิตรภาคเอกชน",
     scope: "external",
     scopeName: "ทุนภายนอก (มูลนิธิ/องค์กรเอกชน)",

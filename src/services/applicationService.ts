@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { Application, ApplicationStatus, ApplicationFormData, UploadedFiles } from '../types/application';
 import { INITIAL_APPLICATIONS } from '../data/initialApplications';
+import { stripScholarshipCode } from '../utils/scholarshipName';
 
 interface DbProgramJoin {
   id: string;
@@ -62,7 +63,9 @@ const mapRowToApplication = (row: DbScholarshipApplicationRow): Application => {
   const year = student?.year ? `ปี ${student.year}` : ((formData.year as string) || 'ปี 1');
   const phone = student?.phone || (formData.phone as string) || '';
   const email = student?.email || (formData.email as string) || '';
-  const scholarshipName = program?.name || (formData.scholarshipName as string) || 'ทุนการศึกษา ภาควิชาคณิตศาสตร์';
+  const scholarshipName = stripScholarshipCode(
+    program?.name || (formData.scholarshipName as string) || 'ทุนการศึกษา ภาควิชาคณิตศาสตร์'
+  );
 
   const subStatus = formData.subStatus as string | undefined;
   const status = mapDbStatusToAppStatus(row.status, subStatus);

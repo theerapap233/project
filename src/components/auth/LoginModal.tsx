@@ -35,7 +35,6 @@ export const LoginModal: React.FC = () => {
   // Staff login state
   const [staffUsername, setStaffUsername] = useState('admin');
   const [staffPassword, setStaffPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(true);
 
   // Student login state
   const [studentIdentifier, setStudentIdentifier] = useState('6604062610099');
@@ -191,83 +190,39 @@ export const LoginModal: React.FC = () => {
   return (
     <div className="modal-backdrop open" onClick={closeLoginModal}>
       <div
-        className="modal-card"
+        className="modal-card login-modal-card"
         onClick={(e) => e.stopPropagation()}
         style={{
           maxWidth: studentMode === 'register' && activeTab === 'student' ? 540 : 460,
-          borderRadius: 20,
-          padding: 0,
-          overflow: 'hidden',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-          border: '1px solid var(--border-light)'
+          padding: 0
         }}
       >
-        {/* Header with Background Gradient */}
-        <div
-          style={{
-            background: activeTab === 'student'
-              ? 'linear-gradient(135deg, #077b38 0%, #033c1b 100%)'
-              : 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-            color: 'white',
-            padding: '24px 24px 20px',
-            position: 'relative'
-          }}
-        >
+        <div className="login-modal-header">
           <button
             type="button"
             className="modal-close-btn"
             onClick={closeLoginModal}
-            style={{
-              position: 'absolute',
-              right: 16,
-              top: 16,
-              color: 'rgba(255, 255, 255, 0.8)',
-              background: 'rgba(255, 255, 255, 0.15)',
-              border: 'none',
-              borderRadius: '50%',
-              width: 32,
-              height: 32,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              fontSize: '1.2rem',
-              lineHeight: 1
-            }}
+            aria-label="ปิดหน้าต่างเข้าสู่ระบบ"
           >
-            &times;
+            <span aria-hidden="true">&times;</span>
           </button>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: '14px',
-                background: 'rgba(255, 255, 255, 0.18)',
-                backdropFilter: 'blur(8px)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                border: '1px solid rgba(255, 255, 255, 0.25)',
-                boxShadow: '0 8px 16px rgba(0, 0, 0, 0.15)'
-              }}
-            >
+          <div className="login-modal-brand">
+            <div className="login-modal-icon" aria-hidden="true">
               {activeTab === 'student' ? (
-                <GraduationCap size={26} strokeWidth={2.2} />
+                <GraduationCap size={24} strokeWidth={2} />
               ) : (
-                <ShieldCheck size={26} strokeWidth={2.2} />
+                <ShieldCheck size={24} strokeWidth={2} />
               )}
             </div>
 
-            <div>
-              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#ffffff' }}>
+            <div className="login-modal-brand-copy">
+              <h3>
                 {activeTab === 'student'
                   ? (studentMode === 'register' ? 'ลงทะเบียนนักศึกษาใหม่' : 'เข้าสู่ระบบนักศึกษา')
                   : 'เข้าสู่ระบบสำหรับเจ้าหน้าที่'}
               </h3>
-              <p style={{ margin: '3px 0 0', fontSize: '0.8rem', color: 'rgba(255, 255, 255, 0.85)' }}>
+              <p>
                 {activeTab === 'student'
                   ? 'ระบบทุนการศึกษา ภาควิชาคณิตศาสตร์ มจพ.'
                   : 'สำหรับเจ้าหน้าที่และคณะกรรมการพิจารณาทุน'}
@@ -275,40 +230,16 @@ export const LoginModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Role Tabs */}
-          <div
-            style={{
-              display: 'flex',
-              gap: 6,
-              marginTop: 18,
-              background: 'rgba(0, 0, 0, 0.22)',
-              padding: 4,
-              borderRadius: 12
-            }}
-          >
+          <div className="login-role-tabs" role="tablist" aria-label="เลือกระบบเข้าสู่ระบบ">
             <button
               type="button"
+              role="tab"
+              aria-selected={activeTab === 'student'}
               onClick={() => {
                 setActiveTab('student');
                 setWarningMsg(null);
               }}
-              style={{
-                flex: 1,
-                padding: '8px 12px',
-                borderRadius: 9,
-                border: 'none',
-                background: activeTab === 'student' ? '#ffffff' : 'transparent',
-                color: activeTab === 'student' ? '#077b38' : 'rgba(255, 255, 255, 0.85)',
-                fontWeight: activeTab === 'student' ? 700 : 500,
-                fontSize: '0.86rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-                transition: 'all 0.2s ease',
-                boxShadow: activeTab === 'student' ? '0 2px 8px rgba(0,0,0,0.15)' : 'none'
-              }}
+              className={`login-role-tab${activeTab === 'student' ? ' active' : ''}`}
             >
               <GraduationCap size={16} />
               <span>นักศึกษา (Student)</span>
@@ -316,27 +247,13 @@ export const LoginModal: React.FC = () => {
 
             <button
               type="button"
+              role="tab"
+              aria-selected={activeTab === 'staff'}
               onClick={() => {
                 setActiveTab('staff');
                 setWarningMsg(null);
               }}
-              style={{
-                flex: 1,
-                padding: '8px 12px',
-                borderRadius: 9,
-                border: 'none',
-                background: activeTab === 'staff' ? '#ffffff' : 'transparent',
-                color: activeTab === 'staff' ? '#0f172a' : 'rgba(255, 255, 255, 0.85)',
-                fontWeight: activeTab === 'staff' ? 700 : 500,
-                fontSize: '0.86rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-                transition: 'all 0.2s ease',
-                boxShadow: activeTab === 'staff' ? '0 2px 8px rgba(0,0,0,0.15)' : 'none'
-              }}
+              className={`login-role-tab${activeTab === 'staff' ? ' active' : ''}`}
             >
               <ShieldCheck size={16} />
               <span>เจ้าหน้าที่ (Staff)</span>
@@ -345,7 +262,7 @@ export const LoginModal: React.FC = () => {
         </div>
 
         {/* Modal Body */}
-        <div style={{ padding: '22px 24px', maxHeight: '78vh', overflowY: 'auto' }}>
+        <div className="login-modal-body">
           {warningMsg && (
             <div
               style={{
@@ -546,7 +463,7 @@ export const LoginModal: React.FC = () => {
               {/* 1.2 STUDENT REGISTRATION FORM */}
               {studentMode === 'register' && (
                 <form onSubmit={handleStudentRegister} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div className="login-register-grid">
                     <div className="form-group">
                       <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--navy-800)', marginBottom: 4, display: 'block' }}>
                         รหัสนักศึกษา 13 หลัก <span style={{ color: 'red' }}>*</span>
@@ -577,7 +494,7 @@ export const LoginModal: React.FC = () => {
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div className="login-register-grid">
                     <div className="form-group">
                       <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--navy-800)', marginBottom: 4, display: 'block' }}>
                         เบอร์โทรศัพท์ <span style={{ color: 'red' }}>*</span>
@@ -607,7 +524,7 @@ export const LoginModal: React.FC = () => {
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div className="login-register-grid">
                     <div className="form-group">
                       <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--navy-800)', marginBottom: 4, display: 'block' }}>
                         ตั้งรหัสผ่าน (อย่างน้อย 6 ตัว) <span style={{ color: 'red' }}>*</span>
@@ -707,22 +624,13 @@ export const LoginModal: React.FC = () => {
           {/* TAB 2: STAFF / ADMIN */}
           {activeTab === 'staff' && (
             <form onSubmit={handleStaffSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div
-                style={{
-                  background: '#f8fafc',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: 10,
-                  padding: '10px 14px',
-                  fontSize: '0.82rem',
-                  color: 'var(--text-muted)'
-                }}
-              >
-                🔒 ส่วนนี้สำหรับเจ้าหน้าที่ธุรการและคณะกรรมการพิจารณาทุนการศึกษา ภาควิชาคณิตศาสตร์
+              <div className="login-staff-note">
+                สำหรับเจ้าหน้าที่และคณะกรรมการพิจารณาทุนการศึกษา ภาควิชาคณิตศาสตร์
               </div>
 
               <div className="form-group">
                 <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)', marginBottom: 6, display: 'block' }}>
-                  ชื่อผู้ใช้เจ้าหน้าที่ (Staff Username)
+                  ชื่อผู้ใช้เจ้าหน้าที่
                 </label>
                 <div style={{ position: 'relative' }}>
                   <User
@@ -753,7 +661,7 @@ export const LoginModal: React.FC = () => {
               <div className="form-group">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)', margin: 0 }}>
-                    รหัสผ่านเจ้าหน้าที่ (Password)
+                    รหัสผ่านเจ้าหน้าที่
                   </label>
                   <a
                     href="#forgot-password"
@@ -803,20 +711,6 @@ export const LoginModal: React.FC = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', color: 'var(--navy-700)', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                  />
-                  จดจำการเข้าสู่ระบบ
-                </label>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                  คีย์ลัด: Ctrl+Shift+A
-                </span>
-              </div>
-
               <button
                 type="submit"
                 className="btn btn-primary"
@@ -828,8 +722,8 @@ export const LoginModal: React.FC = () => {
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: 8,
-                  background: 'var(--navy-800)',
-                  borderColor: 'var(--navy-800)'
+                  background: 'var(--math-green)',
+                  borderColor: 'var(--math-green)'
                 }}
               >
                 <ShieldCheck size={18} />

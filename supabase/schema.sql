@@ -99,7 +99,6 @@ CREATE TABLE IF NOT EXISTS public.scholarship_programs (
   description TEXT,
   
   -- เพิ่มฟิลด์ให้เข้ากับ Website (Scholarship Model) โดยยังคงโครงสร้างเดิม
-  code CHARACTER VARYING,
   badge_color CHARACTER VARYING,
   academic_year CHARACTER VARYING,
   term CHARACTER VARYING,
@@ -354,7 +353,7 @@ ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
 INSERT INTO public.scholarship_programs (id, name, category_id, amount, quota, is_open, scholarship_type, description) VALUES
 (
   'b0000000-0000-0000-0000-000000000001',
-  'ทุนเรียนดีเด่นและสร้างชื่อเสียงทางคณิตศาสตร์ (MATH-EXC-2567)',
+  'ทุนเรียนดีเด่นและสร้างชื่อเสียงทางคณิตศาสตร์',
   'a0000000-0000-0000-0000-000000000001',
   35000,
   10,
@@ -364,7 +363,7 @@ INSERT INTO public.scholarship_programs (id, name, category_id, amount, quota, i
 ),
 (
   'b0000000-0000-0000-0000-000000000002',
-  'ทุนช่วยเหลือนักศึกษาขาดแคลนทุนทรัพย์ (MATH-AID-2567)',
+  'ทุนช่วยเหลือนักศึกษาขาดแคลนทุนทรัพย์',
   'a0000000-0000-0000-0000-000000000002',
   25000,
   25,
@@ -374,7 +373,7 @@ INSERT INTO public.scholarship_programs (id, name, category_id, amount, quota, i
 ),
 (
   'b0000000-0000-0000-0000-000000000003',
-  'ทุนผู้ช่วยสอนประจำรายวิชาพื้นฐาน Teaching Assistant - TA (MATH-TA-2567)',
+  'ทุนผู้ช่วยสอนประจำรายวิชาพื้นฐาน Teaching Assistant - TA',
   'a0000000-0000-0000-0000-000000000003',
   20000,
   15,
@@ -384,7 +383,7 @@ INSERT INTO public.scholarship_programs (id, name, category_id, amount, quota, i
 ),
 (
   'b0000000-0000-0000-0000-000000000004',
-  'ทุนศิษย์เก่าคณิตศาสตร์ มจพ. เพื่อการพัฒนาศักยภาพ (MATH-ALUMNI-2567)',
+  'ทุนศิษย์เก่าคณิตศาสตร์ มจพ. เพื่อการพัฒนาศักยภาพ',
   'a0000000-0000-0000-0000-000000000004',
   20000,
   12,
@@ -394,7 +393,7 @@ INSERT INTO public.scholarship_programs (id, name, category_id, amount, quota, i
 ),
 (
   'b0000000-0000-0000-0000-000000000005',
-  'ทุนจิตสาธารณะและส่งเสริมกิจกรรมนักศึกษา (MATH-VOLUNTEER-2567)',
+  'ทุนจิตสาธารณะและส่งเสริมกิจกรรมนักศึกษา',
   'a0000000-0000-0000-0000-000000000005',
   15000,
   8,
@@ -404,7 +403,7 @@ INSERT INTO public.scholarship_programs (id, name, category_id, amount, quota, i
 ),
 (
   'b0000000-0000-0000-0000-000000000006',
-  'ทุนส่งเสริมการแข่งขันและการวิจัยคณิตศาสตร์ระดับชาติ/นานาชาติ (MATH-INNOV-2567)',
+  'ทุนส่งเสริมการแข่งขันและการวิจัยคณิตศาสตร์ระดับชาติ/นานาชาติ',
   'a0000000-0000-0000-0000-000000000001',
   30000,
   6,

@@ -14,6 +14,7 @@ import { studentAuthService } from '../services/studentAuthService';
 import { StudentAccount, StudentLoginLogInput, StudentPersonalInfo, StudentRegistrationData } from '../types/studentAccount';
 import { calculateStudentYear, normalizeMajorName, normalizePersonalInfo } from '../utils/studentProfile';
 import { getCurrentAcademicYear } from '../utils/academicCalendar';
+import { stripScholarshipCode } from '../utils/scholarshipName';
 
 export type { StudentAccount, StudentPersonalInfo, StudentRegistrationData };
 
@@ -255,6 +256,7 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
         if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed.map((s: Partial<Scholarship>) => ({
             ...s,
+            title: stripScholarshipCode(s.title || ''),
             minGPAX: typeof s.minGPAX === 'number' ? s.minGPAX : 2.00,
             targetYears: Array.isArray(s.targetYears) && s.targetYears.length > 0 ? s.targetYears : ['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4'],
             deadline: s.deadline || '2026-10-31',
@@ -279,6 +281,7 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
             const initialMatch = INITIAL_APPLICATIONS.find(init => init.trackingId === app.trackingId);
             return {
               ...app,
+              scholarshipName: stripScholarshipCode(app.scholarshipName),
               systemRating: app.systemRating || app.formData?.systemRating || initialMatch?.systemRating || 0,
               systemComment: app.systemComment || app.formData?.systemComment || initialMatch?.systemComment || ''
             };
@@ -1492,7 +1495,6 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
   ) => {
     const newSch: Scholarship = {
       id: `sch-${Date.now()}`,
-      code: `MATH-NEW-${Math.floor(1000 + Math.random() * 9000)}`,
       title,
       scope: 'internal',
       scopeName: 'ทุนภายใน (ภาควิชา/มจพ.)',

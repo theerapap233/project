@@ -3212,6 +3212,163 @@ body:has(.modal-backdrop.open) {
   color: var(--navy-900);
 }
 
+.login-modal-card {
+  max-height: min(90vh, 760px);
+  border: 1px solid var(--border-light);
+  border-radius: 20px;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.18);
+}
+
+.login-modal-header {
+  position: relative;
+  padding: 24px 24px 18px;
+  background: var(--surface-white);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.login-modal-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-right: 36px;
+}
+
+.login-modal-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  flex: 0 0 52px;
+  color: var(--math-green);
+  background: var(--math-green-soft);
+  border: 1px solid var(--math-green-border);
+  border-radius: 14px;
+}
+
+.login-modal-brand-copy h3 {
+  margin: 0;
+  color: var(--navy-900);
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.login-modal-brand-copy p {
+  margin: 3px 0 0;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.login-modal-header > .modal-close-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+}
+
+.login-role-tabs {
+  display: flex;
+  gap: 4px;
+  margin-top: 18px;
+  padding: 4px;
+  background: var(--surface-ground);
+  border: 1px solid var(--border-light);
+  border-radius: 11px;
+}
+
+.login-role-tab {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 9px 10px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  font-size: 0.86rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.login-role-tab:hover {
+  color: var(--math-green);
+}
+
+.login-role-tab.active {
+  color: var(--math-green-dark);
+  background: var(--surface-white);
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
+}
+
+.login-modal-body {
+  min-height: 0;
+  flex: 1 1 auto;
+  padding: 22px 24px;
+  overflow-y: auto;
+}
+
+.login-staff-note {
+  padding: 2px 0 2px 10px;
+  color: var(--text-muted);
+  border-left: 2px solid var(--math-green-border);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.login-register-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+@media (max-width: 520px) {
+  .login-modal-card {
+    max-height: calc(100vh - 40px);
+    border-radius: 16px;
+  }
+
+  .login-modal-header {
+    padding: 20px 16px 14px;
+  }
+
+  .login-modal-brand {
+    gap: 11px;
+  }
+
+  .login-modal-icon {
+    width: 46px;
+    height: 46px;
+    flex-basis: 46px;
+  }
+
+  .login-modal-brand-copy h3 {
+    font-size: 1.05rem;
+  }
+
+  .login-modal-brand-copy p {
+    font-size: 0.75rem;
+  }
+
+  .login-role-tab {
+    gap: 5px;
+    padding: 9px 5px;
+    font-size: 0.78rem;
+  }
+
+  .login-modal-body {
+    padding: 18px 16px;
+  }
+
+  .login-register-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .modal-body {
   padding: 28px;
   overflow-y: auto;
@@ -4682,6 +4839,141 @@ fieldset:disabled .form-input-light {
 }
 
 /* Print Styles for Application Slip & Admin Reports */
+.printable-report-area {
+  box-sizing: border-box;
+  width: 210mm;
+  max-width: calc(100vw - 40px);
+  min-height: 297mm;
+  margin: 0 auto;
+  padding: 10mm;
+  color: #0f172a;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 2px;
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.18);
+  font-family: 'Sarabun', 'Noto Sans Thai', system-ui, -apple-system, sans-serif;
+}
+
+.application-report-stack {
+  display: flex;
+  width: 100%;
+  max-width: none;
+  min-height: 0;
+  flex-direction: column;
+  gap: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.application-report-stack .application-print-page {
+  box-sizing: border-box;
+  width: 210mm;
+  max-width: calc(100vw - 40px);
+  min-height: 297mm;
+  margin: 0 auto;
+  padding: 10mm;
+  border: 1px solid #e2e8f0;
+  border-radius: 2px;
+  background: #ffffff;
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.18);
+}
+
+.application-report-stack > div {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.list-report-page {
+  display: flex;
+  min-height: 277mm;
+  flex-direction: column;
+  color: #111827;
+  font-size: 0.78rem;
+}
+
+.list-report-header {
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #334155;
+  text-align: center;
+}
+
+.list-report-header h1 {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.list-report-header > div {
+  margin-top: 2px;
+  color: #475569;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.list-report-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin-bottom: 12px;
+  padding: 6px 9px;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+
+.list-report-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: #111827;
+  font-size: 0.74rem;
+}
+
+.list-report-table th,
+.list-report-table td {
+  border: 1px solid #64748b;
+  padding: 5px 7px;
+  background: transparent;
+  line-height: 1.45;
+}
+
+.list-report-table th {
+  font-weight: 700;
+}
+
+.list-report-table .list-report-empty {
+  padding: 14px 8px;
+  color: #475569;
+  text-align: center;
+}
+
+.list-report-signatures {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-top: auto;
+  padding-top: 24px;
+  text-align: center;
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+
+.list-report-signature-line {
+  margin-bottom: 24px;
+}
+
+.list-report-signature-detail {
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 0.68rem;
+}
+
 @media print {
   body * {
     visibility: hidden;
@@ -4696,12 +4988,61 @@ fieldset:disabled .form-input-light {
     top: 0;
     width: 100% !important;
     max-width: 100% !important;
+    min-height: 0 !important;
+    box-sizing: border-box !important;
     margin: 0 !important;
     padding: 0 !important;
     background: #ffffff !important;
     color: #000000 !important;
     box-shadow: none !important;
     border: none !important;
+  }
+  .application-report-stack {
+    display: block;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    gap: 0 !important;
+  }
+  .application-report-stack > div {
+    display: block;
+    gap: 0 !important;
+  }
+  .application-report-stack .application-print-page {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+  }
+  .list-report-page {
+    min-height: 277mm;
+  }
+  .list-report-table th,
+  .list-report-table td {
+    background: transparent !important;
+  }
+  .printable-report-area table {
+    page-break-inside: auto;
+    break-inside: auto;
+  }
+  .printable-report-area thead {
+    display: table-header-group;
+  }
+  .printable-report-area tr,
+  .printable-report-area img {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .application-print-page {
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
   .no-print,
   .site-header,
@@ -4714,12 +5055,14 @@ fieldset:disabled .form-input-light {
     display: none !important;
   }
   @page {
-    size: A4;
-    margin: 12mm 15mm;
+    size: A4 portrait;
+    margin: 10mm;
   }
   .page-break {
-    page-break-after: always;
-    break-after: page;
+    page-break-before: always;
+    break-before: page;
+    page-break-after: auto;
+    break-after: auto;
   }
 }
 
@@ -5705,6 +6048,50 @@ body:has(.modal-backdrop.open) .preview-mode-dock {
   border-color: #2563eb !important;
   background: #2563eb !important;
   color: #fff !important;
+}
+
+.admin-dashboard .admin-applications-minimal .application-status-filters-minimal .application-print-button {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 6px 14px !important;
+  border: 1px solid var(--border-light, #e2e8f0) !important;
+  border-radius: 20px !important;
+  background: var(--surface-card, #fff) !important;
+  color: var(--text-muted, #64748b) !important;
+  box-shadow: none !important;
+  font-size: 0.82rem;
+  font-weight: 600 !important;
+  white-space: nowrap;
+}
+
+.admin-dashboard .admin-applications-minimal .application-status-filters-minimal .application-print-button:hover:not(:disabled) {
+  border-color: var(--border-light, #e2e8f0) !important;
+  background: var(--surface-alt, #f8fafc) !important;
+  color: var(--text-muted, #64748b) !important;
+}
+
+.admin-dashboard .admin-applications-minimal .application-status-filters-minimal .application-print-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.admin-dashboard .admin-applications-minimal .application-status-filters-minimal .application-print-count {
+  display: inline-flex;
+  min-width: 26px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 7px;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
 .admin-dashboard .admin-applications-minimal .application-status-filters-minimal .application-status-option .application-status-count {

@@ -37,6 +37,14 @@ import { PROVINCES } from '../../data/provinces';
 import { compressImage } from '../../utils/imageUtils';
 
 type AdminTab = 'applications' | 'scholarships' | 'news' | 'faq' | 'downloads' | 'ratings';
+type PrintListField = 'fullName' | 'studentId' | 'year' | 'scholarshipName';
+
+const PRINT_LIST_FIELDS: { key: PrintListField; label: string; heading: string }[] = [
+  { key: 'fullName', label: 'ชื่อ-นามสกุล', heading: 'ชื่อ-นามสกุล' },
+  { key: 'studentId', label: 'รหัสนักศึกษา', heading: 'รหัสนักศึกษา' },
+  { key: 'year', label: 'ชั้นปี', heading: 'ชั้นปี' },
+  { key: 'scholarshipName', label: 'ทุนที่สมัคร', heading: 'ทุนการศึกษาที่สมัคร' }
+];
 
 const SCHOLARSHIP_YEAR_PRESETS = [
   { value: 'all', label: 'ทุกชั้นปี', years: ['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4', 'บัณฑิตศึกษา'] },
@@ -96,6 +104,9 @@ export const AdminSection: React.FC = () => {
     isOpen: false,
     type: 'list'
   });
+  const [printListFields, setPrintListFields] = useState<PrintListField[]>(
+    PRINT_LIST_FIELDS.filter(field => field.key !== 'scholarshipName').map(field => field.key)
+  );
 
   const getFullAddressText = (addr?: { houseNo?: string; moo?: string; soi?: string; road?: string; subDistrict?: string; district?: string; province?: string; zipCode?: string }) => {
     if (!addr) return '-';
@@ -160,12 +171,10 @@ export const AdminSection: React.FC = () => {
   // Helper to find matching scholarship info
   const getAppScholarshipInfo = (app: Application) => {
     return scholarships.find(s => 
-      s.id === app.scholarshipId || 
-      (s.code && s.code === app.scholarshipId) || 
-      s.title === app.scholarshipName || 
+      s.id === app.scholarshipId ||
+      s.title === app.scholarshipName ||
       app.scholarshipName.includes(s.title) ||
-      s.title.includes(app.scholarshipName) ||
-      (s.code && app.scholarshipName.includes(s.code))
+      s.title.includes(app.scholarshipName)
     );
   };
 
@@ -179,9 +188,9 @@ export const AdminSection: React.FC = () => {
       return sch ? sch.scope === 'external' : app.scholarshipName.includes('ศิษย์เก่า');
     }
 
-    // Direct match by scholarship ID, code, or title
+    // Direct match by scholarship ID or title
     if (sch) {
-      if (sch.id === typeVal || sch.code === typeVal || sch.title === typeVal) return true;
+      if (sch.id === typeVal || sch.title === typeVal) return true;
     }
     if (app.scholarshipId === typeVal || app.scholarshipName === typeVal || app.scholarshipName.includes(typeVal)) {
       return true;
@@ -189,19 +198,19 @@ export const AdminSection: React.FC = () => {
 
     // Fallbacks for categories
     if (typeVal === 'academic') {
-      return (sch?.category === 'academic') || app.scholarshipName.includes('เรียนดี') || app.scholarshipName.includes('MATH-EXC');
+      return (sch?.category === 'academic') || app.scholarshipName.includes('เรียนดี') || app.scholarshipName.includes('วิจัย') || app.scholarshipName.includes('การแข่งขัน');
     }
     if (typeVal === 'need') {
-      return (sch?.category === 'need') || app.scholarshipName.includes('ขาดแคลน') || app.scholarshipName.includes('MATH-AID');
+      return (sch?.category === 'need') || app.scholarshipName.includes('ขาดแคลน') || app.scholarshipName.includes('ช่วยเหลือ') || app.scholarshipName.includes('มูลนิธิ');
     }
     if (typeVal === 'work') {
-      return (sch?.category === 'work') || app.scholarshipName.includes('ผู้ช่วยสอน') || app.scholarshipName.includes('TA') || app.scholarshipName.includes('MATH-TA');
+      return (sch?.category === 'work') || app.scholarshipName.includes('ผู้ช่วยสอน') || app.scholarshipName.includes('Teaching Assistant');
     }
     if (typeVal === 'alumni') {
-      return (sch?.category === 'alumni') || app.scholarshipName.includes('ศิษย์เก่า') || app.scholarshipName.includes('MATH-ALUMNI');
+      return (sch?.category === 'alumni') || app.scholarshipName.includes('ศิษย์เก่า');
     }
     if (typeVal === 'activity') {
-      return (sch?.category === 'activity') || app.scholarshipName.includes('จิตสาธารณะ') || app.scholarshipName.includes('MATH-VOLUNTEER');
+      return (sch?.category === 'activity') || app.scholarshipName.includes('จิตสาธารณะ') || app.scholarshipName.includes('กิจกรรม');
     }
 
     return false;
@@ -211,7 +220,7 @@ export const AdminSection: React.FC = () => {
     if (typeVal === 'all') return 'ทุนการศึกษาทั้งหมด';
     if (typeVal === 'internal') return 'ทุนภายใน';
     if (typeVal === 'external') return 'ทุนภายนอก';
-    const sch = scholarships.find(s => s.id === typeVal || s.code === typeVal || s.title === typeVal);
+    const sch = scholarships.find(s => s.id === typeVal || s.title === typeVal);
     if (sch) return sch.title;
     return typeVal;
   };
@@ -1618,54 +1627,84 @@ export const AdminSection: React.FC = () => {
 
               {/* ปุ่มสลับมุมมอง: การ์ด / ตาราง */}
               <div
-                role="group"
-                aria-label="เลือกมุมมองรายการใบสมัคร"
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  padding: 3,
-                  gap: 2,
-                  borderRadius: 10,
-                  border: '1px solid var(--border-light, #e2e8f0)',
-                  background: 'var(--surface-card, #ffffff)',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                  gap: 8,
+                  flexWrap: 'wrap',
+                  justifyContent: 'flex-end'
                 }}
               >
-                {([
-                  { mode: 'grid', label: 'มุมมองการ์ด', Icon: LayoutGrid },
-                  { mode: 'list', label: 'มุมมองตาราง', Icon: List }
-                ] as const).map(({ mode, label, Icon }) => {
-                  const active = appViewMode === mode;
-                  return (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => changeAppViewMode(mode)}
-                      aria-pressed={active}
-                      title={label}
-                      aria-label={label}
-                      style={{
-                        width: 34,
-                        height: 30,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderRadius: 7,
-                        border: 'none',
-                        cursor: 'pointer',
-                        background: active ? 'var(--math-green, #077b38)' : 'transparent',
-                        color: active ? '#ffffff' : 'var(--text-muted, #64748b)',
-                        transition: 'all 0.15s ease'
-                      }}
-                    >
-                      <Icon size={17} strokeWidth={2} />
-                    </button>
-                  );
-                })}
+                <button
+                  type="button"
+                  onClick={handlePrintList}
+                  disabled={printListApps.length === 0}
+                  className="application-print-button"
+                >
+                  <Printer size={15} />
+                  <span>พิมพ์รายชื่อ</span>
+                  <span className="application-print-count">{printListApps.length}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePrintApplications()}
+                  disabled={printListApps.length === 0}
+                  className="application-print-button"
+                >
+                  <FileText size={15} />
+                  <span>พิมพ์ใบสมัคร</span>
+                  <span className="application-print-count">{printListApps.length}</span>
+                </button>
+                <div
+                  role="group"
+                  aria-label="เลือกมุมมองรายการใบสมัคร"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: 3,
+                    gap: 2,
+                    borderRadius: 10,
+                    border: '1px solid var(--border-light, #e2e8f0)',
+                    background: 'var(--surface-card, #ffffff)',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                  }}
+                >
+                  {([
+                    { mode: 'grid', label: 'มุมมองการ์ด', Icon: LayoutGrid },
+                    { mode: 'list', label: 'มุมมองตาราง', Icon: List }
+                  ] as const).map(({ mode, label, Icon }) => {
+                    const active = appViewMode === mode;
+                    return (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => changeAppViewMode(mode)}
+                        aria-pressed={active}
+                        title={label}
+                        aria-label={label}
+                        style={{
+                          width: 34,
+                          height: 30,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: 7,
+                          border: 'none',
+                          cursor: 'pointer',
+                          background: active ? 'var(--math-green, #077b38)' : 'transparent',
+                          color: active ? '#ffffff' : 'var(--text-muted, #64748b)',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <Icon size={17} strokeWidth={2} />
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
-            {/* Helper Tip & Multi-Select Action Bar */}
+            {/* Multi-Select Action Bar */}
             {selectedAppIds.size > 0 ? (
               <div className="application-selection-toolbar-minimal" style={{
                 display: 'flex',
@@ -1742,50 +1781,6 @@ export const AdminSection: React.FC = () => {
 
                   <button
                     type="button"
-                    onClick={handlePrintList}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      padding: '6px 14px',
-                      borderRadius: '7px',
-                      background: '#ffffff',
-                      color: 'var(--math-green)',
-                      border: 'none',
-                      fontWeight: 700,
-                      fontSize: '0.84rem',
-                      cursor: 'pointer',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                    }}
-                  >
-                    <Printer size={15} />
-                    <span>พิมพ์รายชื่อ ({selectedAppIds.size})</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handlePrintApplications('selected')}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      padding: '6px 14px',
-                      borderRadius: '7px',
-                      background: '#ffffff',
-                      color: 'var(--math-green)',
-                      border: 'none',
-                      fontWeight: 700,
-                      fontSize: '0.84rem',
-                      cursor: 'pointer',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                    }}
-                  >
-                    <FileText size={15} />
-                    <span>พิมพ์ใบสมัคร ({selectedAppIds.size})</span>
-                  </button>
-
-                  <button
-                    type="button"
                     onClick={handleToggleSelectAll}
                     style={{
                       padding: '6px 12px',
@@ -1824,11 +1819,7 @@ export const AdminSection: React.FC = () => {
                   </button>
                 </div>
               </div>
-            ) : (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, padding: '0 4px', fontSize: '0.78rem', color: '#64748b' }}>
-                <span>💡 กดชื่อนักศึกษาเพื่อดูประวัติการสมัครทุน · ติ๊กกล่องเลือกหลายคน เพื่อกดผ่าน / ไม่ผ่านพร้อมกัน หรือสั่งพิมพ์</span>
-              </div>
-            )}
+            ) : null}
 
             {/* Applications: มุมมองการ์ด */}
             {appViewMode === 'grid' ? (
@@ -4664,41 +4655,56 @@ export const AdminSection: React.FC = () => {
               borderRadius: '12px',
               padding: '12px 20px',
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
+              flexDirection: 'column',
+              alignItems: 'stretch',
+              gap: 10,
               boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
               border: '1px solid #e2e8f0',
               position: 'sticky',
               top: 10,
               zIndex: 20
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                 <span style={{ fontWeight: 700, fontSize: '0.98rem', color: 'var(--navy-900)' }}>
                   {printModalState.type === 'list' ? '🖨️ รายงานสรุปรายชื่อผู้สมัคร (1. รายชื่อ)' : '📄 แบบฟอร์มใบสมัครขอรับทุน (2. ใบสมัคร)'}
                 </span>
 
-                {printModalState.type === 'application' && (
-                  <select
-                    value={printModalState.targetAppId}
-                    onChange={(e) => setPrintModalState({ ...printModalState, targetAppId: e.target.value })}
-                    style={{ fontSize: '0.84rem', padding: '5px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#f8fafc', color: 'var(--navy-900)', fontWeight: 500 }}
-                  >
-                    {selectedAppIds.size > 0 && (
-                      <option value="selected">
-                        พิมพ์เฉพาะรายชื่อที่เลือกไว้ ({selectedAppIds.size} คน)
-                      </option>
-                    )}
-                    <option value="all">พิมพ์ใบสมัครทุกคนในรายการที่กรอง ({filteredApps.length} คน)</option>
-                    {filteredApps.map(a => (
-                      <option key={a.trackingId} value={a.trackingId}>
-                        {a.fullName} ({a.studentId}) - {a.scholarshipName}
-                      </option>
-                    ))}
-                  </select>
-                )}
               </div>
 
-              <div style={{ display: 'flex', gap: 10 }}>
+              {printModalState.type === 'list' && (
+                <fieldset className="no-print" style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px 16px',
+                  flexWrap: 'wrap',
+                  margin: '12px 0 0',
+                  padding: '10px 0 0',
+                  border: 0,
+                  borderTop: '1px solid #e2e8f0'
+                }}>
+                  <legend style={{ padding: 0, marginBottom: 8, fontSize: '0.82rem', fontWeight: 700, color: 'var(--navy-800)' }}>
+                    เลือกข้อมูลในรายชื่อที่ต้องการพิมพ์
+                  </legend>
+                  {PRINT_LIST_FIELDS.map(field => (
+                    <label key={field.key} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', color: 'var(--navy-700)', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={printListFields.includes(field.key)}
+                        disabled={printListFields.length === 1 && printListFields.includes(field.key)}
+                        onChange={(event) => {
+                          setPrintListFields(current => event.target.checked
+                            ? [...current, field.key]
+                            : current.filter(value => value !== field.key)
+                          );
+                        }}
+                      />
+                      {field.label}
+                    </label>
+                  ))}
+                </fieldset>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
                 <button
                   type="button"
                   onClick={() => window.print()}
@@ -4714,7 +4720,7 @@ export const AdminSection: React.FC = () => {
                   }}
                 >
                   <Printer size={16} />
-                  <span>สั่งพิมพ์ (Print)</span>
+                  <span>พิมพ์ / บันทึก PDF</span>
                 </button>
                 <button
                   type="button"
@@ -4728,37 +4734,20 @@ export const AdminSection: React.FC = () => {
             </div>
 
             {/* Document Paper Container */}
-            <div className="printable-report-area" style={{
-              background: '#ffffff',
-              borderRadius: '8px',
-              padding: '48px 52px',
-              color: '#0f172a',
-              boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
-              fontFamily: '"Sarabun", "Noto Sans Thai", system-ui, -apple-system, sans-serif'
-            }}>
+            <div className={`printable-report-area${printModalState.type === 'application' ? ' application-report-stack' : ''}`}>
               {/* ========================================== */}
               {/* REPORT 1: รายชื่อผู้สมัคร (NAME LIST REPORT) */}
               {/* ========================================== */}
               {printModalState.type === 'list' && (
-                <div>
+                <div className="list-report-page">
                   {/* Formal Header */}
-                  <div style={{ textAlign: 'center', borderBottom: '2px solid #0f172a', paddingBottom: 16, marginBottom: 20 }}>
-                    <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#0f172a' }}>
-                      ภาควิชาคณิตศาสตร์ คณะวิทยาศาสตร์ประยุกต์
-                    </h2>
-                    <h3 style={{ margin: '4px 0 0', fontSize: '1.05rem', fontWeight: 600, color: '#334155' }}>
-                      มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ
-                    </h3>
-                    <h1 style={{ margin: '14px 0 6px', fontSize: '1.35rem', fontWeight: 800, color: 'var(--math-green, #077b38)' }}>
-                      รายงานสรุปรายชื่อผู้สมัครขอรับทุนการศึกษา
-                    </h1>
-                    <div style={{ fontSize: '0.9rem', color: '#475569' }}>
-                      ประจำปีการศึกษา {siteSettings.academicYear || '2567'} ภาคการศึกษาที่ {siteSettings.semester || '1'}
-                    </div>
+                  <div className="list-report-header">
+                    <h1>รายงานรายชื่อผู้สมัครทุนการศึกษา</h1>
+                    <div>ประจำปีการศึกษา 2568 ภาคการศึกษาที่ 1</div>
                   </div>
 
-                  {/* Summary Box */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, fontSize: '0.86rem', color: '#334155', background: '#f8fafc', padding: '10px 16px', borderRadius: 6, border: '1px solid #e2e8f0' }}>
+                  {/* Summary */}
+                  <div className="list-report-summary">
                     <div>
                       <strong>เงื่อนไข:</strong> {selectedAppIds.size > 0 ? `เลือกเฉพาะรายชื่อ (${printListApps.length} คน)` : `${filterScope !== 'all' ? `ประเภท: ${filterScope === 'internal' ? 'ทุนภายใน' : 'ทุนภายนอก'} | ` : ''}${filterType !== 'all' ? `ทุนการศึกษา: ${getFilterTypeLabel(filterType)}` : 'ทุนการศึกษาทั้งหมด'}`} | {filterStatus !== 'all' ? `สถานะ: ${filterStatus}` : 'ทุกสถานะ'}
                     </div>
@@ -4768,58 +4757,67 @@ export const AdminSection: React.FC = () => {
                   </div>
 
                   {/* Table */}
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.86rem', color: '#0f172a' }}>
+                  <table className="list-report-table">
                     <thead>
-                      <tr style={{ background: '#f1f5f9' }}>
-                        <th style={{ border: '1px solid #94a3b8', padding: '8px 6px', textAlign: 'center', width: 40 }}>ลำดับ</th>
-                        <th style={{ border: '1px solid #94a3b8', padding: '8px 10px', textAlign: 'center', width: 110 }}>รหัสนักศึกษา</th>
-                        <th style={{ border: '1px solid #94a3b8', padding: '8px 10px', textAlign: 'left' }}>ชื่อ - นามสกุล</th>
-                        <th style={{ border: '1px solid #94a3b8', padding: '8px 8px', textAlign: 'center', width: 90 }}>สาขา/ชั้นปี</th>
-                        <th style={{ border: '1px solid #94a3b8', padding: '8px 10px', textAlign: 'left' }}>ทุนการศึกษาที่สมัคร</th>
-                        <th style={{ border: '1px solid #94a3b8', padding: '8px 6px', textAlign: 'center', width: 55 }}>GPAX</th>
-                        <th style={{ border: '1px solid #94a3b8', padding: '8px 8px', textAlign: 'center', width: 85 }}>วันที่ยื่น</th>
-                        <th style={{ border: '1px solid #94a3b8', padding: '8px 8px', textAlign: 'center', width: 95 }}>สถานะ</th>
+                      <tr>
+                        <th style={{ textAlign: 'center', width: 40 }}>ลำดับ</th>
+                        {PRINT_LIST_FIELDS.filter(field => printListFields.includes(field.key)).map(field => (
+                          <th key={field.key} style={{ textAlign: field.key === 'scholarshipName' ? 'left' : 'center' }}>
+                            {field.heading}
+                          </th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody>
                       {printListApps.length === 0 ? (
                         <tr>
-                          <td colSpan={8} style={{ border: '1px solid #cbd5e1', padding: 24, textAlign: 'center', color: '#64748b' }}>
+                          <td colSpan={printListFields.length + 1} className="list-report-empty">
                             ไม่พบข้อมูลผู้สมัครตามเงื่อนไขที่ระบุ
                           </td>
                         </tr>
                       ) : (
-                        printListApps.map((app, idx) => (
-                          <tr key={app.trackingId}>
-                            <td style={{ border: '1px solid #cbd5e1', padding: '7px 6px', textAlign: 'center' }}>{idx + 1}</td>
-                            <td style={{ border: '1px solid #cbd5e1', padding: '7px 10px', textAlign: 'center', fontFamily: 'monospace', fontWeight: 600 }}>{app.studentId}</td>
-                            <td style={{ border: '1px solid #cbd5e1', padding: '7px 10px', fontWeight: 600 }}>{app.fullName}</td>
-                            <td style={{ border: '1px solid #cbd5e1', padding: '7px 8px', textAlign: 'center' }}>{app.major} {app.year}</td>
-                            <td style={{ border: '1px solid #cbd5e1', padding: '7px 10px' }}>{app.scholarshipName}</td>
-                            <td style={{ border: '1px solid #cbd5e1', padding: '7px 6px', textAlign: 'center', fontWeight: 700 }}>{app.gpax.toFixed(2)}</td>
-                            <td style={{ border: '1px solid #cbd5e1', padding: '7px 8px', textAlign: 'center', fontSize: '0.8rem' }}>{formatThaiDate(app.submissionDate)}</td>
-                            <td style={{ border: '1px solid #cbd5e1', padding: '7px 8px', textAlign: 'center', fontSize: '0.8rem' }}>
-                              {app.status === 'submitted' ? 'รอตรวจสอบ' : app.status === 'approved' ? 'อนุมัติทุนแล้ว' : app.status === 'rejected' ? 'ไม่ผ่านการคัดเลือก' : app.status}
-                            </td>
-                          </tr>
-                        ))
+                        printListApps.map((app, idx) => {
+                          const formFullName = [app.formData?.firstName?.trim(), app.formData?.lastName?.trim()]
+                            .filter(Boolean)
+                            .join(' ');
+                          const values: Record<PrintListField, string> = {
+                            fullName: formFullName || app.fullName || '-',
+                            studentId: app.studentId || '-',
+                            year: app.year || '-',
+                            scholarshipName: app.scholarshipName || '-'
+                          };
+                          return (
+                            <tr key={app.trackingId}>
+                              <td style={{ textAlign: 'center' }}>{idx + 1}</td>
+                              {PRINT_LIST_FIELDS.filter(field => printListFields.includes(field.key)).map(field => (
+                                <td key={field.key} style={{
+                                  textAlign: field.key === 'scholarshipName' ? 'left' : 'center',
+                                  fontFamily: field.key === 'studentId' ? 'monospace' : undefined,
+                                  fontWeight: field.key === 'studentId' ? 600 : undefined
+                                }}>
+                                  {values[field.key]}
+                                </td>
+                              ))}
+                            </tr>
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
 
                   {/* Sign-off Blocks */}
-                  <div style={{ marginTop: 44, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, textAlign: 'center', fontSize: '0.9rem' }}>
+                  <div className="list-report-signatures">
                     <div>
-                      <div style={{ marginBottom: 44 }}>ลงชื่อ ................................................................ ผู้จัดทำรายงาน</div>
-                      <div>( ................................................................ )</div>
-                      <div style={{ color: '#64748b', fontSize: '0.84rem', marginTop: 4 }}>เจ้าหน้าที่ฝ่ายทุนการศึกษา ภาควิชาคณิตศาสตร์</div>
-                      <div style={{ color: '#64748b', fontSize: '0.84rem', marginTop: 2 }}>วันที่ ......... / ......... / ...............</div>
+                      <div className="list-report-signature-line">ลงชื่อ ........................................................ ผู้จัดทำรายงาน</div>
+                      <div>( ........................................................ )</div>
+                      <div className="list-report-signature-detail">เจ้าหน้าที่ฝ่ายทุนการศึกษา ภาควิชาคณิตศาสตร์</div>
+                      <div className="list-report-signature-detail">วันที่ ......... / ......... / ...............</div>
                     </div>
                     <div>
-                      <div style={{ marginBottom: 44 }}>ลงชื่อ ................................................................ ผู้รับรองรายงาน</div>
-                      <div>( ................................................................ )</div>
-                      <div style={{ color: '#64748b', fontSize: '0.84rem', marginTop: 4 }}>หัวหน้าภาควิชาคณิตศาสตร์</div>
-                      <div style={{ color: '#64748b', fontSize: '0.84rem', marginTop: 2 }}>วันที่ ......... / ......... / ...............</div>
+                      <div className="list-report-signature-line">ลงชื่อ ........................................................ ผู้รับรองรายงาน</div>
+                      <div>( ........................................................ )</div>
+                      <div className="list-report-signature-detail">หัวหน้าภาควิชาคณิตศาสตร์</div>
+                      <div className="list-report-signature-detail">วันที่ ......... / ......... / ...............</div>
                     </div>
                   </div>
                 </div>
@@ -4843,15 +4841,15 @@ export const AdminSection: React.FC = () => {
                     return (
                       <div 
                         key={app.trackingId} 
-                        className={appIdx > 0 ? 'page-break' : ''} 
+                        className={`application-print-page${appIdx > 0 ? ' page-break' : ''}`}
                         style={{ 
                           fontFamily: "'Sarabun', 'TH Sarabun New', sans-serif",
                           color: '#000000',
                           background: '#ffffff',
                           lineHeight: 1.5,
                           fontSize: '9pt',
-                          paddingTop: appIdx > 0 ? 20 : 0,
-                          marginBottom: appIdx > 0 ? 30 : 0
+                          paddingTop: 0,
+                          marginBottom: 0
                         }}
                       >
                         {/* ======================================================== */}
@@ -5058,6 +5056,22 @@ export const AdminSection: React.FC = () => {
                                   {app.familyIncome ? `${Number(app.familyIncome).toLocaleString()} บาท/เดือน` : '-'}
                                 </span>
                               </div>
+
+                              <div>
+                                <strong>ผู้สนับสนุนค่าใช้จ่าย:</strong>{' '}
+                                {fd.sponsor?.length
+                                  ? [...fd.sponsor.map(person => person === 'father' ? 'บิดา' : person === 'mother' ? 'มารดา' : person), fd.sponsorOther].filter(Boolean).join(', ')
+                                  : '-'}
+                                {' '}<strong>ยอดกู้ยืมเพื่อการศึกษา:</strong>{' '}
+                                {fd.loanAmount ? `${Number(fd.loanAmount).toLocaleString()} บาท` : '-'}
+                              </div>
+
+                              <div>
+                                <strong>การทำงานระหว่างเรียน:</strong>{' '}
+                                {fd.hasPartTimeJob
+                                  ? `${fd.partTimeJobLocation || 'มีงานพิเศษ'}${fd.partTimeJobIncome ? ` รายได้ ${Number(fd.partTimeJobIncome).toLocaleString()} บาท/เดือน` : ''}`
+                                  : 'ไม่มี'}
+                              </div>
                             </div>
                           </div>
 
@@ -5074,7 +5088,15 @@ export const AdminSection: React.FC = () => {
                             <div style={{ paddingLeft: '8px', fontSize: '9.2pt', lineHeight: 1.75 }}>
                               <div>
                                 <strong>กิจกรรมที่เคยปฏิบัติ / กิจกรรมจิตอาสา:</strong>{' '}
-                                <span>{fd.activities || 'ไม่มีกิจกรรมระบุ'}</span>
+                                {fd.activityList?.length
+                                  ? fd.activityList.map((activity, index) => (
+                                      <span key={`${activity.name}-${index}`}>
+                                        {index > 0 ? ' • ' : ''}
+                                        {activity.name || 'ไม่ระบุชื่อกิจกรรม'}
+                                        {activity.role ? ` (${activity.role})` : ''}
+                                      </span>
+                                    ))
+                                  : <span>{fd.activities || 'ไม่มีกิจกรรมระบุ'}{fd.activityRole ? ` (${fd.activityRole})` : ''}</span>}
                                 {fd.volunteerHours > 0 && (
                                   <span style={{ marginLeft: 10 }}>
                                     (จำนวนชั่วโมงจิตอาสา: <strong>{fd.volunteerHours}</strong> ชั่วโมง)
@@ -5110,19 +5132,11 @@ export const AdminSection: React.FC = () => {
                               color: '#0f172a',
                               marginBottom: 6
                             }}>
-                              ๔. คำรับรองความถูกต้องและการลงนาม
+                              ๔. คำรับรองความถูกต้อง
                             </div>
                             <div style={{ paddingLeft: '8px' }}>
                               <div style={{ fontSize: '9pt', textIndent: '28px', textAlign: 'justify', lineHeight: 1.75, marginBottom: 18 }}>
                                 "ข้าพเจ้าขอรับรองว่า ข้อความและเอกสารหลักฐานทั้งหมดที่ระบุไว้ในใบสมัครนี้เป็นความจริงทุกประการ หากปรากฏว่าเป็นเท็จ ข้าพเจ้ายินยอมให้ยกเลิกสิทธิ์ในการรับทุนการศึกษาทันที"
-                              </div>
-
-                              <div style={{ display: 'flex', justifyContent: 'flex-end', paddingRight: 40, marginTop: 14 }}>
-                                <div style={{ textAlign: 'center', fontSize: '9.2pt', lineHeight: 1.85 }}>
-                                  <div>ลงชื่อ ................................................................ ผู้สมัคร</div>
-                                  <div style={{ marginTop: 4 }}>( {app.fullName} )</div>
-                                  <div style={{ marginTop: 3, color: '#475569' }}>วันที่ {formatThaiDate(app.submissionDate)}</div>
-                                </div>
                               </div>
                             </div>
                           </div>

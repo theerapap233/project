@@ -2,11 +2,13 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { Scholarship, ScholarshipCategory } from '../types/scholarship';
 import { INITIAL_SCHOLARSHIPS } from '../data/scholarshipData';
 import { getCurrentAcademicYear } from '../utils/academicCalendar';
+import { stripScholarshipCode } from '../utils/scholarshipName';
 
 interface DbScholarshipProgram {
   id: string;
   name: string;
   category_id: string | null;
+  scholarship_type: string | null;
   amount: number | null;
   quota: number | null;
   is_open: boolean;
@@ -46,22 +48,18 @@ const getBadgeColorByCategory = (category: Exclude<ScholarshipCategory, 'all'>):
   }
 };
 
-const mapProgramToScholarship = (row: DbScholarshipProgram, index: number): Scholarship => {
+const mapProgramToScholarship = (row: DbScholarshipProgram): Scholarship => {
   const categoryName = row.category?.name || 'ทุนการศึกษา ภาควิชาคณิตศาสตร์';
   const categorySlug = mapCategoryNameToSlug(categoryName);
   const badgeColor = getBadgeColorByCategory(categorySlug);
-
-  // สกัด Code หรือกำหนด Code เริ่มต้น
-  const codeMatch = row.name.match(/\((MATH-[A-Z]+-\d+)\)/);
-  const code = codeMatch ? codeMatch[1] : `MATH-SCH-${String(index + 1).padStart(2, '0')}`;
+  const title = stripScholarshipCode(row.name);
 
   const isExternal = 
-    row.name.includes('ศิษย์เก่า') || 
-    row.name.includes('ALUMNI') || 
-    row.name.includes('INNOV') || 
-    row.name.includes('CORP') || 
-    row.name.includes('ภายนอก') || 
-    row.name.includes('มูลนิธิ') ||
+    categorySlug === 'alumni' ||
+    row.scholarship_type === 'external' ||
+    title.includes('ศิษย์เก่า') ||
+    title.includes('ภายนอก') ||
+    title.includes('มูลนิธิ') ||
     (row.description ? (row.description.includes('ภายนอก') || row.description.includes('ศิษย์เก่า')) : false);
 
   const scope: 'internal' | 'external' = isExternal ? 'external' : 'internal';
@@ -69,8 +67,7 @@ const mapProgramToScholarship = (row: DbScholarshipProgram, index: number): Scho
 
   return {
     id: row.id,
-    code,
-    title: row.name.replace(/\s*\([A-Z0-9-]+\)\s*$/, ''),
+    title,
     scope,
     scopeName,
     category: categorySlug,
@@ -117,6 +114,7 @@ export const scholarshipService = {
           id,
           name,
           category_id,
+          scholarship_type,
           amount,
           quota,
           is_open,
@@ -188,7 +186,7 @@ export const scholarshipService = {
 
       const { error } = await supabase.from('scholarship_programs').insert([
         {
-          name: `${sch.title} (${sch.code})`,
+          name: sch.title,
           category_id: matchedCat ? matchedCat.id : null,
           amount: parsedAmount,
           quota: sch.totalSlots,
@@ -235,7 +233,7 @@ export const scholarshipService = {
 
     try {
       const updates: any = { updated_at: new Date().toISOString() };
-      if (sch.title) updates.name = `${sch.title} (${sch.code || 'MATH-SCH'})`;
+      if (sch.title) updates.name = sch.title;
       if (sch.amount) updates.amount = parseInt(sch.amount.replace(/[^0-9]/g, '')) || 20000;
       if (sch.totalSlots !== undefined) updates.quota = sch.totalSlots;
       if (sch.status) updates.is_open = sch.status === 'open';
