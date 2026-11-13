@@ -65,6 +65,12 @@ npm run build
 - `application_guardians`, `application_loans`, `application_documents`
 - `news`, `pdf_documents`
 
+ระบบออกเลขที่ใบสมัครรูปแบบตัวเลข `YYTTYNNN` โดยใช้ปี พ.ศ. 2 หลัก เทอม 2 หลัก ชั้นปี 1 หลัก และลำดับ 3 หลัก (ตัวอย่าง `69014001`) ผ่านฟังก์ชันฐานข้อมูลที่ออกเลขแบบ atomic สคริปต์ [`supabase/application_tracking_id.sql`](supabase/application_tracking_id.sql) ใช้กับฐานข้อมูลเดิม และจะแปลงเลขที่ใบสมัครแบบเก่าให้เป็นรูปแบบใหม่ด้วย
+
+หากใช้ฐานข้อมูลเดิม ให้รัน [`supabase/staff_profile.sql`](supabase/staff_profile.sql) เพื่อเพิ่มช่องตำแหน่งเจ้าหน้าที่ก่อนใช้การบันทึกโปรไฟล์เจ้าหน้าที่
+
+หากใช้ฐานข้อมูลเดิม ให้รัน [`supabase/scholarship_bulk_dates.sql`](supabase/scholarship_bulk_dates.sql) เพื่อเพิ่มวันเริ่มรับสมัคร ซึ่งใช้ร่วมกับการปรับวันรับสมัครแบบกลุ่ม
+
 ---
 
 ## 🏛️ จัดทำโดย

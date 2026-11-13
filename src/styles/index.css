@@ -2393,6 +2393,124 @@ button, input, select, textarea {
   min-width: 0;
 }
 
+.staff-profile-staff-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.staff-profile-staff-fields > .staff-profile-password-section {
+  grid-column: 1 / -1;
+}
+
+.staff-profile-staff-fields .staff-profile-edit-field > label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  color: var(--navy-800);
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+.staff-profile-staff-fields .staff-profile-edit-field > label span {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.staff-profile-staff-fields .form-input-light[readonly] {
+  background: var(--surface-ground);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.staff-profile-role-badge {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  background: var(--surface-ground);
+  color: var(--navy-800);
+  font-size: 0.88rem;
+  font-weight: 650;
+}
+
+.staff-profile-role-badge svg {
+  color: var(--math-green);
+}
+
+.staff-profile-password-section {
+  padding: 16px;
+  border: 1px solid var(--border-light);
+  border-radius: 14px;
+  background: var(--surface-ground);
+}
+
+.staff-profile-password-heading {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 14px;
+}
+
+.staff-profile-password-heading > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.staff-profile-password-heading strong {
+  color: var(--text-main);
+  font-size: 0.9rem;
+}
+
+.staff-profile-password-heading > div > span {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.staff-profile-password-icon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(7, 123, 56, 0.1);
+  color: var(--math-green);
+}
+
+.staff-profile-password-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 11px;
+}
+
+.staff-profile-password-fields label {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--navy-800);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.staff-profile-password-fields .form-input-light {
+  width: 100%;
+  min-height: 42px;
+  box-sizing: border-box;
+}
+
+.staff-profile-password-submit {
+  margin-top: 13px;
+}
+
 /* ฟอร์มข้อมูลส่วนตัวเชิงลึกของนักศึกษา (ย้ายมาจากใบสมัครทุน) */
 .student-info-section {
   margin-top: 16px;
@@ -3040,6 +3158,15 @@ button, input, select, textarea {
 
   .staff-password-fields {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .staff-profile-staff-fields,
+  .staff-profile-password-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .staff-profile-staff-fields > .staff-profile-password-section {
+    grid-column: auto;
   }
 
   .staff-password-field-full {
@@ -4897,12 +5024,13 @@ fieldset:disabled .form-input-light {
 .list-report-header {
   margin-bottom: 16px;
   padding-bottom: 10px;
-  border-bottom: 1px solid #334155;
+  border-bottom: 2px solid #a3d8b5;
   text-align: center;
 }
 
 .list-report-header h1 {
   margin: 0;
+  color: #155e35;
   font-size: 1.08rem;
   font-weight: 700;
   line-height: 1.5;
@@ -4910,7 +5038,7 @@ fieldset:disabled .form-input-light {
 
 .list-report-header > div {
   margin-top: 2px;
-  color: #475569;
+  color: #64748b;
   font-size: 0.82rem;
   line-height: 1.5;
 }
@@ -4922,7 +5050,9 @@ fieldset:disabled .form-input-light {
   gap: 4px 16px;
   margin-bottom: 12px;
   padding: 6px 9px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid #d5e5da;
+  border-radius: 4px;
+  background: #f5faf6;
   color: #334155;
   font-size: 0.7rem;
   line-height: 1.5;
@@ -4937,13 +5067,15 @@ fieldset:disabled .form-input-light {
 
 .list-report-table th,
 .list-report-table td {
-  border: 1px solid #64748b;
+  border: 1px solid #cbd5d0;
   padding: 5px 7px;
   background: transparent;
   line-height: 1.45;
 }
 
 .list-report-table th {
+  background: #eef6f0;
+  color: #1f5133;
   font-weight: 700;
 }
 
@@ -4974,7 +5106,133 @@ fieldset:disabled .form-input-light {
   font-size: 0.68rem;
 }
 
+.print-preview-toolbar {
+  color: #1e293b;
+  border-color: #d7e5dc !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08) !important;
+}
+
+.print-preview-toolbar fieldset {
+  border-top-color: #e2e8f0 !important;
+}
+
+.print-preview-toolbar legend,
+.print-preview-toolbar label {
+  color: #334155 !important;
+}
+
+.print-preview-title {
+  color: #155e35 !important;
+}
+
+.print-preview-toolbar .print-action-button {
+  border: 1px solid var(--math-green, #077b38) !important;
+  border-radius: 7px !important;
+  background: var(--math-green, #077b38) !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+.print-preview-toolbar .print-close-button {
+  border: 1px solid #dbe3e8 !important;
+  border-radius: 7px !important;
+  background: #ffffff !important;
+  color: #475569 !important;
+  box-shadow: none !important;
+}
+
+.print-preview-toolbar .print-action-button:hover {
+  background: var(--math-green-dark, #055c29) !important;
+}
+
+.print-preview-toolbar .print-close-button:hover {
+  background: #f8fafc !important;
+}
+
+.application-form-title {
+  color: #155e35 !important;
+}
+
+.application-form-header {
+  padding: 5px 12px 8px;
+  border-bottom: 1px solid #d5e5da;
+}
+
+.application-form-institution {
+  color: #334155 !important;
+}
+
+.application-form-scholarship {
+  margin-top: 10px;
+  color: #155e35;
+  font-size: 11pt;
+  font-weight: 700;
+}
+
+.application-form-document-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  color: #475569 !important;
+  font-size: 8.8pt;
+  text-align: left;
+}
+
+.application-form-document-meta > span:last-child {
+  text-align: right;
+}
+
+.application-form-personal-info {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.application-form-personal-info > div:first-child {
+  min-width: 0;
+  flex: 1;
+}
+
+.application-form-photo {
+  border-color: #94a3b8 !important;
+  background: #ffffff !important;
+  color: #64748b !important;
+}
+
+.application-form-section-title {
+  padding: 3px 7px;
+  border-left: 3px solid #78b88d;
+  background: #f3f8f4;
+  color: #234b32 !important;
+}
+
+@media (max-width: 560px) {
+  .application-form-personal-info {
+    gap: 6px !important;
+  }
+
+  .application-form-document-meta {
+    flex-wrap: wrap;
+  }
+
+  .application-form-personal-info > div:first-child {
+    padding-left: 0 !important;
+  }
+
+  .application-form-photo {
+    width: 68px !important;
+    height: 88px !important;
+  }
+}
+
 @media print {
+  .printable-report-area {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
   body * {
     visibility: hidden;
   }
@@ -4991,7 +5249,7 @@ fieldset:disabled .form-input-light {
     min-height: 0 !important;
     box-sizing: border-box !important;
     margin: 0 !important;
-    padding: 0 !important;
+    padding: 8mm 0 0 !important;
     background: #ffffff !important;
     color: #000000 !important;
     box-shadow: none !important;
@@ -5027,6 +5285,32 @@ fieldset:disabled .form-input-light {
   .list-report-table th,
   .list-report-table td {
     background: transparent !important;
+  }
+  .list-report-header {
+    border-bottom-color: #78b88d !important;
+  }
+  .application-form-header {
+    border-bottom-color: #b7c8bc !important;
+  }
+  .list-report-header h1,
+  .application-form-title,
+  .application-form-section-title {
+    color: #155e35 !important;
+  }
+  .list-report-summary,
+  .application-form-section-title {
+    background-color: #f3f8f4 !important;
+  }
+  .list-report-table th {
+    background-color: #eef6f0 !important;
+    color: #1f5133 !important;
+  }
+  .list-report-table th,
+  .list-report-table td {
+    border-color: #b7c8bc !important;
+  }
+  .printable-report-area img {
+    filter: grayscale(100%);
   }
   .printable-report-area table {
     page-break-inside: auto;
@@ -5965,8 +6249,9 @@ body:has(.modal-backdrop.open) .preview-mode-dock {
   margin-bottom: 12px !important;
   border-radius: 10px !important;
   box-shadow: none !important;
-  display: grid !important;
-  grid-template-columns: minmax(0, 1fr) minmax(165px, 220px) minmax(0, 320px) auto;
+  display: flex !important;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .admin-applications-minimal .application-filters-minimal .form-input-light {
@@ -5985,7 +6270,19 @@ body:has(.modal-backdrop.open) .preview-mode-dock {
 
 .admin-applications-minimal .application-filters-minimal > div {
   min-width: 0 !important;
-  width: 100%;
+  width: auto !important;
+  flex: 0 1 auto;
+}
+
+.admin-applications-minimal .application-filters-minimal .application-filter-search {
+  flex: 1 1 360px !important;
+}
+
+.admin-applications-minimal .application-filters-minimal .application-filter-scope,
+.admin-applications-minimal .application-filters-minimal .application-filter-scholarship,
+.admin-applications-minimal .application-filters-minimal .application-filter-year {
+  min-width: 0 !important;
+  max-width: min(100%, 360px) !important;
 }
 
 .admin-applications-minimal .application-filters-minimal .application-filter-search input {
@@ -5993,33 +6290,19 @@ body:has(.modal-backdrop.open) .preview-mode-dock {
 }
 
 .admin-applications-minimal .application-filters-minimal .application-filter-scope select,
-.admin-applications-minimal .application-filters-minimal .application-filter-scholarship select {
+.admin-applications-minimal .application-filters-minimal .application-filter-scholarship select,
+.admin-applications-minimal .application-filters-minimal .application-filter-year select {
+  width: max-content !important;
+  min-width: 0 !important;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-@media (max-width: 900px) {
-  .admin-applications-minimal .application-filters-minimal {
-    grid-template-columns: minmax(0, 1fr) minmax(160px, 220px);
-  }
-
-  .admin-applications-minimal .application-filter-search {
-    grid-column: 1 / -1;
-  }
-
-  .admin-applications-minimal .application-filter-scholarship {
-    max-width: none !important;
-  }
-}
-
 @media (max-width: 560px) {
-  .admin-applications-minimal .application-filters-minimal {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .admin-applications-minimal .application-filter-search {
-    grid-column: auto;
+  .admin-applications-minimal .application-filters-minimal .application-filter-search {
+    flex-basis: 100% !important;
   }
 }
 
@@ -6058,7 +6341,7 @@ body:has(.modal-backdrop.open) .preview-mode-dock {
   gap: 7px;
   padding: 6px 14px !important;
   border: 1px solid var(--border-light, #e2e8f0) !important;
-  border-radius: 20px !important;
+  border-radius: 7px !important;
   background: var(--surface-card, #fff) !important;
   color: var(--text-muted, #64748b) !important;
   box-shadow: none !important;

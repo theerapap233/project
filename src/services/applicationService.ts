@@ -205,7 +205,8 @@ export const applicationService = {
   async submitFullApplication(
     formData: ApplicationFormData,
     files: UploadedFiles,
-    appObj: Application
+    appObj: Application,
+    registrationPeriod: { academicYear: string; semester: string }
   ): Promise<{ success: boolean; trackingId: string; source: 'supabase' | 'local' }> {
     if (!isSupabaseConfigured()) {
       return { success: true, trackingId: appObj.trackingId, source: 'local' };
@@ -267,10 +268,22 @@ export const applicationService = {
         }
       }
 
+      const { data: trackingId, error: trackingIdError } = await supabase.rpc(
+        'allocate_application_tracking_id',
+        {
+          p_academic_year: registrationPeriod.academicYear,
+          p_term: registrationPeriod.semester,
+          p_student_year: formData.year
+        }
+      );
+      if (trackingIdError || typeof trackingId !== 'string' || !/^\d{8}$/.test(trackingId)) {
+        throw trackingIdError || new Error('ไม่สามารถสร้างเลขที่ใบสมัครได้');
+      }
+
       // 3. บันทึกใบสมัครลง scholarship_applications
       const fullFormDataPayload = {
         ...formData, // include all fields like nickname, address, sponsor, etc.
-        trackingId: appObj.trackingId,
+        trackingId,
         scholarshipName: appObj.scholarshipName,
         documents: appObj.documents,
         profilePhoto: files.profilePhoto,
@@ -340,7 +353,7 @@ export const applicationService = {
         await supabase.from('application_documents').insert(docsToInsert);
       }
 
-      return { success: true, trackingId: appObj.trackingId, source: 'supabase' };
+      return { success: true, trackingId, source: 'supabase' };
     } catch (err) {
       console.error('Error submitting application to Supabase:', err);
       return { success: false, trackingId: appObj.trackingId, source: 'local' };

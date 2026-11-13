@@ -66,6 +66,8 @@ export const AdminSection: React.FC = () => {
     siteSettings,
     createNewScholarship, 
     updateScholarship,
+    updateScholarshipDates,
+    updateScholarshipTerms,
     deleteScholarship,
     addAnnouncement,
     updateAnnouncement,
@@ -89,6 +91,7 @@ export const AdminSection: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
+  const [filterStudentYear, setFilterStudentYear] = useState<string>('all');
   const [filterScope, setFilterScope] = useState<'all' | 'internal' | 'external'>('all');
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
@@ -132,8 +135,15 @@ export const AdminSection: React.FC = () => {
   const [schSlots, setSchSlots] = useState(5);
   const [schMinGPAX, setSchMinGPAX] = useState(2.75);
   const [schTargetYears, setSchTargetYears] = useState<string[]>(['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4']);
+  const [schStartDate, setSchStartDate] = useState('');
   const [schDeadline, setSchDeadline] = useState('2026-10-31');
   const [schTerm, setSchTerm] = useState('ภาคการศึกษาที่ 1');
+  const [selectedScholarshipIds, setSelectedScholarshipIds] = useState<string[]>([]);
+  const [isBulkDateModalOpen, setIsBulkDateModalOpen] = useState(false);
+  const [bulkStartDate, setBulkStartDate] = useState('');
+  const [bulkDeadline, setBulkDeadline] = useState('');
+  const [isBulkTermModalOpen, setIsBulkTermModalOpen] = useState(false);
+  const [bulkTerm, setBulkTerm] = useState('ภาคการศึกษาที่ 1');
   const [schScope, setSchScope] = useState<'internal' | 'external'>('internal');
   const [schStatus, setSchStatus] = useState<'open' | 'closed' | 'closing_soon'>('open');
   const [schDesc, setSchDesc] = useState('');
@@ -240,6 +250,17 @@ export const AdminSection: React.FC = () => {
     return applications.filter(a => checkAppMatchesScope(a, 'external')).length;
   }, [applications]);
 
+  const studentYearCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    applications.forEach(app => {
+      const studentYear = app.year.trim();
+      if (studentYear) {
+        counts.set(studentYear, (counts.get(studentYear) || 0) + 1);
+      }
+    });
+    return [...counts.entries()].sort(([yearA], [yearB]) => yearB.localeCompare(yearA, undefined, { numeric: true }));
+  }, [applications]);
+
   const filteredScholarshipsForSelect = useMemo(() => {
     if (filterScope === 'internal') {
       return scholarships.filter(s => s.scope === 'internal');
@@ -271,8 +292,9 @@ export const AdminSection: React.FC = () => {
     const matchesStatus = filterStatus === 'all' || app.status === filterStatus;
     const matchesScope = checkAppMatchesScope(app, filterScope);
     const matchesType = checkAppMatchesType(app, filterType);
+    const matchesStudentYear = filterStudentYear === 'all' || app.year === filterStudentYear;
 
-    return matchesSearch && matchesStatus && matchesScope && matchesType;
+    return matchesSearch && matchesStatus && matchesScope && matchesType && matchesStudentYear;
   });
 
   // Multi-select state
@@ -684,6 +706,7 @@ export const AdminSection: React.FC = () => {
     setSchSlots(5);
     setSchMinGPAX(2.75);
     setSchTargetYears(['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4']);
+    setSchStartDate('');
     setSchDeadline('2026-10-31');
     setSchTerm('ภาคการศึกษาที่ 1');
     setSchScope('internal');
@@ -699,6 +722,7 @@ export const AdminSection: React.FC = () => {
     setSchSlots(sch.totalSlots);
     setSchMinGPAX(typeof sch.minGPAX === 'number' ? sch.minGPAX : 2.0);
     setSchTargetYears(Array.isArray(sch.targetYears) && sch.targetYears.length > 0 ? sch.targetYears : ['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4']);
+    setSchStartDate(sch.startDate || '');
     setSchDeadline(sch.deadline ? sch.deadline.split('T')[0] : '2026-10-31');
     setSchTerm(sch.term || 'ภาคการศึกษาที่ 1');
     setSchScope(sch.scope || 'internal');
@@ -711,7 +735,7 @@ export const AdminSection: React.FC = () => {
     preset => preset.years.join('|') === (schTargetYears || []).join('|')
   )?.value;
 
-  const handleSaveSch = (e: React.FormEvent) => {
+  const handleSaveSch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!schTitle.trim()) {
       showToast('กรุณาระบุชื่อทุนการศึกษา', 'warning');
@@ -729,14 +753,19 @@ export const AdminSection: React.FC = () => {
       showToast('กรุณาระบุจำนวนทุนที่เปิดรับให้ถูกต้อง', 'warning');
       return;
     }
+    if (schStartDate && schDeadline && schStartDate > schDeadline) {
+      showToast('วันเริ่มรับสมัครต้องไม่อยู่หลังวันปิดรับสมัคร', 'warning');
+      return;
+    }
 
     if (editingSchId) {
-      updateScholarship(editingSchId, {
+      const saved = await updateScholarship(editingSchId, {
         title: schTitle.trim(),
         amount: schAmount.trim(),
         totalSlots: Number(schSlots),
         minGPAX: Number(schMinGPAX),
         targetYears: schTargetYears,
+        startDate: schStartDate,
         deadline: schDeadline,
         academicYear: getCurrentAcademicYear(),
         term: schTerm,
@@ -744,10 +773,12 @@ export const AdminSection: React.FC = () => {
         status: schStatus,
         description: schDesc.trim()
       });
+      if (!saved) return;
     } else {
       createNewScholarship(schTitle.trim(), schAmount.trim(), Number(schSlots), {
         minGPAX: Number(schMinGPAX),
         targetYears: schTargetYears,
+        startDate: schStartDate,
         deadline: schDeadline,
         academicYear: getCurrentAcademicYear(),
         term: schTerm
@@ -759,6 +790,49 @@ export const AdminSection: React.FC = () => {
   const handleDeleteSch = (id: string, title: string) => {
     if (window.confirm(`ยืนยันการลบประกาศทุน "${title}" ใช่หรือไม่?`)) {
       deleteScholarship(id);
+      setSelectedScholarshipIds(prev => prev.filter(selectedId => selectedId !== id));
+    }
+  };
+
+  const toggleScholarshipSelection = (id: string) => {
+    setSelectedScholarshipIds(prev =>
+      prev.includes(id) ? prev.filter(selectedId => selectedId !== id) : [...prev, id]
+    );
+  };
+
+  const handleApplyBulkScholarshipDates = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (selectedScholarshipIds.length === 0) {
+      showToast('กรุณาเลือกทุนที่ต้องการปรับวันอย่างน้อย 1 รายการ', 'warning');
+      return;
+    }
+    if (!bulkStartDate || !bulkDeadline) {
+      showToast('กรุณาระบุวันเริ่มและวันสิ้นสุดรับสมัคร', 'warning');
+      return;
+    }
+    if (bulkStartDate > bulkDeadline) {
+      showToast('วันเริ่มรับสมัครต้องไม่อยู่หลังวันสิ้นสุด', 'warning');
+      return;
+    }
+
+    const saved = await updateScholarshipDates(selectedScholarshipIds, bulkStartDate, bulkDeadline);
+    if (saved) {
+      setIsBulkDateModalOpen(false);
+      setSelectedScholarshipIds([]);
+    }
+  };
+
+  const handleApplyBulkScholarshipTerm = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (selectedScholarshipIds.length === 0) {
+      showToast('กรุณาเลือกทุนที่ต้องการปรับภาคการศึกษาอย่างน้อย 1 รายการ', 'warning');
+      return;
+    }
+
+    const saved = await updateScholarshipTerms(selectedScholarshipIds, bulkTerm);
+    if (saved) {
+      setIsBulkTermModalOpen(false);
+      setSelectedScholarshipIds([]);
     }
   };
 
@@ -1379,7 +1453,7 @@ export const AdminSection: React.FC = () => {
               </div>
             </div>
 
-            {/* Search & Combobox Filters (ปีการศึกษา, สถานะ) */}
+            {/* Search & Combobox Filters */}
             <div className="application-filters-minimal" style={{
               background: 'var(--surface-card)', 
               padding: '12px 16px', 
@@ -1472,13 +1546,43 @@ export const AdminSection: React.FC = () => {
                 </select>
               </div>
 
-              {/* Reset filter button if any active (เฉพาะประเภททุนและชื่อข้อมูลทุน) */}
-              {(filterType !== 'all' || filterScope !== 'all') && (
+              {/* Combobox: ชั้นปีของนักศึกษา */}
+              <div className="application-filter-year" style={{ position: 'relative', minWidth: 145, maxWidth: 180 }}>
+                <select
+                  value={filterStudentYear}
+                  onChange={(e) => setFilterStudentYear(e.target.value)}
+                  className="form-input-light"
+                  style={{
+                    height: '42px',
+                    borderRadius: '8px',
+                    fontSize: '0.86rem',
+                    fontWeight: filterStudentYear !== 'all' ? 600 : 500,
+                    color: filterStudentYear !== 'all' ? 'var(--math-green, #077b38)' : 'var(--navy-800, #1e293b)',
+                    background: filterStudentYear !== 'all' ? '#ecfdf5' : 'var(--surface-ground, #f8fafc)',
+                    borderColor: filterStudentYear !== 'all' ? '#a7f3d0' : 'var(--border-light, #e2e8f0)',
+                    paddingLeft: 12,
+                    paddingRight: 28,
+                    cursor: 'pointer',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    outline: 'none'
+                  }}
+                >
+                  <option value="all">ชั้นปี: ทั้งหมด</option>
+                  {studentYearCounts.map(([year, count]) => (
+                    <option key={year} value={year}>{year} ({count})</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Reset filter button if any active */}
+              {(filterType !== 'all' || filterScope !== 'all' || filterStudentYear !== 'all') && (
                 <button
                   type="button"
                   onClick={() => {
                     setFilterType('all');
                     setFilterScope('all');
+                    setFilterStudentYear('all');
                   }}
                   style={{
                     height: '42px',
@@ -1496,7 +1600,7 @@ export const AdminSection: React.FC = () => {
                     whiteSpace: 'nowrap',
                     transition: 'all 0.15s ease'
                   }}
-                  title="ล้างค่าตัวกรองประเภททุนและข้อมูลทุน"
+                  title="ล้างค่าตัวกรองประเภททุน ข้อมูลทุน และชั้นปี"
                 >
                   ล้างตัวกรอง
                 </button>
@@ -2208,16 +2312,24 @@ export const AdminSection: React.FC = () => {
                 <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', flex: 1 }}>
                   {/* Header Badges */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 8 }}>
-                    <span style={{ 
-                      fontSize: '0.75rem', 
-                      background: sch.scope === 'internal' ? 'var(--math-green-soft)' : 'var(--kmutnb-orange-glow)', 
-                      color: sch.scope === 'internal' ? 'var(--math-green)' : 'var(--kmutnb-orange)',
-                      padding: '3px 8px',
-                      borderRadius: '4px',
-                      fontWeight: 600
-                    }}>
-                      {sch.scope === 'internal' ? 'ทุนภายในภาควิชา' : 'ทุนภายนอก/เครือข่าย'}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedScholarshipIds.includes(sch.id)}
+                        onChange={() => toggleScholarshipSelection(sch.id)}
+                        aria-label={`เลือกทุน ${sch.title} เพื่อปรับวันรับสมัครแบบกลุ่ม`}
+                      />
+                      <span style={{
+                        fontSize: '0.75rem',
+                        background: sch.scope === 'internal' ? 'var(--math-green-soft)' : 'var(--kmutnb-orange-glow)',
+                        color: sch.scope === 'internal' ? 'var(--math-green)' : 'var(--kmutnb-orange)',
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        fontWeight: 600
+                      }}>
+                        {sch.scope === 'internal' ? 'ทุนภายในภาควิชา' : 'ทุนภายนอก/เครือข่าย'}
+                      </span>
+                    </div>
 
                     <span style={{
                       fontSize: '0.72rem',
@@ -2286,7 +2398,18 @@ export const AdminSection: React.FC = () => {
                       </span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>ปิดรับสมัคร:</span>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>ภาคเรียน:</span>
+                      <span style={{ fontSize: '0.82rem', color: 'var(--navy-700)' }}>{sch.term || 'ภาคการศึกษาที่ 1'}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>เปิดรับสมัคร:</span>
+                      <span style={{ fontSize: '0.82rem', color: 'var(--navy-700)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                        <Calendar size={13} strokeWidth={1.8} style={{ color: 'var(--text-muted)' }} />
+                        {sch.startDate || 'ไม่กำหนด'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>สิ้นสุดรับสมัคร:</span>
                       <span style={{ fontSize: '0.82rem', color: 'var(--navy-700)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                         <Calendar size={13} strokeWidth={1.8} style={{ color: 'var(--text-muted)' }} />
                         {sch.deadline}
@@ -2339,6 +2462,35 @@ export const AdminSection: React.FC = () => {
                   <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--navy-900)', fontWeight: 700 }}>
                     รายการประกาศทุนการศึกษาทั้งหมด ({scholarships.length} ทุน)
                   </h3>
+                  <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => setSelectedScholarshipIds(
+                        selectedScholarshipIds.length === scholarships.length ? [] : scholarships.map(sch => sch.id)
+                      )}
+                    >
+                      {scholarships.length > 0 && selectedScholarshipIds.length === scholarships.length ? 'ยกเลิกเลือกทั้งหมด' : 'เลือกทุนทั้งหมด'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => setIsBulkDateModalOpen(true)}
+                      disabled={selectedScholarshipIds.length === 0}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                    >
+                      <Calendar size={14} /> ปรับวันเริ่ม–สิ้นสุดแบบกลุ่ม ({selectedScholarshipIds.length})
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => setIsBulkTermModalOpen(true)}
+                      disabled={selectedScholarshipIds.length === 0}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                    >
+                      <Calendar size={14} /> ปรับภาคการศึกษาแบบกลุ่ม ({selectedScholarshipIds.length})
+                    </button>
+                  </div>
                 </div>
 
                 <button 
@@ -4160,6 +4312,87 @@ export const AdminSection: React.FC = () => {
         </div>
       )}
 
+      {isBulkDateModalOpen && (
+        <div className="modal-backdrop open">
+          <div className="modal-card announcement-modal" style={{ maxWidth: 480 }}>
+            <div className="modal-header">
+              <h3 style={{ margin: 0, fontSize: '1.2rem' }}>ปรับวันรับสมัครแบบกลุ่ม</h3>
+              <button type="button" className="modal-close-btn" onClick={() => setIsBulkDateModalOpen(false)} aria-label="ปิด">&times;</button>
+            </div>
+            <form onSubmit={handleApplyBulkScholarshipDates}>
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.88rem' }}>
+                  กำลังปรับวันรับสมัครให้ทุนที่เลือก {selectedScholarshipIds.length} รายการ
+                </p>
+                <div className="form-group">
+                  <label htmlFor="bulk-scholarship-start-date">วันเริ่มรับสมัคร</label>
+                  <input
+                    id="bulk-scholarship-start-date"
+                    type="date"
+                    className="form-input-light"
+                    value={bulkStartDate}
+                    onChange={event => setBulkStartDate(event.target.value)}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="bulk-scholarship-deadline">วันสิ้นสุดรับสมัคร</label>
+                  <input
+                    id="bulk-scholarship-deadline"
+                    type="date"
+                    className="form-input-light"
+                    value={bulkDeadline}
+                    onChange={event => setBulkDeadline(event.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '0 20px 20px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setIsBulkDateModalOpen(false)}>ยกเลิก</button>
+                <button type="submit" className="btn btn-primary">บันทึกวันรับสมัคร</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isBulkTermModalOpen && (
+        <div className="modal-backdrop open">
+          <div className="modal-card announcement-modal" style={{ maxWidth: 480 }}>
+            <div className="modal-header">
+              <h3 style={{ margin: 0, fontSize: '1.2rem' }}>ปรับภาคการศึกษาแบบกลุ่ม</h3>
+              <button type="button" className="modal-close-btn" onClick={() => setIsBulkTermModalOpen(false)} aria-label="ปิด">&times;</button>
+            </div>
+            <form onSubmit={handleApplyBulkScholarshipTerm}>
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.88rem' }}>
+                  กำลังปรับภาคการศึกษาให้ทุนที่เลือก {selectedScholarshipIds.length} รายการ
+                </p>
+                <div className="form-group">
+                  <label htmlFor="bulk-scholarship-term">ภาคการศึกษา</label>
+                  <select
+                    id="bulk-scholarship-term"
+                    className="form-input-light"
+                    value={bulkTerm}
+                    onChange={event => setBulkTerm(event.target.value)}
+                    required
+                  >
+                    <option value="ภาคการศึกษาที่ 1">ภาคการศึกษาที่ 1</option>
+                    <option value="ภาคการศึกษาที่ 2">ภาคการศึกษาที่ 2</option>
+                    <option value="ภาคการศึกษาที่ 3 (ฤดูร้อน)">ภาคการศึกษาที่ 3 (ฤดูร้อน)</option>
+                    <option value="ตลอดปีการศึกษา">ตลอดปีการศึกษา</option>
+                  </select>
+                </div>
+              </div>
+              <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '0 20px 20px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setIsBulkTermModalOpen(false)}>ยกเลิก</button>
+                <button type="submit" className="btn btn-primary">บันทึกภาคการศึกษา</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* MODAL: ADD / EDIT SCHOLARSHIP */}
       {isSchModalOpen && (
         <div className="modal-backdrop open">
@@ -4313,23 +4546,37 @@ export const AdminSection: React.FC = () => {
                     >
                       <option value="ภาคการศึกษาที่ 1">ภาคการศึกษาที่ 1</option>
                       <option value="ภาคการศึกษาที่ 2">ภาคการศึกษาที่ 2</option>
+                      <option value="ภาคการศึกษาที่ 3 (ฤดูร้อน)">ภาคการศึกษาที่ 3 (ฤดูร้อน)</option>
                       <option value="ภาคฤดูร้อน">ภาคฤดูร้อน</option>
                       <option value="ตลอดปีการศึกษา">ตลอดปีการศึกษา</option>
                     </select>
                   </div>
                 </div>
 
-                <div className="form-group">
-                  <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
-                    กำหนดการปิดรับสมัคร
-                  </label>
-                  <input 
-                    type="date"
-                    className="form-input-light" 
-                    value={schDeadline}
-                    onChange={(e) => setSchDeadline(e.target.value)}
-                    required
-                  />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                  <div className="form-group">
+                    <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
+                      วันเริ่มรับสมัคร
+                    </label>
+                    <input
+                      type="date"
+                      className="form-input-light"
+                      value={schStartDate}
+                      onChange={(e) => setSchStartDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
+                      วันสิ้นสุดรับสมัคร
+                    </label>
+                    <input
+                      type="date"
+                      className="form-input-light"
+                      value={schDeadline}
+                      onChange={(e) => setSchDeadline(e.target.value)}
+                      required
+                    />
+                  </div>
                 </div>
 
                 <div className="form-group">
@@ -4650,7 +4897,7 @@ export const AdminSection: React.FC = () => {
         <div className="modal-backdrop open" style={{ zIndex: 3000, overflowY: 'auto', padding: '20px 10px', alignItems: 'flex-start' }}>
           <div style={{ maxWidth: 940, width: '100%', margin: '20px auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* Top Toolbar (no-print) */}
-            <div className="no-print" style={{
+            <div className="no-print print-preview-toolbar" style={{
               background: '#ffffff',
               borderRadius: '12px',
               padding: '12px 20px',
@@ -4665,8 +4912,9 @@ export const AdminSection: React.FC = () => {
               zIndex: 20
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                <span style={{ fontWeight: 700, fontSize: '0.98rem', color: 'var(--navy-900)' }}>
-                  {printModalState.type === 'list' ? '🖨️ รายงานสรุปรายชื่อผู้สมัคร (1. รายชื่อ)' : '📄 แบบฟอร์มใบสมัครขอรับทุน (2. ใบสมัคร)'}
+                <span className="print-preview-title" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 700, fontSize: '0.98rem', color: '#111111' }}>
+                  {printModalState.type === 'list' ? <Printer size={18} /> : <FileText size={18} />}
+                  {printModalState.type === 'list' ? 'รายงานสรุปรายชื่อผู้สมัคร (1. รายชื่อ)' : 'แบบฟอร์มใบสมัครขอรับทุน (2. ใบสมัคร)'}
                 </span>
 
               </div>
@@ -4697,6 +4945,7 @@ export const AdminSection: React.FC = () => {
                             : current.filter(value => value !== field.key)
                           );
                         }}
+                        style={{ accentColor: '#111111' }}
                       />
                       {field.label}
                     </label>
@@ -4708,15 +4957,13 @@ export const AdminSection: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => window.print()}
-                  className="btn btn-primary"
+                  className="btn btn-primary print-action-button"
                   style={{
                     padding: '8px 22px',
                     fontSize: '0.88rem',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: 6,
-                    background: 'var(--math-green, #077b38)',
-                    borderColor: 'var(--math-green, #077b38)'
+                    gap: 6
                   }}
                 >
                   <Printer size={16} />
@@ -4725,7 +4972,7 @@ export const AdminSection: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setPrintModalState({ ...printModalState, isOpen: false })}
-                  className="btn btn-secondary"
+                  className="btn btn-secondary print-close-button"
                   style={{ padding: '8px 18px', fontSize: '0.88rem' }}
                 >
                   ปิด
@@ -4848,7 +5095,7 @@ export const AdminSection: React.FC = () => {
                           background: '#ffffff',
                           lineHeight: 1.5,
                           fontSize: '9pt',
-                          paddingTop: 0,
+                          paddingTop: '8mm',
                           marginBottom: 0
                         }}
                       >
@@ -4857,70 +5104,28 @@ export const AdminSection: React.FC = () => {
                         {/* ======================================================== */}
                         <div>
                           {/* FORMAL HEADER */}
-                          <div style={{ textAlign: 'center', marginBottom: 12 }}>
-                            <div style={{ fontSize: '14pt', fontWeight: 800, color: '#000000' }}>
+                          <div className="application-form-header" style={{ textAlign: 'center', marginBottom: 12 }}>
+                            <div className="application-form-title" style={{ fontSize: '14pt', fontWeight: 800, color: '#000000' }}>
                               ใบสมัครขอรับทุนการศึกษา
                             </div>
-                            <div style={{ fontSize: '10.5pt', fontWeight: 700, color: '#1f2937', marginTop: 2 }}>
-                              ภาควิชาคณิตศาสตร์ คณะวิทยาศาสตร์ประยุกต์ มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ
+                            <div className="application-form-institution" style={{ fontSize: '10.5pt', fontWeight: 700, color: '#1f2937', marginTop: 2 }}>
+                              มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ
                             </div>
                             <div style={{ fontSize: '9pt', color: '#374151', marginTop: 2 }}>
                               ประจำปีการศึกษา {siteSettings.academicYear || '2567'} ภาคการศึกษาที่ {siteSettings.semester || '1'}
                             </div>
-                          </div>
-
-                          {/* TOP META ROW: General info on left and photo on right */}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6, gap: 16 }}>
-                            {/* Left: General Scholarship & Application Info */}
-                            <div style={{ flex: 1, fontSize: '9.2pt', lineHeight: 1.8 }}>
-                              <div>
-                                <strong>ทุนการศึกษาที่สมัคร:</strong>{' '}
-                                <span style={{ fontWeight: 700, fontSize: '9.8pt' }}>{app.scholarshipName}</span>
-                              </div>
-                              <div style={{ marginTop: 2 }}>
-                                <strong>คณะ:</strong> วิทยาศาสตร์ประยุกต์ &nbsp;&nbsp;&nbsp;&nbsp;
-                                <strong>ภาควิชา:</strong> คณิตศาสตร์ &nbsp;&nbsp;&nbsp;&nbsp;
-                                <strong>ระดับการศึกษา:</strong> [ ] ปวช. &nbsp;[✓] ปริญญาตรี 4 ปี &nbsp;[ ] ปริญญาโท
-                              </div>
-                              <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginTop: 2, fontSize: '8.8pt', color: '#1e293b' }}>
-                                <span><strong>เลขที่ใบสมัคร:</strong> #{app.trackingId}</span>
-                                <span><strong>วันที่ยื่นสมัคร:</strong> {formatThaiDate(app.submissionDate)}</span>
-                                <span>
-                                  <strong>สถานะ:</strong>{' '}
-                                  {app.status === 'approved' ? 'อนุมัติทุนแล้ว' : app.status === 'rejected' ? 'ไม่ผ่านการพิจารณา' : 'รอการพิจารณา'}
-                                </span>
-                              </div>
+                            <div className="application-form-scholarship">
+                              {app.scholarshipName}
                             </div>
-
-                            {/* Right: Photo Box */}
-                            <div style={{
-                              border: '1px dashed #94a3b8',
-                              width: '84px',
-                              height: '104px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              textAlign: 'center',
-                              fontSize: '8.5pt',
-                              color: '#64748b',
-                              background: '#f8fafc',
-                              overflow: 'hidden',
-                              boxSizing: 'border-box',
-                              flexShrink: 0
-                            }}>
-                              {app.profilePhoto ? (
-                                <img src={app.profilePhoto} alt="รูปถ่ายนักศึกษา" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                              ) : (
-                                <div>
-                                  ติดรูปถ่าย<br />1 - 1.5 นิ้ว
-                                </div>
-                              )}
+                            <div className="application-form-document-meta">
+                              <span><strong>เลขที่ใบสมัคร:</strong> {app.trackingId}</span>
+                              <span><strong>วันที่ยื่นสมัคร:</strong> {formatThaiDate(app.submissionDate)}</span>
                             </div>
                           </div>
 
                           {/* SECTION ๑: ข้อมูลส่วนบุคคลและการศึกษา */}
                           <div style={{ marginBottom: 12 }}>
-                            <div style={{
+                            <div className="application-form-section-title" style={{
                               fontWeight: 800,
                               fontSize: '9.8pt',
                               color: '#0f172a',
@@ -4928,7 +5133,8 @@ export const AdminSection: React.FC = () => {
                             }}>
                               ๑. ข้อมูลส่วนบุคคลและข้อมูลการศึกษา
                             </div>
-                            <div style={{ paddingLeft: '8px', fontSize: '9.2pt', lineHeight: 1.8 }}>
+                            <div className="application-form-personal-info">
+                              <div style={{ paddingLeft: '8px', fontSize: '9.2pt', lineHeight: 1.8 }}>
                               <div>
                                 <strong>ชื่อ-นามสกุล:</strong>{' '}
                                 <span style={{ borderBottom: '1px dotted #475569', display: 'inline-block', minWidth: '190px', fontWeight: 600, padding: '0 4px' }}>
@@ -4983,12 +5189,36 @@ export const AdminSection: React.FC = () => {
                                   {fullIdCardAddr}
                                 </span>
                               </div>
+                              </div>
+                              <div className="application-form-photo" style={{
+                                border: '1px dashed #94a3b8',
+                                width: '84px',
+                                height: '104px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                textAlign: 'center',
+                                fontSize: '8.5pt',
+                                color: '#64748b',
+                                background: '#f8fafc',
+                                overflow: 'hidden',
+                                boxSizing: 'border-box',
+                                flexShrink: 0
+                              }}>
+                                {app.profilePhoto ? (
+                                  <img src={app.profilePhoto} alt="รูปถ่ายนักศึกษา" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                ) : (
+                                  <div>
+                                    ติดรูปถ่าย<br />1 - 1.5 นิ้ว
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
 
                           {/* SECTION ๒: ข้อมูลครอบครัวและภาระทางการเงิน */}
                           <div style={{ marginBottom: 12 }}>
-                            <div style={{
+                            <div className="application-form-section-title" style={{
                               fontWeight: 800,
                               fontSize: '9.8pt',
                               color: '#0f172a',
@@ -5077,7 +5307,7 @@ export const AdminSection: React.FC = () => {
 
                           {/* SECTION ๓: ประวัติกิจกรรมและเหตุผลความจำเป็นในการขอรับทุน */}
                           <div style={{ marginBottom: 12 }}>
-                            <div style={{
+                            <div className="application-form-section-title" style={{
                               fontWeight: 800,
                               fontSize: '9.8pt',
                               color: '#0f172a',
@@ -5126,7 +5356,7 @@ export const AdminSection: React.FC = () => {
 
                           {/* SECTION ๔: คำรับรองและการลงนาม (เฉพาะผู้สมัคร) */}
                           <div style={{ marginTop: 14 }}>
-                            <div style={{
+                            <div className="application-form-section-title" style={{
                               fontWeight: 800,
                               fontSize: '9.8pt',
                               color: '#0f172a',

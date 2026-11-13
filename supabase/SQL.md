@@ -2,6 +2,9 @@
 -- สคริปต์ที่จัดลำดับตาราง Foreign Keys, Indexes, RLS Policies และ Seed Data เรียบร้อยแล้ว
 -- สามารถนำไฟล์ `supabase/schema.sql` ไปกด Run ใน Supabase SQL Editor ได้ทันที 100%
 -- สำหรับฐานข้อมูลเดิม ให้รัน `supabase/remove_scholarship_codes.sql` หนึ่งครั้ง
+-- สำหรับฐานข้อมูลเดิม ให้รัน `supabase/application_tracking_id.sql` เพื่อเปิดใช้เลข YYTTYNNN และแปลงเลขที่ใบสมัครเดิม
+-- สำหรับฐานข้อมูลเดิม ให้รัน `supabase/staff_profile.sql` เพื่อเพิ่มฟิลด์ตำแหน่งในโปรไฟล์เจ้าหน้าที่
+-- สำหรับฐานข้อมูลเดิม ให้รัน `supabase/scholarship_bulk_dates.sql` เพื่อเพิ่มวันเริ่มรับสมัครของทุน
 
 CREATE TABLE public.staff_roles (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -16,6 +19,7 @@ CREATE TABLE public.staff_users (
   name character varying NOT NULL,
   email character varying NOT NULL UNIQUE,
   department character varying,
+  position character varying,
   role_id uuid NOT NULL,
   avatar_url text,
   is_active boolean NOT NULL DEFAULT true,

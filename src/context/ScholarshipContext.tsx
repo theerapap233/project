@@ -118,11 +118,14 @@ interface ScholarshipContextType {
     totalSlots: number,
     criteria?: Pick<Scholarship, 'minGPAX' | 'targetYears'> & {
       deadline?: string;
+      startDate?: string;
       academicYear?: string;
       term?: string;
     }
   ) => void;
-  updateScholarship: (id: string, data: Partial<Scholarship>) => void;
+  updateScholarship: (id: string, data: Partial<Scholarship>) => Promise<boolean>;
+  updateScholarshipDates: (ids: string[], startDate: string, deadline: string) => Promise<boolean>;
+  updateScholarshipTerms: (ids: string[], term: string) => Promise<boolean>;
   deleteScholarship: (id: string) => void;
   exportApplicationsCSV: () => void;
   scrollToSection: (id: string) => void;
@@ -134,6 +137,7 @@ interface ScholarshipContextType {
   closeChatbot: () => void;
   toggleChatbot: () => void;
   updateCurrentUser: (updates: Partial<UserProfile>) => void;
+  saveStaffProfile: (updates: Pick<UserProfile, 'email' | 'position' | 'avatarUrl'>) => Promise<boolean>;
   login: (identifier: string, password: string, customName?: string) => Promise<{ success: boolean; message?: string }>;
   changeStaffCredentials: (username: string, newPassword: string, currentPassword?: string) => Promise<boolean>;
   logout: () => void;
@@ -637,6 +641,50 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   };
 
+  const saveStaffProfile = async (
+    updates: Pick<UserProfile, 'email' | 'position' | 'avatarUrl'>
+  ): Promise<boolean> => {
+    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'officer')) return false;
+
+    const email = updates.email.trim();
+    const position = updates.position?.trim();
+    if (!email || !position) {
+      showToast('กรุณากรอกอีเมลและตำแหน่งให้ครบถ้วน', 'warning');
+      return false;
+    }
+
+    if (isSupabaseConfigured()) {
+      const { data, error } = await supabase
+        .from('staff_users')
+        .update({
+          email,
+          position,
+          avatar_url: updates.avatarUrl || null
+        })
+        .eq('username', currentUser.username || currentUser.studentId)
+        .select('username')
+        .maybeSingle();
+
+      if (error) {
+        console.error('ไม่สามารถบันทึกข้อมูลโปรไฟล์เจ้าหน้าที่ลง Supabase ได้:', error.message);
+        showToast(`บันทึกข้อมูลเจ้าหน้าที่ลง Supabase ไม่สำเร็จ (${error.code || 'database error'})`, 'error');
+        return false;
+      }
+      if (!data) {
+        showToast('ไม่พบบัญชีเจ้าหน้าที่ใน Supabase กรุณาเข้าสู่ระบบใหม่', 'error');
+        return false;
+      }
+    }
+
+    updateCurrentUser({
+      ...updates,
+      email,
+      position,
+      avatarUrl: updates.avatarUrl || null
+    });
+    return true;
+  };
+
   // บันทึกประวัติการเข้าสู่ระบบ/ออกจากระบบลง Supabase (ไม่บล็อก UI)
   const logStudentAuth = (entry: StudentLoginLogInput) => {
     if (!isSupabaseConfigured()) return;
@@ -962,7 +1010,7 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
     if (isSupabaseConfigured()) {
       const { data, error } = await supabase
         .from('staff_users')
-        .select('username, name, email, department, role_id, staff_roles(role_name, role_title)')
+        .select('username, name, email, department, position, avatar_url, role_id, staff_roles(role_name, role_title)')
         .eq('username', cleanId)
         .eq('password', password)
         .eq('is_active', true)
@@ -997,7 +1045,10 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
         email: data.email,
         faculty: 'คณะวิทยาศาสตร์ประยุกต์',
         major: typeof data.department === 'string' ? data.department : 'งานกิจการนักศึกษาและทุนการศึกษา',
-        position: typeof role.role_title === 'string' ? role.role_title : 'เจ้าหน้าที่',
+        position: typeof data.position === 'string' && data.position
+          ? data.position
+          : typeof role.role_title === 'string' ? role.role_title : 'เจ้าหน้าที่',
+        avatarUrl: typeof data.avatar_url === 'string' ? data.avatar_url : null,
         role: role.role_name === 'admin' ? 'admin' : 'officer'
       };
 
@@ -1192,17 +1243,56 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   };
 
-  const updateScholarship = (id: string, data: Partial<Scholarship>) => {
-    setScholarships(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
-    
+  const updateScholarship = async (id: string, data: Partial<Scholarship>): Promise<boolean> => {
     if (isSupabaseConfigured()) {
-      scholarshipService.updateScholarship(id, data).then(ok => {
-        if (ok) showToast('อัปเดตข้อมูลทุนการศึกษาและบันทึกลง Supabase สำเร็จ', 'success');
-        else showToast('อัปเดตข้อมูลทุนการศึกษาสำเร็จ (บันทึกในเครื่อง)', 'success');
-      });
-    } else {
-      showToast('อัปเดตข้อมูลทุนการศึกษาสำเร็จ', 'success');
+      const saved = await scholarshipService.updateScholarship(id, data);
+      if (!saved) {
+        showToast('บันทึกข้อมูลทุนลง Supabase ไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่อและ migration ของฐานข้อมูล', 'error');
+        return false;
+      }
     }
+
+    setScholarships(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
+    showToast(isSupabaseConfigured()
+      ? 'อัปเดตข้อมูลทุนการศึกษาและบันทึกลง Supabase สำเร็จ'
+      : 'อัปเดตข้อมูลทุนการศึกษาสำเร็จ', 'success');
+    return true;
+  };
+
+  const updateScholarshipDates = async (ids: string[], startDate: string, deadline: string): Promise<boolean> => {
+    if (ids.length === 0) return false;
+
+    if (isSupabaseConfigured()) {
+      const saved = await scholarshipService.updateScholarshipDates(ids, startDate, deadline);
+      if (!saved) {
+        showToast('บันทึกวันรับสมัครลง Supabase ไม่สำเร็จ กรุณารัน supabase/scholarship_bulk_dates.sql และตรวจสอบการเชื่อมต่อ', 'error');
+        return false;
+      }
+    }
+
+    setScholarships(prev => prev.map(s =>
+      ids.includes(s.id) ? { ...s, startDate, deadline } : s
+    ));
+    showToast(`ปรับวันเปิด-ปิดรับสมัครของทุน ${ids.length} รายการเรียบร้อยแล้ว`, 'success');
+    return true;
+  };
+
+  const updateScholarshipTerms = async (ids: string[], term: string): Promise<boolean> => {
+    if (ids.length === 0) return false;
+
+    if (isSupabaseConfigured()) {
+      const saved = await scholarshipService.updateScholarshipTerms(ids, term);
+      if (!saved) {
+        showToast('บันทึกภาคการศึกษาลง Supabase ไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่อ', 'error');
+        return false;
+      }
+    }
+
+    setScholarships(prev => prev.map(s =>
+      ids.includes(s.id) ? { ...s, term } : s
+    ));
+    showToast(`ปรับภาคการศึกษาของทุน ${ids.length} รายการเรียบร้อยแล้ว`, 'success');
+    return true;
   };
 
   const deleteScholarship = (id: string) => {
@@ -1296,12 +1386,20 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const submitApplication = (data: ApplicationFormData, files: UploadedFiles): string => {
-    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    const trackingId = `KMUTNB-SCH-67${randomSuffix}`;
     const today = new Date();
+    const matchedScholarship = scholarships.find(s => s.id === data.scholarshipId);
+    const academicYear = matchedScholarship?.academicYear || siteSettings.academicYear || String(today.getFullYear() + 543);
+    const semesterDigits = (matchedScholarship?.term || siteSettings.semester).replace(/\D/g, '');
+    const term = semesterDigits ? semesterDigits.padStart(2, '0').slice(-2) : '01';
+    const studentYear = data.year.replace(/\D/g, '').slice(-1) || '1';
+    const trackingPrefix = `${academicYear.slice(-2)}${term}${studentYear}`;
+    const nextSequence = applications.reduce((maxSequence, application) => {
+      const match = application.trackingId.match(new RegExp(`^${trackingPrefix}(\\d{3})$`));
+      return match ? Math.max(maxSequence, Number(match[1])) : maxSequence;
+    }, 0) + 1;
+    const trackingId = `${trackingPrefix}${String(nextSequence).padStart(3, '0')}`;
     const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-    const matchedScholarship = scholarships.find(s => s.id === data.scholarshipId);
     const scholarshipName = matchedScholarship ? matchedScholarship.title : 'ทุนการศึกษา ภาควิชาคณิตศาสตร์';
 
     const uploadedList: string[] = [];
@@ -1339,9 +1437,17 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     // บันทึกไปยัง Supabase ในพื้นหลัง (ถ้าเชื่อมต่อ)
     if (isSupabaseConfigured()) {
-      applicationService.submitFullApplication(data, files, newApp).then(res => {
+      applicationService.submitFullApplication(data, files, newApp, {
+        academicYear,
+        semester: matchedScholarship?.term || siteSettings.semester
+      }).then(res => {
         if (res.source === 'supabase') {
-          showToast(`ยื่นใบสมัครสำเร็จและบันทึกสู่ Supabase Cloud! รหัสติดตาม: ${trackingId}`, 'success');
+          setApplications(prev => prev.map(application => application.trackingId === trackingId
+            ? { ...application, trackingId: res.trackingId }
+            : application
+          ));
+          setLatestTrackingId(res.trackingId);
+          showToast(`ยื่นใบสมัครสำเร็จและบันทึกสู่ Supabase Cloud! รหัสติดตาม: ${res.trackingId}`, 'success');
         } else {
           showToast(`ยื่นใบสมัครสำเร็จ (บันทึกในเครื่อง): รหัสติดตาม: ${trackingId}`, 'info');
         }
@@ -1491,6 +1597,7 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
       deadline?: string;
       academicYear?: string;
       term?: string;
+      startDate?: string;
     }
   ) => {
     const newSch: Scholarship = {
@@ -1506,6 +1613,7 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
       remainingSlots: totalSlots,
       academicYear: criteria?.academicYear ?? getCurrentAcademicYear(),
       term: criteria?.term ?? 'ภาคการศึกษาที่ 1',
+      startDate: criteria?.startDate,
       deadline: criteria?.deadline ?? '2026-11-15',
       status: 'open',
       minGPAX: criteria?.minGPAX ?? 2.75,
@@ -1626,6 +1734,7 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
         changeStudentPassword,
         loginDemoStudent,
         updateCurrentUser,
+        saveStaffProfile,
         changeStaffCredentials,
         login,
         logout,
@@ -1645,6 +1754,8 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
         updateDownload,
         deleteDownload,
         updateScholarship,
+        updateScholarshipDates,
+        updateScholarshipTerms,
         deleteScholarship,
         openScholarshipDetail,
         closeScholarshipDetail,

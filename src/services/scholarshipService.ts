@@ -15,6 +15,7 @@ interface DbScholarshipProgram {
   deadline: string | null;
   academic_year: string | null;
   term: string | null;
+  application_start_date: string | null;
   min_gpax: number | null;
   target_years: string[] | null;
   description: string | null;
@@ -78,6 +79,7 @@ const mapProgramToScholarship = (row: DbScholarshipProgram): Scholarship => {
     remainingSlots: Math.max(1, Math.floor((row.quota || 10) * 0.4)),
     academicYear: row.academic_year || getCurrentAcademicYear(),
     term: row.term || 'ภาคการศึกษาที่ 1',
+    startDate: row.application_start_date?.slice(0, 10) || undefined,
     deadline: row.deadline?.slice(0, 10) || '2026-10-31',
     status: row.is_open ? 'open' : 'closed',
     minGPAX: row.min_gpax ?? (categorySlug === 'academic' ? 3.00 : 2.00),
@@ -121,6 +123,7 @@ export const scholarshipService = {
           deadline,
           academic_year,
           term,
+          application_start_date,
           min_gpax,
           target_years,
           description,
@@ -192,6 +195,7 @@ export const scholarshipService = {
           quota: sch.totalSlots,
           is_open: sch.status === 'open',
           description: sch.description,
+          application_start_date: sch.startDate || null,
           deadline: sch.deadline ? `${sch.deadline}T00:00:00.000Z` : null,
           academic_year: sch.academicYear,
           term: sch.term,
@@ -238,6 +242,7 @@ export const scholarshipService = {
       if (sch.totalSlots !== undefined) updates.quota = sch.totalSlots;
       if (sch.status) updates.is_open = sch.status === 'open';
       if (sch.description !== undefined) updates.description = sch.description;
+      if (sch.startDate !== undefined) updates.application_start_date = sch.startDate || null;
       if (sch.deadline !== undefined) updates.deadline = `${sch.deadline}T00:00:00.000Z`;
       if (sch.academicYear !== undefined) updates.academic_year = sch.academicYear;
       if (sch.term !== undefined) updates.term = sch.term;
@@ -253,6 +258,48 @@ export const scholarshipService = {
       return true;
     } catch (err) {
       console.error('Error updating scholarship in Supabase:', err);
+      return false;
+    }
+  },
+
+  async updateScholarshipDates(
+    programIds: string[],
+    startDate: string,
+    deadline: string
+  ): Promise<boolean> {
+    if (!isSupabaseConfigured()) return false;
+
+    try {
+      const { error } = await supabase
+        .from('scholarship_programs')
+        .update({
+          application_start_date: startDate,
+          deadline: `${deadline}T00:00:00.000Z`,
+          updated_at: new Date().toISOString()
+        })
+        .in('id', programIds);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('Error updating scholarship dates in Supabase:', err);
+      return false;
+    }
+  },
+
+  async updateScholarshipTerms(programIds: string[], term: string): Promise<boolean> {
+    if (!isSupabaseConfigured()) return false;
+
+    try {
+      const { error } = await supabase
+        .from('scholarship_programs')
+        .update({ term, updated_at: new Date().toISOString() })
+        .in('id', programIds);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('Error updating scholarship terms in Supabase:', err);
       return false;
     }
   },

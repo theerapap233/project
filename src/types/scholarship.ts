@@ -23,6 +23,7 @@ export interface Scholarship {
   remainingSlots: number;
   academicYear: string;
   term: string;
+  startDate?: string;
   deadline: string;
   status: ScholarshipStatus;
   minGPAX: number;

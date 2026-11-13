@@ -17,6 +17,7 @@ import {
   ClipboardList,
   GraduationCap,
   LogIn,
+  LockKeyhole,
   Mail,
   Phone,
   ShieldCheck,
@@ -35,6 +36,7 @@ export const Navbar: React.FC = () => {
     openLoginModal,
     openLogoutModal,
     updateCurrentUser,
+    saveStaffProfile,
     changeStaffCredentials,
     changeStudentPassword,
     showToast,
@@ -135,8 +137,8 @@ export const Navbar: React.FC = () => {
     const trimmedName = profileForm.name.trim();
     const trimmedEmail = profileForm.email.trim();
 
-    if (!trimmedName || !trimmedEmail) {
-      showToast('กรุณากรอกชื่อและอีเมลให้ครบถ้วน', 'warning');
+    if (!trimmedEmail) {
+      showToast('กรุณากรอกอีเมลให้ครบถ้วน', 'warning');
       return;
     }
 
@@ -163,31 +165,17 @@ export const Navbar: React.FC = () => {
     }
 
     // Staff Profile Save
-    const trimmedUsername = profileForm.username.trim();
-    if (!trimmedUsername || !profileForm.position.trim()) {
-      showToast('กรุณากรอกชื่อ อีเมล ตำแหน่ง และ username ให้ครบถ้วน', 'warning');
+    if (!profileForm.position.trim()) {
+      showToast('กรุณากรอกตำแหน่งให้ครบถ้วน', 'warning');
       return;
     }
 
-    const credentialsChanged = trimmedUsername !== (currentUser.username || currentUser.studentId);
-    if (credentialsChanged) {
-      if (!hasStaffCredentials) {
-        showToast('กรุณาตั้งรหัสผ่านก่อนเปลี่ยน username', 'warning');
-        return;
-      }
-      const changed = await changeStaffCredentials(trimmedUsername, '');
-      if (!changed) return;
-    }
-
-    updateCurrentUser({
-      ...profileForm,
-      gpax: profileForm.gpax ? parseFloat(profileForm.gpax) : undefined,
-      name: trimmedName,
+    const saved = await saveStaffProfile({
       email: trimmedEmail,
-      username: trimmedUsername,
       avatarUrl: profileForm.avatarUrl || null,
       position: profileForm.position.trim()
     });
+    if (!saved) return;
     setIsProfileMenuOpen(false);
     setIsEditingProfile(false);
   };
@@ -208,11 +196,10 @@ export const Navbar: React.FC = () => {
     setIsPersonalInfoModalOpen(true);
   };
 
-  const handleChangePassword = async (event: React.FormEvent) => {
-    event.preventDefault();
-
-    if (newPassword.length < 6) {
-      showToast('รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร', 'warning');
+  const handleChangePassword = async () => {
+    const minimumPasswordLength = isStudent ? 6 : 8;
+    if (newPassword.length < minimumPasswordLength) {
+      showToast(`รหัสผ่านใหม่ต้องมีอย่างน้อย ${minimumPasswordLength} ตัวอักษร`, 'warning');
       return;
     }
     if (newPassword !== confirmNewPassword) {
@@ -236,11 +223,6 @@ export const Navbar: React.FC = () => {
       showToast('กรุณากรอกรหัสผ่านเดิมเพื่อยืนยัน', 'warning');
       return;
     }
-    if (newPassword.length < 8) {
-      showToast('รหัสผ่านเจ้าหน้าที่ใหม่ต้องมีอย่างน้อย 8 ตัวอักษร', 'warning');
-      return;
-    }
-
     const username = currentUser?.username || currentUser?.studentId || '';
     const changed = await changeStaffCredentials(username, newPassword, currentPassword);
     if (!changed) return;
@@ -413,30 +395,49 @@ export const Navbar: React.FC = () => {
                   }}
                 >
                   {/* User Profile Header Card */}
-                  <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border-light)', marginBottom: 8 }}>
-                    <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                      {currentUser.name}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderBottom: '1px solid var(--border-light)', marginBottom: 8 }}>
+                    <span style={{
+                      width: 52,
+                      height: 52,
+                      flex: '0 0 52px',
+                      display: 'grid',
+                      placeItems: 'center',
+                      overflow: 'hidden',
+                      borderRadius: '50%',
+                      background: isStudent ? 'var(--math-green, #077b38)' : '#64748b',
+                      color: '#fff',
+                      fontSize: '1rem',
+                      fontWeight: 700
+                    }}>
+                      {currentUser.avatarUrl ? (
+                        <img src={currentUser.avatarUrl} alt={`รูปโปรไฟล์ ${currentUser.name}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : staffInitials}
+                    </span>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ overflow: 'hidden', fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-main)', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {currentUser.name}
+                      </div>
+                      {isStudent ? (
+                        <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <span style={{ fontSize: '0.78rem', color: 'var(--math-green)', fontWeight: 600 }}>
+                            รหัส: {currentUser.studentId}
+                          </span>
+                          <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                            {currentUser.major}
+                          </span>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                            {currentUser.gpax !== undefined ? (
+                              <>GPAX: <strong>{Number(currentUser.gpax).toFixed(2)}</strong> • </>
+                            ) : null}
+                            {calculateStudentYear(currentUser.studentId, currentUser.year)}
+                          </span>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                          {currentUser.position || 'เจ้าหน้าที่ธุรการ/กรรมการทุน'}
+                        </div>
+                      )}
                     </div>
-                    {isStudent ? (
-                      <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <span style={{ fontSize: '0.78rem', color: 'var(--math-green)', fontWeight: 600 }}>
-                          รหัส: {currentUser.studentId}
-                        </span>
-                        <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                          {currentUser.major}
-                        </span>
-                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                          {currentUser.gpax !== undefined ? (
-                            <>GPAX: <strong>{Number(currentUser.gpax).toFixed(2)}</strong> • </>
-                          ) : null}
-                          {calculateStudentYear(currentUser.studentId, currentUser.year)}
-                        </span>
-                      </div>
-                    ) : (
-                      <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                        {currentUser.position || 'เจ้าหน้าที่ธุรการ/กรรมการทุน'}
-                      </div>
-                    )}
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -525,35 +526,37 @@ export const Navbar: React.FC = () => {
                       </button>
                     )}
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCurrentPassword('');
-                        setNewPassword('');
-                        setConfirmNewPassword('');
-                        setIsChangingPassword(true);
-                        setIsProfileMenuOpen(false);
-                      }}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        padding: '8px 12px',
-                        textAlign: 'left',
-                        fontSize: '0.82rem',
-                        color: 'var(--text-main)',
-                        cursor: 'pointer',
-                        borderRadius: '8px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        fontWeight: 600
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-alt)'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                    >
-                      <span>🔒</span>
-                      <span>เปลี่ยนรหัสผ่าน</span>
-                    </button>
+                    {isStudent && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCurrentPassword('');
+                          setNewPassword('');
+                          setConfirmNewPassword('');
+                          setIsChangingPassword(true);
+                          setIsProfileMenuOpen(false);
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          padding: '8px 12px',
+                          textAlign: 'left',
+                          fontSize: '0.82rem',
+                          color: 'var(--text-main)',
+                          cursor: 'pointer',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          fontWeight: 600
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-alt)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <span>🔒</span>
+                        <span>เปลี่ยนรหัสผ่าน</span>
+                      </button>
+                    )}
 
                     <button
                       type="button"
@@ -593,7 +596,7 @@ export const Navbar: React.FC = () => {
             className="staff-profile-edit-dialog"
             data-profile-menu-root="true"
             onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: 480, width: 'min(100%, 480px)' }}
+            style={{ maxWidth: isStudent ? 480 : 620, width: `min(100%, ${isStudent ? 480 : 620}px)` }}
           >
             <div className="staff-profile-edit-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -792,22 +795,33 @@ export const Navbar: React.FC = () => {
                 </div>
               ) : (
                 /* Staff Profile Form Fields */
-                <div className="staff-profile-edit-fields">
+                <div className="staff-profile-edit-fields staff-profile-staff-fields">
                   <div className="staff-profile-edit-field">
+                    <label>ชื่อ-นามสกุล <span>แก้ไขไม่ได้</span></label>
                     <div className="staff-profile-input-wrap">
                       <UserRound size={17} aria-hidden="true" />
-                      <input className="form-input-light" aria-label="ชื่อ-นามสกุล" value={profileForm.name} onChange={(e) => setProfileForm(prev => ({ ...prev, name: e.target.value }))} placeholder="ชื่อ-นามสกุล" required />
+                      <input className="form-input-light" aria-label="ชื่อ-นามสกุล (แก้ไขไม่ได้)" value={currentUser?.name || ''} readOnly />
                     </div>
                   </div>
 
                   <div className="staff-profile-edit-field">
+                    <label>ชื่อผู้ใช้ <span>แก้ไขไม่ได้</span></label>
                     <div className="staff-profile-input-wrap">
                       <AtSign size={17} aria-hidden="true" />
-                      <input className="form-input-light" aria-label="ชื่อผู้ใช้" autoComplete="username" value={profileForm.username} onChange={event => setProfileForm(prev => ({ ...prev, username: event.target.value }))} placeholder="ชื่อผู้ใช้" required />
+                      <input className="form-input-light" aria-label="ชื่อผู้ใช้ (แก้ไขไม่ได้)" autoComplete="username" value={currentUser?.username || currentUser?.studentId || ''} readOnly />
                     </div>
                   </div>
 
                   <div className="staff-profile-edit-field">
+                    <label>สิทธิ์การใช้งาน <span>แก้ไขไม่ได้</span></label>
+                    <div className="staff-profile-role-badge">
+                      <ShieldCheck size={17} aria-hidden="true" />
+                      {currentUser?.role === 'admin' ? 'ผู้ดูแลระบบสูงสุด' : 'เจ้าหน้าที่'}
+                    </div>
+                  </div>
+
+                  <div className="staff-profile-edit-field">
+                    <label>อีเมล</label>
                     <div className="staff-profile-input-wrap">
                       <Mail size={17} aria-hidden="true" />
                       <input type="email" className="form-input-light" aria-label="อีเมล" value={profileForm.email} onChange={(e) => setProfileForm(prev => ({ ...prev, email: e.target.value }))} placeholder="อีเมล" required />
@@ -815,11 +829,58 @@ export const Navbar: React.FC = () => {
                   </div>
 
                   <div className="staff-profile-edit-field">
+                    <label>ตำแหน่ง</label>
                     <div className="staff-profile-input-wrap">
                       <BriefcaseBusiness size={17} aria-hidden="true" />
                       <input className="form-input-light" aria-label="ตำแหน่ง" value={profileForm.position} onChange={(e) => setProfileForm(prev => ({ ...prev, position: e.target.value }))} placeholder="ตำแหน่ง" required />
                     </div>
                   </div>
+
+                  <section className="staff-profile-password-section">
+                    <div className="staff-profile-password-heading">
+                      <span className="staff-profile-password-icon"><LockKeyhole size={17} /></span>
+                      <div>
+                        <strong>เปลี่ยนรหัสผ่าน</strong>
+                        <span>กรอกรหัสผ่านเดิมและตั้งรหัสผ่านใหม่อย่างน้อย 8 ตัวอักษร</span>
+                      </div>
+                    </div>
+                    <div className="staff-profile-password-fields">
+                      <label className="staff-password-field-full">รหัสผ่านเดิม
+                        <input
+                          className="form-input-light"
+                          type="password"
+                          autoComplete="current-password"
+                          value={currentPassword}
+                          onChange={event => setCurrentPassword(event.target.value)}
+                          placeholder="กรอกรหัสผ่านปัจจุบัน"
+                        />
+                      </label>
+                      <label>รหัสผ่านใหม่
+                        <input
+                          className="form-input-light"
+                          type="password"
+                          autoComplete="new-password"
+                          value={newPassword}
+                          onChange={event => setNewPassword(event.target.value)}
+                          minLength={8}
+                        />
+                      </label>
+                      <label>ยืนยันรหัสผ่านใหม่
+                        <input
+                          className="form-input-light"
+                          type="password"
+                          autoComplete="new-password"
+                          value={confirmNewPassword}
+                          onChange={event => setConfirmNewPassword(event.target.value)}
+                          minLength={8}
+                        />
+                      </label>
+                    </div>
+                    <button type="button" className="btn btn-secondary staff-profile-password-submit" onClick={() => void handleChangePassword()}>
+                      <LockKeyhole size={15} />
+                      เปลี่ยนรหัสผ่าน
+                    </button>
+                  </section>
                 </div>
               )}
 
@@ -922,7 +983,7 @@ export const Navbar: React.FC = () => {
               </div>
               <button type="button" className="staff-profile-close" onClick={() => setIsChangingPassword(false)} aria-label="ปิดหน้าต่าง">✕</button>
             </div>
-            <form onSubmit={handleChangePassword}>
+            <form onSubmit={(event) => { event.preventDefault(); void handleChangePassword(); }}>
               <div className="staff-password-fields">
                 <label className="staff-password-field-full">รหัสผ่านเดิม
                   <input
