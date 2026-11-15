@@ -5,6 +5,7 @@
 -- สำหรับฐานข้อมูลเดิม ให้รัน `supabase/application_tracking_id.sql` เพื่อเปิดใช้เลข YYTTYNNN และแปลงเลขที่ใบสมัครเดิม
 -- สำหรับฐานข้อมูลเดิม ให้รัน `supabase/staff_profile.sql` เพื่อเพิ่มฟิลด์ตำแหน่งในโปรไฟล์เจ้าหน้าที่
 -- สำหรับฐานข้อมูลเดิม ให้รัน `supabase/scholarship_bulk_dates.sql` เพื่อเพิ่มวันเริ่มรับสมัครของทุน
+-- สำหรับระบบ OTP ลืมรหัสผ่าน ให้รัน `supabase/password_reset_otp.sql` และ deploy Edge Function ตาม README.md
 
 CREATE TABLE public.staff_roles (
   id uuid NOT NULL DEFAULT gen_random_uuid(),

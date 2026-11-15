@@ -35,6 +35,10 @@ import { formatThaiDate } from '../../utils/dateFormatter';
 import { getCurrentAcademicYear } from '../../utils/academicCalendar';
 import { PROVINCES } from '../../data/provinces';
 import { compressImage } from '../../utils/imageUtils';
+import {
+  buildApplicationRecommendations,
+  compareApplicationRecommendations
+} from '../../utils/applicationRecommendation';
 
 type AdminTab = 'applications' | 'scholarships' | 'news' | 'faq' | 'downloads' | 'ratings';
 type PrintListField = 'fullName' | 'studentId' | 'year' | 'scholarshipName';
@@ -47,13 +51,11 @@ const PRINT_LIST_FIELDS: { key: PrintListField; label: string; heading: string }
 ];
 
 const SCHOLARSHIP_YEAR_PRESETS = [
-  { value: 'all', label: 'ทุกชั้นปี', years: ['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4', 'บัณฑิตศึกษา'] },
-  { value: 'undergraduate', label: 'ปริญญาตรี (ปี 1-4)', years: ['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4'] },
+  { value: 'all', label: 'ทุกชั้นปี', years: ['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4'] },
   { value: 'year-1', label: 'ปี 1', years: ['ปี 1'] },
   { value: 'year-2', label: 'ปี 2', years: ['ปี 2'] },
   { value: 'year-3', label: 'ปี 3', years: ['ปี 3'] },
-  { value: 'year-4', label: 'ปี 4', years: ['ปี 4'] },
-  { value: 'graduate', label: 'บัณฑิตศึกษา', years: ['บัณฑิตศึกษา'] }
+  { value: 'year-4', label: 'ปี 4', years: ['ปี 4'] }
 ];
 
 export const AdminSection: React.FC = () => {
@@ -281,9 +283,14 @@ export const AdminSection: React.FC = () => {
     }
   };
 
-  // Filtered Applications
-  const filteredApps = applications.filter(app => {
-    const matchesSearch = 
+  const applicationRecommendations = useMemo(
+    () => buildApplicationRecommendations(applications, scholarships),
+    [applications, scholarships]
+  );
+
+  // Keep active applications first, with transparent recommendation ordering.
+  const matchingApps = applications.filter(app => {
+    const matchesSearch =
       app.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       app.studentId.toLowerCase().includes(searchTerm.toLowerCase()) ||
       app.trackingId.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -296,6 +303,17 @@ export const AdminSection: React.FC = () => {
 
     return matchesSearch && matchesStatus && matchesScope && matchesType && matchesStudentYear;
   });
+  const pendingApps = matchingApps.filter(app => app.status === 'submitted');
+  pendingApps.sort((first, second) => compareApplicationRecommendations(
+    applicationRecommendations.get(first.trackingId),
+    applicationRecommendations.get(second.trackingId),
+    first,
+    second
+  ));
+  const filteredApps = [
+    ...pendingApps,
+    ...matchingApps.filter(app => app.status !== 'submitted')
+  ];
 
   // Multi-select state
   const [selectedAppIds, setSelectedAppIds] = useState<Set<string>>(new Set());
@@ -2392,7 +2410,7 @@ export const AdminSection: React.FC = () => {
                       </span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>จำนวนโควตา:</span>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>จำนวนทุน:</span>
                       <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--navy-800)' }}>
                         {sch.totalSlots} ทุน (เหลือ {sch.remainingSlots})
                       </span>
@@ -3552,7 +3570,6 @@ export const AdminSection: React.FC = () => {
                           <option value="ปี 2">ชั้นปีที่ 2</option>
                           <option value="ปี 3">ชั้นปีที่ 3</option>
                           <option value="ปี 4">ชั้นปีที่ 4</option>
-                          <option value="บัณฑิตศึกษา">บัณฑิตศึกษา</option>
                         </select>
                       </div>
 

@@ -171,6 +171,8 @@ export const Navbar: React.FC = () => {
     }
 
     const saved = await saveStaffProfile({
+      name: trimmedName,
+      username: profileForm.username.trim(),
       email: trimmedEmail,
       avatarUrl: profileForm.avatarUrl || null,
       position: profileForm.position.trim()
@@ -797,18 +799,33 @@ export const Navbar: React.FC = () => {
                 /* Staff Profile Form Fields */
                 <div className="staff-profile-edit-fields staff-profile-staff-fields">
                   <div className="staff-profile-edit-field">
-                    <label>ชื่อ-นามสกุล <span>แก้ไขไม่ได้</span></label>
+                    <label>ชื่อ-นามสกุล</label>
                     <div className="staff-profile-input-wrap">
                       <UserRound size={17} aria-hidden="true" />
-                      <input className="form-input-light" aria-label="ชื่อ-นามสกุล (แก้ไขไม่ได้)" value={currentUser?.name || ''} readOnly />
+                      <input
+                        className="form-input-light"
+                        aria-label="ชื่อ-นามสกุล"
+                        value={profileForm.name}
+                        onChange={(e) => setProfileForm(prev => ({ ...prev, name: e.target.value }))}
+                        placeholder="ชื่อ-นามสกุล"
+                        required
+                      />
                     </div>
                   </div>
 
                   <div className="staff-profile-edit-field">
-                    <label>ชื่อผู้ใช้ <span>แก้ไขไม่ได้</span></label>
+                    <label>ชื่อผู้ใช้</label>
                     <div className="staff-profile-input-wrap">
                       <AtSign size={17} aria-hidden="true" />
-                      <input className="form-input-light" aria-label="ชื่อผู้ใช้ (แก้ไขไม่ได้)" autoComplete="username" value={currentUser?.username || currentUser?.studentId || ''} readOnly />
+                      <input
+                        className="form-input-light"
+                        aria-label="ชื่อผู้ใช้"
+                        autoComplete="username"
+                        value={profileForm.username}
+                        onChange={(e) => setProfileForm(prev => ({ ...prev, username: e.target.value }))}
+                        placeholder="ชื่อผู้ใช้"
+                        required
+                      />
                     </div>
                   </div>
 

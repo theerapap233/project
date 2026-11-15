@@ -43,10 +43,10 @@ export const ScholarshipCard: React.FC<ScholarshipCardProps> = ({ scholarship })
           <span>เกรดขั้นต่ำ: <strong>GPAX ≥ {(typeof scholarship.minGPAX === 'number' ? scholarship.minGPAX : 2.0).toFixed(2)}</strong></span>
         </li>
         <li>
-          <span>กลุ่มเป้าหมาย: <strong>{(Array.isArray(scholarship.targetYears) && scholarship.targetYears.length > 0 ? scholarship.targetYears : ['ทุกชั้นปี']).join(', ')}</strong></span>
+          <span>ชั้นปี: <strong>{(Array.isArray(scholarship.targetYears) && scholarship.targetYears.length > 0 ? scholarship.targetYears : ['ทุกชั้นปี']).join(', ')}</strong></span>
         </li>
         <li>
-          <span>จำนวนโควตา: <strong>{scholarship.totalSlots ?? 0} ทุน</strong></span>
+          <span>จำนวนทุน: <strong>{scholarship.totalSlots ?? 0} ทุน</strong></span>
         </li>
       </ul>
 

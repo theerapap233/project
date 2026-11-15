@@ -1,10 +1,9 @@
 import { useMemo } from 'react';
 import { useScholarship } from '../context/ScholarshipContext';
 import { Application } from '../types/application';
+import { normalizeStudentId } from '../utils/studentId';
 
-/** ตัด prefix "s" และช่องว่างออก เพื่อเทียบรหัสนักศึกษาให้ตรงกันเสมอ */
-export const normalizeStudentId = (id: string | undefined | null): string =>
-  (id || '').trim().replace(/^s/i, '').toLowerCase();
+export { normalizeStudentId } from '../utils/studentId';
 
 /**
  * ดึงเฉพาะใบสมัครของนักศึกษาที่ล็อกอินอยู่ (เรียงจากใหม่ไปเก่า)

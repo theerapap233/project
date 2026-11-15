@@ -287,10 +287,10 @@ export const applicationService = {
         scholarshipName: appObj.scholarshipName,
         documents: appObj.documents,
         profilePhoto: files.profilePhoto,
-        subStatus: 'submitted',
-        interviewDate: 'รอการตรวจสอบเอกสาร',
-        score: null,
-        committeeNotes: 'ยื่นใบสมัครออนไลน์'
+        subStatus: appObj.status,
+        interviewDate: appObj.interviewDate,
+        score: appObj.score,
+        committeeNotes: appObj.committeeNotes
       };
 
       const { data: newAppRow, error: appErr } = await supabase
@@ -300,9 +300,9 @@ export const applicationService = {
           student_id: studentId,
           gpa: formData.gpax,
           scholarship_type: 'general',
-          status: 'pending',
+          status: mapAppStatusToDbStatus(appObj.status),
           reason: formData.reason,
-          note: 'ยื่นใบสมัครออนไลน์ผ่านระบบ',
+          note: appObj.committeeNotes,
           form_data: fullFormDataPayload
         }])
         .select('id')

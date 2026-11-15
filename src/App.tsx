@@ -18,11 +18,10 @@ import { MyApplicationsBanner } from './components/applications/MyApplicationsBa
 import { LoginModal } from './components/auth/LoginModal';
 import { LogoutModal } from './components/auth/LogoutModal';
 import { ToastContainer } from './components/ui/ToastContainer';
-import { AiChatBot } from './components/chatbot/AiChatBot';
 
 
 const MainContent: React.FC = () => {
-  const { currentUser, isAdminActive, isPreviewMode, isMyApplicationsOpen } = useScholarship();
+  const { currentUser, isAdminActive, isPreviewMode } = useScholarship();
   const isStaffMode = Boolean(currentUser && isAdminActive);
 
   return (
@@ -72,14 +71,6 @@ const MainContent: React.FC = () => {
 
       {/* Floating Toasts */}
       <ToastContainer />
-
-      {/* AI Chatbot (ผู้ช่วยตอบคำถามแทนส่วน FAQ) */}
-      {(!isStaffMode || isPreviewMode) && (
-        /* ซ่อนปุ่มแชตชั่วคราวขณะเปิดหน้าต่างใบสมัครของฉัน (ไม่ unmount เพื่อเก็บประวัติแชตไว้) */
-        <div style={isMyApplicationsOpen ? { display: 'none' } : undefined}>
-          <AiChatBot />
-        </div>
-      )}
 
       {/* Supabase Status Indicator & Setup Helper */}
 

@@ -65,6 +65,7 @@ const mapProgramToScholarship = (row: DbScholarshipProgram): Scholarship => {
 
   const scope: 'internal' | 'external' = isExternal ? 'external' : 'internal';
   const scopeName = scope === 'external' ? 'ทุนภายนอก (องค์กร/ศิษย์เก่า)' : 'ทุนภายใน (ภาควิชา/มจพ.)';
+  const targetYears = (row.target_years ?? []).filter(year => year !== 'บัณฑิตศึกษา');
 
   return {
     id: row.id,
@@ -83,7 +84,7 @@ const mapProgramToScholarship = (row: DbScholarshipProgram): Scholarship => {
     deadline: row.deadline?.slice(0, 10) || '2026-10-31',
     status: row.is_open ? 'open' : 'closed',
     minGPAX: row.min_gpax ?? (categorySlug === 'academic' ? 3.00 : 2.00),
-    targetYears: row.target_years ?? ['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4', 'บัณฑิตศึกษา'],
+    targetYears: targetYears.length > 0 ? targetYears : ['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4'],
     targetMajors: ['คณิตศาสตร์ประยุกต์', 'สถิติประยุกต์และการวิเคราะห์ข้อมูล'],
     description: row.description || 'ทุนการศึกษาเพื่อส่งเสริมศักยภาพนักศึกษา ภาควิชาคณิตศาสตร์ คณะวิทยาศาสตร์ประยุกต์ มจพ.',
     requirements: [

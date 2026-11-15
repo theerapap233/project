@@ -18,7 +18,7 @@ const MAJOR_OPTIONS = [
   'วท.บ. คณิตศาสตร์เชิงคอมพิวเตอร์ (MC) - โครงการสมทบพิเศษ'
 ];
 
-const YEAR_OPTIONS = ['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4', 'บัณฑิตศึกษา'];
+const YEAR_OPTIONS = ['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4'];
 
 const emptyAddress = (): Address => ({
   houseNo: '',

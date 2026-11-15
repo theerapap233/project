@@ -10,6 +10,7 @@ import {
   LogIn,
   UserPlus
 } from 'lucide-react';
+import { passwordResetService, type PasswordResetScope } from '../../services/passwordResetService';
 
 export const LoginModal: React.FC = () => {
   const {
@@ -52,6 +53,13 @@ export const LoginModal: React.FC = () => {
 
   const [warningMsg, setWarningMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPasswordResetOpen, setIsPasswordResetOpen] = useState(false);
+  const [resetScope, setResetScope] = useState<PasswordResetScope>('student');
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetOtp, setResetOtp] = useState('');
+  const [resetPassword, setResetPassword] = useState('');
+  const [confirmResetPassword, setConfirmResetPassword] = useState('');
+  const [resetOtpSent, setResetOtpSent] = useState(false);
 
   // Handle Ctrl+Shift+A or Alt+A and URL hash #admin or #login
   useEffect(() => {
@@ -160,7 +168,7 @@ export const LoginModal: React.FC = () => {
     const cleanUser = staffUsername.trim();
 
     if (!cleanUser) {
-      showToast('กรุณากรอกชื่อผู้ใช้เจ้าหน้าที่', 'warning');
+      showToast('กรุณากรอกชื่อผู้ใช้หรืออีเมลเจ้าหน้าที่', 'warning');
       return;
     }
 
@@ -184,19 +192,99 @@ export const LoginModal: React.FC = () => {
 
   const handleForgotPassword = (e: React.MouseEvent) => {
     e.preventDefault();
-    showToast('หากลืมรหัสผ่าน กรุณาติดต่อธุรการภาควิชาคณิตศาสตร์ อาคาร 78 หรือโทร. 02-555-2000 ต่อ 4601-4602', 'info');
+    const scope = activeTab;
+    const loginIdentifier = scope === 'student' ? studentIdentifier : staffUsername;
+    setResetScope(scope);
+    setResetEmail(loginIdentifier.includes('@') ? loginIdentifier.trim() : '');
+    setResetOtp('');
+    setResetPassword('');
+    setConfirmResetPassword('');
+    setResetOtpSent(false);
+    setWarningMsg(null);
+    setIsPasswordResetOpen(true);
+  };
+
+  const closePasswordReset = () => {
+    setIsPasswordResetOpen(false);
+    setWarningMsg(null);
+  };
+
+  const requestPasswordResetOtp = async () => {
+    setWarningMsg(null);
+    setIsSubmitting(true);
+    try {
+      const result = await passwordResetService.requestOtp(resetScope, resetEmail);
+      if (result.success) {
+        setResetOtpSent(true);
+      } else {
+        setWarningMsg(result.message || 'ไม่สามารถส่งรหัส OTP ได้ กรุณาลองใหม่ภายหลัง');
+      }
+    } catch (error) {
+      console.error('Password reset OTP request failed:', error);
+      setWarningMsg('ไม่สามารถเชื่อมต่อระบบรีเซ็ตรหัสผ่านได้ กรุณาลองใหม่ภายหลัง');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRequestPasswordResetOtp = (e: React.FormEvent) => {
+    e.preventDefault();
+    void requestPasswordResetOtp();
+  };
+
+  const handleCompletePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setWarningMsg(null);
+    if (resetPassword.length < 8 || resetPassword.length > 128) {
+      setWarningMsg('รหัสผ่านใหม่ต้องมีความยาว 8-128 ตัวอักษร');
+      return;
+    }
+    if (resetPassword !== confirmResetPassword) {
+      setWarningMsg('รหัสผ่านใหม่และการยืนยันรหัสผ่านไม่ตรงกัน');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const result = await passwordResetService.resetPassword(
+        resetScope,
+        resetEmail,
+        resetOtp,
+        resetPassword
+      );
+      if (!result.success) {
+        setWarningMsg(result.message || 'ไม่สามารถเปลี่ยนรหัสผ่านได้ กรุณาลองใหม่');
+        return;
+      }
+
+      if (resetScope === 'student') {
+        setStudentIdentifier(resetEmail);
+        setStudentPassword('');
+      } else {
+        setStaffUsername(resetEmail);
+        setStaffPassword('');
+      }
+      showToast('เปลี่ยนรหัสผ่านสำเร็จ กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่', 'success');
+      closePasswordReset();
+    } catch (error) {
+      console.error('Password reset completion failed:', error);
+      setWarningMsg('ไม่สามารถเชื่อมต่อระบบรีเซ็ตรหัสผ่านได้ กรุณาลองใหม่ภายหลัง');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <div className="modal-backdrop open" onClick={closeLoginModal}>
-      <div
-        className="modal-card login-modal-card"
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          maxWidth: studentMode === 'register' && activeTab === 'student' ? 540 : 460,
-          padding: 0
-        }}
-      >
+    <>
+      <div className="modal-backdrop open" onClick={closeLoginModal}>
+        <div
+          className="modal-card login-modal-card"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            maxWidth: studentMode === 'register' && activeTab === 'student' ? 540 : 460,
+            padding: 0
+          }}
+        >
         <div className="login-modal-header">
           <button
             type="button"
@@ -630,7 +718,7 @@ export const LoginModal: React.FC = () => {
 
               <div className="form-group">
                 <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)', marginBottom: 6, display: 'block' }}>
-                  ชื่อผู้ใช้เจ้าหน้าที่
+                  ชื่อผู้ใช้หรืออีเมลเจ้าหน้าที่
                 </label>
                 <div style={{ position: 'relative' }}>
                   <User
@@ -647,8 +735,10 @@ export const LoginModal: React.FC = () => {
                     type="text"
                     className="form-input-light"
                     style={{ paddingLeft: 38 }}
-                    placeholder="กรอกชื่อผู้ใช้ เช่น admin หรือ staff"
+                    placeholder="กรอก username หรืออีเมลเจ้าหน้าที่"
                     value={staffUsername}
+                    autoCapitalize="none"
+                    autoComplete="username"
                     onChange={(e) => {
                       setStaffUsername(e.target.value);
                       if (warningMsg) setWarningMsg(null);
@@ -732,7 +822,199 @@ export const LoginModal: React.FC = () => {
             </form>
           )}
         </div>
+        </div>
       </div>
-    </div>
+      {isPasswordResetOpen && (
+        <div
+          className="modal-backdrop open"
+          style={{ zIndex: 2000 }}
+          onClick={closePasswordReset}
+        >
+          <div
+            className="modal-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="password-reset-title"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 460 }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <h3 id="password-reset-title" style={{ margin: 0, color: 'var(--navy-800)' }}>
+                รีเซ็ตรหัสผ่าน{resetScope === 'student' ? 'นักศึกษา' : 'เจ้าหน้าที่'}
+              </h3>
+              <button
+                type="button"
+                onClick={closePasswordReset}
+                className="modal-close-btn"
+                aria-label="กลับเข้าสู่ระบบ"
+              >
+                <span aria-hidden="true">&times;</span>
+              </button>
+            </div>
+            <p style={{ margin: '0 0 18px', color: 'var(--text-muted)', fontSize: '0.88rem', lineHeight: 1.5 }}>
+              กรอกอีเมลที่ผูกกับบัญชี ระบบจะส่งรหัส OTP ซึ่งมีอายุ 10 นาที
+            </p>
+
+            {warningMsg && (
+              <div
+                role="alert"
+                style={{
+                  background: '#FEF2F2',
+                  border: '1px solid #FCA5A5',
+                  borderRadius: 10,
+                  padding: '10px 14px',
+                  fontSize: '0.84rem',
+                  color: '#991B1B',
+                  marginBottom: 16
+                }}
+              >
+                {warningMsg}
+              </div>
+            )}
+
+            {!resetOtpSent ? (
+              <form onSubmit={handleRequestPasswordResetOtp}>
+                <div className="form-group">
+                  <label
+                    htmlFor="password-reset-email"
+                    style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)', marginBottom: 6, display: 'block' }}
+                  >
+                    อีเมล
+                  </label>
+                  <input
+                    id="password-reset-email"
+                    type="email"
+                    className="form-input-light"
+                    autoComplete="email"
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <button type="submit" className="btn btn-primary" disabled={isSubmitting} style={{ width: '100%' }}>
+                  {isSubmitting ? 'กำลังส่ง...' : 'ส่งรหัส OTP'}
+                </button>
+              </form>
+            ) : (
+              <>
+                <div
+                  style={{
+                    background: '#F0FDF4',
+                    border: '1px solid #86EFAC',
+                    borderRadius: 10,
+                    padding: '10px 14px',
+                    fontSize: '0.84rem',
+                    color: '#166534',
+                    marginBottom: 16,
+                    lineHeight: 1.5
+                  }}
+                >
+                  หากอีเมลนี้ผูกกับบัญชีที่ใช้งานได้ ระบบจะส่งรหัส OTP ไปให้ภายในไม่กี่นาที
+                </div>
+                <form onSubmit={handleCompletePasswordReset}>
+                  <div className="form-group">
+                    <label
+                      htmlFor="password-reset-email-sent"
+                      style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)', marginBottom: 6, display: 'block' }}
+                    >
+                      อีเมล
+                    </label>
+                    <input
+                      id="password-reset-email-sent"
+                      type="email"
+                      className="form-input-light"
+                      value={resetEmail}
+                      disabled
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label
+                      htmlFor="password-reset-otp"
+                      style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)', marginBottom: 6, display: 'block' }}
+                    >
+                      รหัส OTP 6 หลัก
+                    </label>
+                    <input
+                      id="password-reset-otp"
+                      type="text"
+                      className="form-input-light"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      pattern="[0-9]{6}"
+                      maxLength={6}
+                      value={resetOtp}
+                      onChange={(e) => setResetOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label
+                      htmlFor="password-reset-new-password"
+                      style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)', marginBottom: 6, display: 'block' }}
+                    >
+                      รหัสผ่านใหม่ (8-128 ตัวอักษร)
+                    </label>
+                    <input
+                      id="password-reset-new-password"
+                      type="password"
+                      className="form-input-light"
+                      autoComplete="new-password"
+                      minLength={8}
+                      maxLength={128}
+                      value={resetPassword}
+                      onChange={(e) => setResetPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label
+                      htmlFor="password-reset-confirm-password"
+                      style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)', marginBottom: 6, display: 'block' }}
+                    >
+                      ยืนยันรหัสผ่านใหม่
+                    </label>
+                    <input
+                      id="password-reset-confirm-password"
+                      type="password"
+                      className="form-input-light"
+                      autoComplete="new-password"
+                      minLength={8}
+                      maxLength={128}
+                      value={confirmResetPassword}
+                      onChange={(e) => setConfirmResetPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <button type="submit" className="btn btn-primary" disabled={isSubmitting} style={{ width: '100%' }}>
+                    {isSubmitting ? 'กำลังเปลี่ยนรหัสผ่าน...' : 'ยืนยันและเปลี่ยนรหัสผ่าน'}
+                  </button>
+                </form>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 14 }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setResetOtpSent(false);
+                      setResetOtp('');
+                      setWarningMsg(null);
+                    }}
+                    style={{ background: 'none', border: 'none', color: 'var(--math-green)', cursor: 'pointer' }}
+                  >
+                    เปลี่ยนอีเมล
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void requestPasswordResetOtp()}
+                    disabled={isSubmitting}
+                    style={{ background: 'none', border: 'none', color: 'var(--math-green)', cursor: 'pointer' }}
+                  >
+                    ส่ง OTP อีกครั้ง
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 };

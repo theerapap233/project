@@ -71,6 +71,23 @@ npm run build
 
 หากใช้ฐานข้อมูลเดิม ให้รัน [`supabase/scholarship_bulk_dates.sql`](supabase/scholarship_bulk_dates.sql) เพื่อเพิ่มวันเริ่มรับสมัคร ซึ่งใช้ร่วมกับการปรับวันรับสมัครแบบกลุ่ม
 
+### ระบบรีเซ็ตรหัสผ่านด้วย OTP
+
+ระบบรีเซ็ตรหัสผ่านใช้ Supabase Edge Function `password-reset` และ Resend ส่ง OTP ทางอีเมลให้ทั้งนักศึกษาและเจ้าหน้าที่ ก่อนเปิดใช้งานกับ Supabase project:
+
+1. รันสคริปต์ [`supabase/password_reset_otp.sql`](supabase/password_reset_otp.sql) ใน Supabase SQL Editor
+2. Deploy Edge Function จาก repository ด้วย Supabase CLI:
+   ```bash
+   supabase functions deploy password-reset
+   ```
+3. ตั้งค่า Edge Function secrets ใน Supabase Dashboard > Edge Functions > Secrets:
+   - `RESEND_API_KEY`: API key ของ Resend
+   - `EMAIL_FROM`: อีเมลผู้ส่งบนโดเมนที่ยืนยันกับ Resend เช่น `Scholarship Office <no-reply@example.ac.th>`
+   - `OTP_HASH_SECRET`: คีย์สุ่มส่วนตัวอย่างน้อย 32 ตัวอักษร ใช้เก็บ OTP ในฐานข้อมูลเป็น HMAC hash
+   - `SUPABASE_URL` และ `SUPABASE_SERVICE_ROLE_KEY`: ค่าของ Supabase project; ห้ามนำ service role key ไปใส่ใน frontend หรือ commit ลง repository
+
+รหัส OTP มีอายุ 10 นาที ใช้ได้ครั้งเดียว จำกัดการขอ 1 ครั้งต่อนาทีและไม่เกิน 5 ครั้งต่อชั่วโมงต่ออีเมล และจำกัดการกรอกผิดไม่เกิน 5 ครั้ง บัญชีที่ไม่พบจะได้รับข้อความตอบกลับแบบเดียวกับบัญชีที่มีอยู่เพื่อไม่เปิดเผยว่ามีบัญชีหรือไม่ การรีเซ็ตนักศึกษายังคงใช้รูปแบบ SHA-256 salted hash เดิมของระบบ
+
 ---
 
 ## 🏛️ จัดทำโดย

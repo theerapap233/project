@@ -15,6 +15,11 @@ import { StudentAccount, StudentLoginLogInput, StudentPersonalInfo, StudentRegis
 import { calculateStudentYear, normalizeMajorName, normalizePersonalInfo } from '../utils/studentProfile';
 import { getCurrentAcademicYear } from '../utils/academicCalendar';
 import { stripScholarshipCode } from '../utils/scholarshipName';
+import {
+  buildApplicationRecommendations,
+  getAutomaticRejectionNotes,
+  shouldAutomaticallyRejectApplication
+} from '../utils/applicationRecommendation';
 
 export type { StudentAccount, StudentPersonalInfo, StudentRegistrationData };
 
@@ -37,9 +42,12 @@ export interface UserProfile {
 
 interface StoredStaffCredentials {
   username: string;
+  email?: string;
   salt: string;
   passwordHash: string;
 }
+
+const DEFAULT_STAFF_EMAIL = 'math-scholarship@sci.kmutnb.ac.th';
 
 export type SupabaseConnectionStatus = 'connected' | 'demo' | 'error' | 'loading';
 
@@ -61,7 +69,6 @@ interface ScholarshipContextType {
   hasStaffCredentials: boolean;
   isLoginModalOpen: boolean;
   isLogoutModalOpen: boolean;
-  isChatbotOpen: boolean;
   
   // Student Auth
   studentAccounts: StudentAccount[];
@@ -133,11 +140,8 @@ interface ScholarshipContextType {
   closeLoginModal: () => void;
   openLogoutModal: () => void;
   closeLogoutModal: () => void;
-  openChatbot: () => void;
-  closeChatbot: () => void;
-  toggleChatbot: () => void;
   updateCurrentUser: (updates: Partial<UserProfile>) => void;
-  saveStaffProfile: (updates: Pick<UserProfile, 'email' | 'position' | 'avatarUrl'>) => Promise<boolean>;
+  saveStaffProfile: (updates: Pick<UserProfile, 'name' | 'username' | 'email' | 'position' | 'avatarUrl'>) => Promise<boolean>;
   login: (identifier: string, password: string, customName?: string) => Promise<{ success: boolean; message?: string }>;
   changeStaffCredentials: (username: string, newPassword: string, currentPassword?: string) => Promise<boolean>;
   logout: () => void;
@@ -258,16 +262,21 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((s: Partial<Scholarship>) => ({
-            ...s,
-            title: stripScholarshipCode(s.title || ''),
-            minGPAX: typeof s.minGPAX === 'number' ? s.minGPAX : 2.00,
-            targetYears: Array.isArray(s.targetYears) && s.targetYears.length > 0 ? s.targetYears : ['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4'],
-            deadline: s.deadline || '2026-10-31',
-            totalSlots: s.totalSlots ?? 5,
-            remainingSlots: s.remainingSlots ?? s.totalSlots ?? 5,
-            status: s.status || 'open'
-          })) as Scholarship[];
+          return parsed.map((s: Partial<Scholarship>) => {
+            const targetYears = Array.isArray(s.targetYears)
+              ? s.targetYears.filter(year => year !== 'บัณฑิตศึกษา')
+              : [];
+            return {
+              ...s,
+              title: stripScholarshipCode(s.title || ''),
+              minGPAX: typeof s.minGPAX === 'number' ? s.minGPAX : 2.00,
+              targetYears: targetYears.length > 0 ? targetYears : ['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4'],
+              deadline: s.deadline || '2026-10-31',
+              totalSlots: s.totalSlots ?? 5,
+              remainingSlots: s.remainingSlots ?? s.totalSlots ?? 5,
+              status: s.status || 'open'
+            };
+          }) as Scholarship[];
         }
       } catch (e) { console.error(e); }
     }
@@ -281,13 +290,25 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           // Merge initial ratings/comments if missing
-          return parsed.map((app: Application) => {
+          const normalizedApps = parsed.map((app: Application) => {
             const initialMatch = INITIAL_APPLICATIONS.find(init => init.trackingId === app.trackingId);
             return {
               ...app,
               scholarshipName: stripScholarshipCode(app.scholarshipName),
               systemRating: app.systemRating || app.formData?.systemRating || initialMatch?.systemRating || 0,
               systemComment: app.systemComment || app.formData?.systemComment || initialMatch?.systemComment || ''
+            };
+          });
+          const recommendations = buildApplicationRecommendations(normalizedApps, scholarships);
+          return normalizedApps.map(app => {
+            const recommendation = recommendations.get(app.trackingId);
+            if (app.status !== 'submitted' || !shouldAutomaticallyRejectApplication(recommendation) || !recommendation) {
+              return app;
+            }
+            return {
+              ...app,
+              status: 'rejected' as const,
+              committeeNotes: getAutomaticRejectionNotes(app.committeeNotes || '', recommendation)
             };
           });
         }
@@ -344,7 +365,6 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState<boolean>(false);
-  const [isChatbotOpen, setIsChatbotOpen] = useState<boolean>(false);
   const [isPreviewMode, setIsPreviewMode] = useState<boolean>(false);
 
   const [announcements, setAnnouncements] = useState<Announcement[]>(() => {
@@ -418,7 +438,42 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
         setScholarships(schResult.data);
       }
       if (appResult.source === 'supabase') {
-        setApplications(appResult.data);
+        const scholarshipsToAssess = schResult.source === 'supabase' ? schResult.data : scholarships;
+        const recommendations = buildApplicationRecommendations(appResult.data, scholarshipsToAssess);
+        const autoRejectedApps = appResult.data.flatMap(app => {
+          const recommendation = recommendations.get(app.trackingId);
+          return app.status === 'submitted' && shouldAutomaticallyRejectApplication(recommendation) && recommendation
+            ? [{ app, recommendation, notes: getAutomaticRejectionNotes(app.committeeNotes || '', recommendation) }]
+            : [];
+        });
+        const persistenceResults = await Promise.all(autoRejectedApps.map(({ app, notes }) =>
+          applicationService.updateApplicationReview(
+            app.trackingId,
+            'rejected',
+            app.score,
+            app.interviewDate,
+            notes
+          )
+        ));
+        const persistedRejections = new Map(
+          autoRejectedApps
+            .filter((_, index) => persistenceResults[index])
+            .map(({ app, notes }) => [app.trackingId, notes])
+        );
+        setApplications(appResult.data.map(app => {
+          const notes = persistedRejections.get(app.trackingId);
+          return notes
+            ? { ...app, status: 'rejected', committeeNotes: notes }
+            : app;
+        }));
+
+        const failedRejections = persistenceResults.filter(success => !success).length;
+        if (failedRejections > 0) {
+          showToast(`เปลี่ยนสถานะไม่ผ่านอัตโนมัติไม่สำเร็จ ${failedRejections} ใบ กรุณาตรวจสอบและลองอีกครั้ง`, 'warning');
+        }
+        if (persistedRejections.size > 0) {
+          showToast(`เปลี่ยนสถานะเป็นไม่ผ่านการพิจารณา ${persistedRejections.size} ใบตามเกณฑ์อัตโนมัติ`, 'info');
+        }
       }
       if (settingsResult.source === 'supabase') {
         setSiteSettings(settingsResult.data);
@@ -504,9 +559,6 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const openLogoutModal = () => setIsLogoutModalOpen(true);
   const closeLogoutModal = () => setIsLogoutModalOpen(false);
-  const openChatbot = () => setIsChatbotOpen(true);
-  const closeChatbot = () => setIsChatbotOpen(false);
-  const toggleChatbot = () => setIsChatbotOpen(prev => !prev);
 
   const updateCurrentUser = (updates: Partial<UserProfile>) => {
     if (!currentUser) return;
@@ -620,7 +672,12 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
           }
         }
         const salt = createPasswordSalt();
-        credentials = { username: cleanUsername, salt, passwordHash: await createPasswordHash(newPassword, salt) };
+        credentials = {
+          username: cleanUsername,
+          email: staffCredentials?.email || DEFAULT_STAFF_EMAIL,
+          salt,
+          passwordHash: await createPasswordHash(newPassword, salt)
+        };
       } else if (staffCredentials) {
         credentials = { ...staffCredentials, username: cleanUsername };
       } else {
@@ -642,14 +699,16 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const saveStaffProfile = async (
-    updates: Pick<UserProfile, 'email' | 'position' | 'avatarUrl'>
+    updates: Pick<UserProfile, 'name' | 'username' | 'email' | 'position' | 'avatarUrl'>
   ): Promise<boolean> => {
     if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'officer')) return false;
 
+    const name = updates.name.trim();
+    const username = updates.username?.trim() || '';
     const email = updates.email.trim();
     const position = updates.position?.trim();
-    if (!email || !position) {
-      showToast('กรุณากรอกอีเมลและตำแหน่งให้ครบถ้วน', 'warning');
+    if (!name || !username || !email || !position) {
+      showToast('กรุณากรอกชื่อ ชื่อผู้ใช้ อีเมล และตำแหน่งให้ครบถ้วน', 'warning');
       return false;
     }
 
@@ -657,15 +716,21 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
       const { data, error } = await supabase
         .from('staff_users')
         .update({
+          name,
+          username,
           email,
           position,
           avatar_url: updates.avatarUrl || null
         })
         .eq('username', currentUser.username || currentUser.studentId)
-        .select('username')
+        .select('username, name')
         .maybeSingle();
 
       if (error) {
+        if (error.code === '23505') {
+          showToast('ชื่อผู้ใช้นี้มีผู้ใช้งานแล้ว กรุณาเลือกชื่ออื่น', 'warning');
+          return false;
+        }
         console.error('ไม่สามารถบันทึกข้อมูลโปรไฟล์เจ้าหน้าที่ลง Supabase ได้:', error.message);
         showToast(`บันทึกข้อมูลเจ้าหน้าที่ลง Supabase ไม่สำเร็จ (${error.code || 'database error'})`, 'error');
         return false;
@@ -674,10 +739,22 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
         showToast('ไม่พบบัญชีเจ้าหน้าที่ใน Supabase กรุณาเข้าสู่ระบบใหม่', 'error');
         return false;
       }
+    } else if (username !== (currentUser.username || currentUser.studentId) && !staffCredentials) {
+      showToast('ไม่สามารถเปลี่ยนชื่อผู้ใช้ในโหมดเดโมได้ กรุณาเข้าสู่ระบบใหม่ก่อน', 'warning');
+      return false;
+    }
+
+    if (staffCredentials) {
+      const updatedCredentials = { ...staffCredentials, username, email };
+      safeSetLocalStorage(LOCAL_STORAGE_STAFF_CREDENTIALS_KEY, JSON.stringify(updatedCredentials));
+      setStaffCredentials(updatedCredentials);
     }
 
     updateCurrentUser({
       ...updates,
+      name,
+      username,
+      studentId: username,
       email,
       position,
       avatarUrl: updates.avatarUrl || null
@@ -1008,13 +1085,18 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
     if (!cleanId || !password) return { success: false, message: 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน' };
 
     if (isSupabaseConfigured()) {
-      const { data, error } = await supabase
+      const findStaffUser = (field: 'username' | 'email', value: string) => supabase
         .from('staff_users')
         .select('username, name, email, department, position, avatar_url, role_id, staff_roles(role_name, role_title)')
-        .eq('username', cleanId)
+        .eq(field, value)
         .eq('password', password)
         .eq('is_active', true)
         .maybeSingle();
+      let result = await findStaffUser('username', cleanId);
+      if (!result.error && !result.data && cleanId.includes('@')) {
+        result = await findStaffUser('email', cleanId.toLowerCase());
+      }
+      const { data, error } = result;
       if (error) {
         console.error('ไม่สามารถตรวจสอบบัญชี staff_users ได้:', error.message);
         return {
@@ -1034,7 +1116,7 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
       ) {
         return {
           success: false,
-          message: 'ไม่พบบัญชีที่ใช้งานได้ หรือ username/รหัสผ่านไม่ตรงกับ staff_users กรุณาตรวจ username, password, is_active และ role'
+          message: 'ไม่พบบัญชีที่ใช้งานได้ หรือ username/อีเมล/รหัสผ่านไม่ตรงกับ staff_users กรุณาตรวจสอบข้อมูลเข้าสู่ระบบและสิทธิ์บัญชี'
         };
       }
 
@@ -1060,7 +1142,14 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
       return { success: true };
     }
 
-    const legacyStaffName = cleanId.toLowerCase() === 'admin' || cleanId.toLowerCase().includes('staff') || cleanId.toLowerCase().includes('officer') || cleanId.toLowerCase().includes('committee') || cleanId.toLowerCase().includes('math');
+    const matchesLocalStaffEmail = cleanId.toLowerCase() ===
+      (staffCredentials?.email || DEFAULT_STAFF_EMAIL).toLowerCase();
+    const legacyStaffName = cleanId.toLowerCase() === 'admin' ||
+      cleanId.toLowerCase().includes('staff') ||
+      cleanId.toLowerCase().includes('officer') ||
+      cleanId.toLowerCase().includes('committee') ||
+      cleanId.toLowerCase().includes('math') ||
+      matchesLocalStaffEmail;
     const isStudentFormat = /^s?[0-9]{8,13}$/i.test(cleanId) || cleanId.includes('@email.kmutnb.ac.th') || (!legacyStaffName && (!staffCredentials || cleanId.toLowerCase() !== staffCredentials.username.toLowerCase()));
 
     if (isStudentFormat) {
@@ -1069,7 +1158,10 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
 
     if (staffCredentials) {
-      if (cleanId.toLowerCase() !== staffCredentials.username.toLowerCase() || !password) {
+      const matchesUsername = cleanId.toLowerCase() === staffCredentials.username.toLowerCase();
+      const matchesEmail = cleanId.toLowerCase() ===
+        (staffCredentials.email || DEFAULT_STAFF_EMAIL).toLowerCase();
+      if ((!matchesUsername && !matchesEmail) || !password) {
         return { success: false, message: 'ชื่อผู้ใช้หรือรหัสผ่านเจ้าหน้าที่ไม่ถูกต้อง' };
       }
       const submittedHash = await createPasswordHash(password, staffCredentials.salt);
@@ -1081,16 +1173,25 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
         return { success: false, message: 'ชื่อผู้ใช้หรือรหัสผ่านเจ้าหน้าที่ไม่ถูกต้อง' };
       }
       const salt = createPasswordSalt();
-      const credentials = { username: cleanId, salt, passwordHash: await createPasswordHash(password, salt) };
+      const username = matchesLocalStaffEmail ? 'admin' : cleanId;
+      const credentials = {
+        username,
+        email: DEFAULT_STAFF_EMAIL,
+        salt,
+        passwordHash: await createPasswordHash(password, salt)
+      };
       safeSetLocalStorage(LOCAL_STORAGE_STAFF_CREDENTIALS_KEY, JSON.stringify(credentials));
       setStaffCredentials(credentials);
     }
 
+    const username = staffCredentials
+      ? staffCredentials.username
+      : matchesLocalStaffEmail ? 'admin' : cleanId;
     const user: UserProfile = {
-      studentId: cleanId,
-      username: cleanId,
+      studentId: username,
+      username,
       name: customName || 'เจ้าหน้าที่ธุรการ/กรรมการทุน ภาควิชาคณิตศาสตร์',
-      email: 'math-scholarship@sci.kmutnb.ac.th',
+      email: DEFAULT_STAFF_EMAIL,
       faculty: 'คณะวิทยาศาสตร์ประยุกต์',
       major: 'งานกิจการนักศึกษาและทุนการศึกษา',
       position: 'เจ้าหน้าที่ธุรการ/กรรมการทุน',
@@ -1430,14 +1531,26 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
       systemRating: data.systemRating || 0,
       systemComment: data.systemComment || ''
     };
+    const recommendation = buildApplicationRecommendations(
+      [...applications, newApp],
+      scholarships
+    ).get(trackingId);
+    const autoReject = shouldAutomaticallyRejectApplication(recommendation);
+    const applicationToSave: Application = autoReject && recommendation
+      ? {
+          ...newApp,
+          status: 'rejected',
+          committeeNotes: getAutomaticRejectionNotes(newApp.committeeNotes, recommendation)
+        }
+      : newApp;
 
-    setApplications(prev => [newApp, ...prev]);
+    setApplications(prev => [applicationToSave, ...prev]);
     setLatestTrackingId(trackingId);
     setIsWizardModalOpen(false);
 
     // บันทึกไปยัง Supabase ในพื้นหลัง (ถ้าเชื่อมต่อ)
     if (isSupabaseConfigured()) {
-      applicationService.submitFullApplication(data, files, newApp, {
+      applicationService.submitFullApplication(data, files, applicationToSave, {
         academicYear,
         semester: matchedScholarship?.term || siteSettings.semester
       }).then(res => {
@@ -1447,13 +1560,28 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
             : application
           ));
           setLatestTrackingId(res.trackingId);
-          showToast(`ยื่นใบสมัครสำเร็จและบันทึกสู่ Supabase Cloud! รหัสติดตาม: ${res.trackingId}`, 'success');
+          showToast(
+            autoReject
+              ? `บันทึกใบสมัครแล้วและเปลี่ยนสถานะเป็นไม่ผ่านการพิจารณาตามเกณฑ์อัตโนมัติ รหัสติดตาม: ${res.trackingId}`
+              : `ยื่นใบสมัครสำเร็จและบันทึกสู่ Supabase Cloud! รหัสติดตาม: ${res.trackingId}`,
+            autoReject ? 'warning' : 'success'
+          );
         } else {
-          showToast(`ยื่นใบสมัครสำเร็จ (บันทึกในเครื่อง): รหัสติดตาม: ${trackingId}`, 'info');
+          showToast(
+            autoReject
+              ? `บันทึกใบสมัครในเครื่องและเปลี่ยนสถานะเป็นไม่ผ่านการพิจารณาตามเกณฑ์อัตโนมัติ รหัสติดตาม: ${trackingId}`
+              : `ยื่นใบสมัครสำเร็จ (บันทึกในเครื่อง): รหัสติดตาม: ${trackingId}`,
+            autoReject ? 'warning' : 'info'
+          );
         }
       });
     } else {
-      showToast(`ยื่นใบสมัครสำเร็จ! รหัสติดตาม: ${trackingId}`, 'success');
+      showToast(
+        autoReject
+          ? `บันทึกใบสมัครแล้วและเปลี่ยนสถานะเป็นไม่ผ่านการพิจารณาตามเกณฑ์อัตโนมัติ รหัสติดตาม: ${trackingId}`
+          : `ยื่นใบสมัครสำเร็จ! รหัสติดตาม: ${trackingId}`,
+        autoReject ? 'warning' : 'success'
+      );
     }
 
     return trackingId;
@@ -1715,10 +1843,6 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
         ),
         isLoginModalOpen,
         isLogoutModalOpen,
-        isChatbotOpen,
-        openChatbot,
-        closeChatbot,
-        toggleChatbot,
         isSupabaseConnected: supabaseStatus === 'connected',
         supabaseStatus,
         isLoadingData,

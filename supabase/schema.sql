@@ -529,7 +529,7 @@ INSERT INTO public.scholarship_programs (id, name, category_id, amount, quota, i
   15,
   true,
   'internal',
-  'เปิดรับนักศึกษาชั้นปีที่ 3-4 หรือบัณฑิตศึกษา ช่วยสอน ตรวจแบบฝึกหัด ในรายวิชา Calculus I, II และ Linear Algebra'
+  'เปิดรับนักศึกษาชั้นปีที่ 3-4 ช่วยสอน ตรวจแบบฝึกหัด ในรายวิชา Calculus I, II และ Linear Algebra'
 ),
 (
   'b0000000-0000-0000-0000-000000000004',
