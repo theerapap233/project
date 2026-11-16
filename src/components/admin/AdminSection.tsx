@@ -18,6 +18,7 @@ import {
   Printer,
   LayoutGrid,
   List,
+  Users,
   X,
   XCircle,
   Star,
@@ -27,6 +28,7 @@ import {
 import { useScholarship } from '../../context/ScholarshipContext';
 import { DecisionPicker, type Decision } from './DecisionPicker';
 import { StudentHistoryModal } from './StudentHistoryModal';
+import { StudentsOverview } from './StudentsOverview';
 import { normalizeStudentId } from '../../hooks/useMyApplications';
 import { Application, ApplicationStatus, ApplicationFormData } from '../../types/application';
 import { Scholarship } from '../../types/scholarship';
@@ -320,14 +322,15 @@ export const AdminSection: React.FC = () => {
   const [isSelectionMode, setIsSelectionMode] = useState(false);
 
   // มุมมองรายการใบสมัคร: 'list' = ตาราง, 'grid' = การ์ด (จำค่าไว้ในเบราว์เซอร์)
-  const [appViewMode, setAppViewMode] = useState<'list' | 'grid'>(() => {
+  const [appViewMode, setAppViewMode] = useState<'list' | 'grid' | 'students'>(() => {
     try {
-      return localStorage.getItem('KMUTNB_ADMIN_APP_VIEW') === 'grid' ? 'grid' : 'list';
+      const saved = localStorage.getItem('KMUTNB_ADMIN_APP_VIEW');
+      return saved === 'grid' || saved === 'students' ? saved : 'list';
     } catch {
       return 'list';
     }
   });
-  const changeAppViewMode = (mode: 'list' | 'grid') => {
+  const changeAppViewMode = (mode: 'list' | 'grid' | 'students') => {
     setAppViewMode(mode);
     try {
       localStorage.setItem('KMUTNB_ADMIN_APP_VIEW', mode);
@@ -1793,7 +1796,8 @@ export const AdminSection: React.FC = () => {
                 >
                   {([
                     { mode: 'grid', label: 'มุมมองการ์ด', Icon: LayoutGrid },
-                    { mode: 'list', label: 'มุมมองตาราง', Icon: List }
+                    { mode: 'list', label: 'มุมมองตาราง', Icon: List },
+                    { mode: 'students', label: 'มุมมองรายนักศึกษา (ดูว่าแต่ละคนสมัครทุนอะไรไปแล้วบ้าง)', Icon: Users }
                   ] as const).map(({ mode, label, Icon }) => {
                     const active = appViewMode === mode;
                     return (
@@ -1943,8 +1947,15 @@ export const AdminSection: React.FC = () => {
               </div>
             ) : null}
 
-            {/* Applications: มุมมองการ์ด */}
-            {appViewMode === 'grid' ? (
+            {/* Applications: มุมมองรายนักศึกษา / การ์ด / ตาราง */}
+            {appViewMode === 'students' ? (
+              <StudentsOverview
+                filteredApps={filteredApps}
+                applications={applications}
+                onOpenHistory={(studentId) => setHistoryStudentId(studentId)}
+                onOpenApplication={(app) => handleOpenReview(app)}
+              />
+            ) : appViewMode === 'grid' ? (
               filteredApps.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-muted)', fontSize: '0.9rem', background: 'var(--surface-card)', borderRadius: 12, border: '1px solid var(--border-light, #e2e8f0)' }}>
                   ไม่พบข้อมูลใบสมัครที่ตรงกับเงื่อนไขการค้นหา

@@ -38,8 +38,8 @@ export const LoginModal: React.FC = () => {
   const [staffPassword, setStaffPassword] = useState('');
 
   // Student login state
-  const [studentIdentifier, setStudentIdentifier] = useState('6604062610099');
-  const [studentPassword, setStudentPassword] = useState('student123');
+  const [studentIdentifier, setStudentIdentifier] = useState('');
+  const [studentPassword, setStudentPassword] = useState('');
 
   // Student register state (เก็บเฉพาะข้อมูลเบื้องต้นที่จำเป็นต่อการสมัคร)
   const [registerForm, setRegisterForm] = useState({
@@ -458,7 +458,7 @@ export const LoginModal: React.FC = () => {
                         type="text"
                         className="form-input-light"
                         style={{ paddingLeft: 38 }}
-                        placeholder="เช่น 6604062610099 หรือ s6604... @email.kmutnb.ac.th"
+                        placeholder="กรอกรหัสนักศึกษาหรืออีเมล"
                         value={studentIdentifier}
                         onChange={(e) => {
                           setStudentIdentifier(e.target.value);
@@ -559,7 +559,7 @@ export const LoginModal: React.FC = () => {
                       <input
                         type="text"
                         className="form-input-light"
-                        placeholder="เช่น 6604062610099"
+                        placeholder="กรอกรหัสนักศึกษา"
                         value={registerForm.studentId}
                         onChange={(e) => setRegisterForm({ ...registerForm, studentId: e.target.value })}
                         maxLength={14}
@@ -574,7 +574,7 @@ export const LoginModal: React.FC = () => {
                       <input
                         type="text"
                         className="form-input-light"
-                        placeholder="เช่น นายสมคิด มุ่งมั่นวิทยา"
+                        placeholder="กรอกชื่อ-นามสกุล"
                         value={registerForm.name}
                         onChange={(e) => setRegisterForm({ ...registerForm, name: e.target.value })}
                         required
