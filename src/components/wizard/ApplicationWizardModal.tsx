@@ -18,8 +18,6 @@ const MAJOR_OPTIONS = [
   'วท.บ. คณิตศาสตร์เชิงคอมพิวเตอร์ (MC) - โครงการสมทบพิเศษ'
 ];
 
-const YEAR_OPTIONS = ['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4'];
-
 const emptyAddress = (): Address => ({
   houseNo: '',
   moo: '',
@@ -118,7 +116,13 @@ export const ApplicationWizardModal: React.FC = () => {
 
   // เมื่อเปิดหน้าต่างสมัคร: เติมข้อมูลส่วนตัวจากบัญชีที่เข้าสู่ระบบ
   useEffect(() => {
-    if (!isWizardModalOpen) return;
+    if (!isWizardModalOpen) {
+      setStep(1);
+      setMaxStepVisited(1);
+      setFormData(createEmptyForm());
+      setFiles({ doc1: null, doc2: null, doc3: null, profilePhoto: null });
+      return;
+    }
 
     const targetScholarshipId = selectedScholarshipIdForApply || scholarships[0]?.id || '';
     const names = (currentUser?.name || '').trim().split(/\s+/);
@@ -127,7 +131,12 @@ export const ApplicationWizardModal: React.FC = () => {
 
     setStep(1);
     setMaxStepVisited(1);
-    setFiles(prev => ({ ...prev, profilePhoto: currentUser?.avatarUrl || null }));
+    setFiles({
+      doc1: null,
+      doc2: null,
+      doc3: null,
+      profilePhoto: currentUser?.avatarUrl || null
+    });
     setFormData({
       ...createEmptyForm(),
       ...personalInfo,
@@ -232,8 +241,12 @@ export const ApplicationWizardModal: React.FC = () => {
       }
     }
 
-    // Step 2: เหตุผลความจำเป็น (ไม่บังคับกรอก หรือไม่เกิน 5 ข้อ)
+    // Step 2: ต้องระบุเหตุผลความจำเป็นอย่างน้อย 1 ข้อ และไม่เกิน 5 ข้อ
     if (currentStep === 2) {
+      if (!reasonsList.some(reason => reason.trim())) {
+        showToast('กรุณาระบุเหตุผลความจำเป็นอย่างน้อย 1 ข้อ', 'warning');
+        return false;
+      }
       return true;
     }
 
@@ -241,28 +254,37 @@ export const ApplicationWizardModal: React.FC = () => {
   };
 
   const handleNext = () => {
+    if (step >= WIZARD_STEPS.length) return;
     if (!validateStep(step)) return;
     const nextStep = Math.min(step + 1, WIZARD_STEPS.length);
     setStep(nextStep);
     setMaxStepVisited(prev => Math.max(prev, nextStep));
   };
 
-  const handlePrev = () => setStep(prev => Math.max(prev - 1, 1));
+  const navigateToStep = (targetStep: number) => {
+    if (step === WIZARD_STEPS.length && targetStep < WIZARD_STEPS.length) {
+      updateField('consent', false);
+    }
+    setStep(targetStep);
+  };
+
+  const handlePrev = () => navigateToStep(Math.max(step - 1, 1));
 
   const handleStepClick = (targetStep: number) => {
     if (targetStep === step) return;
     if (targetStep < step) {
-      setStep(targetStep);
+      navigateToStep(targetStep);
       return;
     }
     if (targetStep <= maxStepVisited && validateStep(step)) {
-      setStep(targetStep);
+      navigateToStep(targetStep);
     }
   };
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
 
+    if (step !== WIZARD_STEPS.length) return;
     if (!isStudent) {
       showToast('กรุณาเข้าสู่ระบบด้วยบัญชีนักศึกษาก่อนยื่นใบสมัคร', 'warning');
       return;
@@ -480,21 +502,13 @@ export const ApplicationWizardModal: React.FC = () => {
                   </div>
 
                   <div className="form-group">
-                    <label className="sub-label">ชั้นปี *</label>
-                    <select
+                    <label className="sub-label">ชั้นปี (คำนวณจากรหัสนักศึกษา)</label>
+                    <input
+                      type="text"
                       className="form-input-light"
-                      value={formData.year}
-                      onChange={(e) => updateField('year', e.target.value)}
-                      required
-                    >
-                      <option value="">-- เลือกชั้นปี --</option>
-                      {formData.year && !YEAR_OPTIONS.includes(formData.year) && (
-                        <option value={formData.year}>{formData.year}</option>
-                      )}
-                      {YEAR_OPTIONS.map(option => (
-                        <option key={option} value={option}>{option}</option>
-                      ))}
-                    </select>
+                      value={calculateStudentYear(formData.studentId, formData.year)}
+                      readOnly
+                    />
                   </div>
 
                   <div className="form-group">
@@ -539,7 +553,7 @@ export const ApplicationWizardModal: React.FC = () => {
                   </span>
                 </div>
                 <p style={{ margin: '0 0 14px', fontSize: '0.84rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                  ระบุเหตุผลความจำเป็นและเป้าหมายในการใช้เงินทุน (เป็นข้อๆ สูงสุดไม่เกิน 5 ข้อ หรือเว้นว่างได้ ไม่บังคับกรอก)
+                  ระบุเหตุผลความจำเป็นและเป้าหมายในการใช้เงินทุนอย่างน้อย 1 ข้อ สูงสุดไม่เกิน 5 ข้อ
                 </p>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -656,7 +670,7 @@ export const ApplicationWizardModal: React.FC = () => {
                     </div>
                   </div>
 
-                  <button type="button" className="wizard-edit-btn" onClick={() => setStep(1)}>
+                  <button type="button" className="wizard-edit-btn" onClick={() => navigateToStep(1)}>
                     แก้ไขข้อมูล
                   </button>
                 </div>
@@ -692,7 +706,7 @@ export const ApplicationWizardModal: React.FC = () => {
                 <div style={{ background: 'var(--surface-white)', padding: 14, borderRadius: 12, border: '1px solid var(--border-light)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <span className="wizard-summary-label" style={{ margin: 0 }}>เหตุผลความจำเป็น</span>
-                    <button type="button" className="wizard-edit-btn" onClick={() => setStep(2)}>
+                    <button type="button" className="wizard-edit-btn" onClick={() => navigateToStep(2)}>
                       แก้ไข
                     </button>
                   </div>

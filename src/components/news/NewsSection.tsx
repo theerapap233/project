@@ -3,8 +3,10 @@ import { Announcement } from '../../types/common';
 import { useScholarship } from '../../context/ScholarshipContext';
 
 export const NewsSection: React.FC = () => {
-  const { announcements, showToast } = useScholarship();
+  const { announcements } = useScholarship();
   const [selectedNews, setSelectedNews] = useState<Announcement | null>(null);
+  const [showAllNews, setShowAllNews] = useState(false);
+  const visibleAnnouncements = showAllNews ? announcements : announcements.slice(0, 3);
 
   const handleOpenNews = (news: Announcement) => {
     setSelectedNews(news);
@@ -12,10 +14,6 @@ export const NewsSection: React.FC = () => {
 
   const handleCloseNews = () => {
     setSelectedNews(null);
-  };
-
-  const handleDownloadDoc = (title: string) => {
-    showToast(`กำลังเปิดเอกสาร: ${title}`, 'info');
   };
 
   return (
@@ -30,40 +28,63 @@ export const NewsSection: React.FC = () => {
         </div>
 
         {/* News Grid - Minimalist 3 Columns */}
-        <div className="news-grid-minimal">
-          {announcements.map(item => (
-            <article
-              key={item.id}
-              className="news-card-minimal"
-              onClick={() => handleOpenNews(item)}
-            >
-              <div className="news-card-top">
-                <span className="news-tag-pill">
-                  {item.tag}
-                </span>
-                <time className="news-date">
-                  <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  {item.date}
-                </time>
-              </div>
+        {visibleAnnouncements.length > 0 ? (
+          <div className="news-grid-minimal">
+            {visibleAnnouncements.map(item => (
+              <article
+                key={item.id}
+                className="news-card-minimal"
+                role="button"
+                tabIndex={0}
+                aria-label={`อ่านข่าว ${item.title}`}
+                onClick={() => handleOpenNews(item)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    handleOpenNews(item);
+                  }
+                }}
+              >
+                <div className="news-card-top">
+                  <span className="news-tag-pill">
+                    {item.tag}
+                  </span>
+                  <time className="news-date">
+                    <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    {item.date}
+                  </time>
+                </div>
 
-              <h3 className="news-title">
-                {item.title}
-              </h3>
+                <h3 className="news-title">
+                  {item.title}
+                </h3>
 
-              <p className="news-summary">
-                {item.summary}
-              </p>
+                <p className="news-summary">
+                  {item.summary}
+                </p>
 
-              <div className="news-footer">
-                <span>{item.linkText || 'อ่านรายละเอียด'}</span>
-                <span className="news-arrow">&rarr;</span>
-              </div>
-            </article>
-          ))}
-        </div>
+                <div className="news-footer">
+                  <span>{item.linkText || 'อ่านรายละเอียด'}</span>
+                  <span className="news-arrow">&rarr;</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="section-subtitle">ขณะนี้ยังไม่มีข่าวสารและประกาศ</p>
+        )}
+        {announcements.length > 3 && (
+          <button
+            type="button"
+            className="section-view-more"
+            aria-expanded={showAllNews}
+            onClick={() => setShowAllNews(showAll => !showAll)}
+          >
+            {showAllNews ? 'ย่อรายการ' : 'ดูเพิ่มเติม'}
+          </button>
+        )}
 
         {/* News Detail Modal */}
         {selectedNews && (
@@ -111,7 +132,7 @@ export const NewsSection: React.FC = () => {
                   รายละเอียดข่าวและประกาศ
                 </h4>
                 <p style={{ color: 'var(--navy-700)', fontSize: '0.95rem', lineHeight: 1.8, marginBottom: 24, whiteSpace: 'pre-line' }}>
-                  {selectedNews.summary}
+                  {selectedNews.summary || 'ยังไม่มีรายละเอียดเพิ่มเติม'}
                 </p>
 
                 <div style={{ 
@@ -129,11 +150,6 @@ export const NewsSection: React.FC = () => {
                 </div>
               </div>
 
-              <div className="modal-footer">
-                <button type="button" className="btn btn-primary" onClick={() => handleDownloadDoc(selectedNews.title)}>
-                  ดาวน์โหลดประกาศ (PDF)
-                </button>
-              </div>
             </div>
           </div>
         )}

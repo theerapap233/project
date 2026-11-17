@@ -6,10 +6,12 @@ import {
   calculateStudentYear,
   createEmptyPersonalInfo,
   DEPARTMENT_MAJOR_OPTIONS,
+  formatMajorShortName,
   hasFilledPersonalInfo,
   normalizeMajorName,
   normalizePersonalInfo
 } from '../../utils/studentProfile';
+import { isStudentUniversityEmail } from '../../utils/studentRegistrationValidation';
 import {
   AtSign,
   BriefcaseBusiness,
@@ -143,6 +145,11 @@ export const Navbar: React.FC = () => {
     }
 
     if (isStudent) {
+      if (!isStudentUniversityEmail(currentUser.studentId, trimmedEmail)) {
+        showToast('อีเมลต้องเป็นรูปแบบ s ตามด้วยรหัสนักศึกษา 13 หลัก @email.kmutnb.ac.th', 'warning');
+        return;
+      }
+
       const gpaxNum = parseFloat(profileForm.gpax);
       if (isNaN(gpaxNum) || gpaxNum < 0 || gpaxNum > 4.0) {
         showToast('เกรดเฉลี่ยสะสม (GPAX) ต้องอยู่ระหว่าง 0.00 - 4.00', 'warning');
@@ -154,7 +161,7 @@ export const Navbar: React.FC = () => {
         email: trimmedEmail,
         phone: profileForm.phone.trim(),
         major: profileForm.major.trim(),
-        year: profileForm.year,
+        year: calculateStudentYear(currentUser.studentId, profileForm.year),
         gpax: gpaxNum,
         avatarUrl: profileForm.avatarUrl || null
       });
@@ -186,7 +193,16 @@ export const Navbar: React.FC = () => {
   const handleSavePersonalInfo = (event: React.FormEvent) => {
     event.preventDefault();
     if (!currentUser) return;
-    updateCurrentUser({ personalInfo: personalForm });
+    const hasFamilyIncome = String(personalForm.fatherIncome).trim() !== '' ||
+      String(personalForm.motherIncome).trim() !== '';
+    const toAmount = (value: number | string) => {
+      const amount = Number(value);
+      return Number.isFinite(amount) ? Math.max(0, Math.floor(amount)) : 0;
+    };
+    const familyIncome = hasFamilyIncome
+      ? toAmount(personalForm.fatherIncome) + toAmount(personalForm.motherIncome)
+      : '';
+    updateCurrentUser({ personalInfo: { ...personalForm, familyIncome } });
     setIsPersonalInfoModalOpen(false);
   };
 
@@ -425,7 +441,7 @@ export const Navbar: React.FC = () => {
                             รหัส: {currentUser.studentId}
                           </span>
                           <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                            {currentUser.major}
+                            {formatMajorShortName(currentUser.major)}
                           </span>
                           <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                             {currentUser.gpax !== undefined ? (
@@ -443,35 +459,6 @@ export const Navbar: React.FC = () => {
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {isStudent && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsProfileMenuOpen(false);
-                          openMyApplications();
-                        }}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          padding: '8px 12px',
-                          textAlign: 'left',
-                          fontSize: '0.82rem',
-                          color: 'var(--math-green, #077b38)',
-                          cursor: 'pointer',
-                          borderRadius: '8px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 8,
-                          fontWeight: 700
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-alt)'}
-                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                      >
-                        <span>📨</span>
-                        <span>ใบสมัครของฉัน / ติดตามสถานะ</span>
-                      </button>
-                    )}
-
                     <button
                       type="button"
                       onClick={() => {
@@ -694,19 +681,14 @@ export const Navbar: React.FC = () => {
 
                     <div className="staff-profile-edit-field">
                       <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--navy-800)', display: 'block', marginBottom: 4 }}>
-                        ชั้นปี
+                        ชั้นปี (คำนวณจากรหัสนักศึกษา)
                       </label>
-                      <select
+                      <input
+                        type="text"
                         className="form-input-light"
-                        value={profileForm.year}
-                        onChange={(e) => setProfileForm(prev => ({ ...prev, year: e.target.value }))}
-                        required
-                      >
-                        <option value="ปี 1">ปี 1</option>
-                        <option value="ปี 2">ปี 2</option>
-                        <option value="ปี 3">ปี 3</option>
-                        <option value="ปี 4">ปี 4</option>
-                      </select>
+                        value={calculateStudentYear(currentUser?.studentId, profileForm.year)}
+                        readOnly
+                      />
                     </div>
                   </div>
 

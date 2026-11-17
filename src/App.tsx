@@ -14,7 +14,6 @@ import { ScholarshipDetailModal } from './components/scholarships/ScholarshipDet
 import { ApplicationWizardModal } from './components/wizard/ApplicationWizardModal';
 import { ApplicationSuccessModal } from './components/wizard/ApplicationSuccessModal';
 import { MyApplicationsModal } from './components/applications/MyApplicationsModal';
-import { MyApplicationsBanner } from './components/applications/MyApplicationsBanner';
 import { LoginModal } from './components/auth/LoginModal';
 import { LogoutModal } from './components/auth/LogoutModal';
 import { ToastContainer } from './components/ui/ToastContainer';
@@ -40,9 +39,6 @@ const MainContent: React.FC = () => {
         ) : (
           /* หน้าเว็บไซต์สำหรับนักศึกษาและบุคคลทั่วไป (รวมถึงโหมด Preview ของเจ้าหน้าที่) */
           <>
-            {/* แถบสรุปสถานะใบสมัคร (แสดงเฉพาะนักศึกษาที่มีใบสมัคร) */}
-            <MyApplicationsBanner />
-
             {/* Section 0: Hero Section (หน้าหลัก) */}
             <HeroSection />
 

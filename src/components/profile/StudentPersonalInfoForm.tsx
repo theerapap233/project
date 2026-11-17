@@ -28,9 +28,34 @@ const labelStyle: React.CSSProperties = {
  * ใช้ทั้งในเมนูโปรไฟล์ของนักศึกษา
  */
 export const StudentPersonalInfoForm: React.FC<StudentPersonalInfoFormProps> = ({ value, onChange }) => {
+  const toAmount = (amount: number | string) => {
+    const parsed = Number(amount);
+    return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0;
+  };
+
   const update = <K extends keyof StudentPersonalInfo>(key: K, next: StudentPersonalInfo[K]) => {
     onChange({ ...value, [key]: next });
   };
+
+  const updateParentIncome = (field: 'fatherIncome' | 'motherIncome', input: string) => {
+    const parsedIncome = Number(input);
+    const income = input === '' || !Number.isFinite(parsedIncome)
+      ? ''
+      : Math.max(0, Math.floor(parsedIncome));
+    const fatherIncome = field === 'fatherIncome' ? income : value.fatherIncome;
+    const motherIncome = field === 'motherIncome' ? income : value.motherIncome;
+    const hasIncome = String(fatherIncome).trim() !== '' || String(motherIncome).trim() !== '';
+
+    onChange({
+      ...value,
+      [field]: income,
+      familyIncome: hasIncome ? toAmount(fatherIncome) + toAmount(motherIncome) : ''
+    });
+  };
+
+  const familyIncome = String(value.fatherIncome).trim() === '' && String(value.motherIncome).trim() === ''
+    ? ''
+    : toAmount(value.fatherIncome) + toAmount(value.motherIncome);
 
   const updateAddress = (which: 'address' | 'idCardAddress', field: keyof Address, next: string) => {
     onChange({
@@ -217,9 +242,10 @@ export const StudentPersonalInfoForm: React.FC<StudentPersonalInfoFormProps> = (
             <input
               type="number"
               min="0"
+              step="1"
               className="form-input-light"
               value={value.fatherIncome}
-              onChange={e => update('fatherIncome', e.target.value)}
+              onChange={e => updateParentIncome('fatherIncome', e.target.value)}
               placeholder="เช่น 15000"
             />
           </div>
@@ -258,9 +284,10 @@ export const StudentPersonalInfoForm: React.FC<StudentPersonalInfoFormProps> = (
             <input
               type="number"
               min="0"
+              step="1"
               className="form-input-light"
               value={value.motherIncome}
-              onChange={e => update('motherIncome', e.target.value)}
+              onChange={e => updateParentIncome('motherIncome', e.target.value)}
               placeholder="เช่น 15000"
             />
           </div>
@@ -283,11 +310,10 @@ export const StudentPersonalInfoForm: React.FC<StudentPersonalInfoFormProps> = (
             <label style={labelStyle}>รายได้รวมครอบครัว (บาท/เดือน)</label>
             <input
               type="number"
-              min="0"
               className="form-input-light"
-              value={value.familyIncome}
-              onChange={e => update('familyIncome', e.target.value)}
-              placeholder="เช่น 25000"
+              value={familyIncome}
+              readOnly
+              aria-label="รายได้รวมครอบครัว คำนวณจากรายได้บิดาและมารดา"
             />
           </div>
           <div>

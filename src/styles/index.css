@@ -1384,6 +1384,12 @@ button, input, select, textarea {
   border: 1px solid var(--warning-border);
 }
 
+.status-badge.closed {
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  border: 1px solid var(--border-light);
+}
+
 .card-title {
   font-size: 1.15rem;
   font-weight: 700;
@@ -5636,6 +5642,28 @@ body:has(.modal-backdrop.open) .preview-mode-dock {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 22px;
+}
+
+.section-view-more {
+  display: block;
+  margin: 18px auto 0;
+  padding: 6px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--math-green, #077b38);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.section-view-more:hover {
+  text-decoration: underline;
+}
+
+.section-view-more:focus-visible {
+  outline: 2px solid var(--math-green, #077b38);
+  outline-offset: 3px;
+  border-radius: 4px;
 }
 
 @media (max-width: 1024px) {

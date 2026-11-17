@@ -12,8 +12,11 @@ export const ScholarshipDetailModal: React.FC = () => {
   if (!isDetailModalOpen || !selectedScholarshipForDetail) return null;
 
   const sch = selectedScholarshipForDetail;
+  const isClosed = sch.status === 'closed';
+  const isClosingSoon = sch.status === 'closing_soon';
 
   const handleApply = () => {
+    if (isClosed) return;
     closeScholarshipDetail();
     openApplicationModal(sch.id);
   };
@@ -47,8 +50,8 @@ export const ScholarshipDetailModal: React.FC = () => {
               {sch.scope === 'external' ? 'ทุนภายนอก' : 'ทุนภายใน'}
             </span>
             <span className="category-tag">{sch.categoryName}</span>
-            <span className="status-badge open">
-              ภาควิชาคณิตศาสตร์
+            <span className={`status-badge ${isClosed ? 'closed' : isClosingSoon ? 'closing_soon' : 'open'}`}>
+              {isClosed ? 'ปิดรับสมัคร' : isClosingSoon ? 'ใกล้ปิดรับสมัคร' : 'เปิดรับสมัคร'}
             </span>
           </div>
 
@@ -126,8 +129,8 @@ export const ScholarshipDetailModal: React.FC = () => {
         </div>
 
         <div className="modal-footer">
-          <button type="button" className="btn btn-primary" onClick={handleApply}>
-            สมัครทุนนี้
+          <button type="button" className="btn btn-primary" onClick={handleApply} disabled={isClosed}>
+            {isClosed ? 'ปิดรับสมัครแล้ว' : 'สมัครทุนนี้'}
           </button>
         </div>
       </div>

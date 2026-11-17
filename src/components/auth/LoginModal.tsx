@@ -11,6 +11,7 @@ import {
   UserPlus
 } from 'lucide-react';
 import { passwordResetService, type PasswordResetScope } from '../../services/passwordResetService';
+import { getStudentRegistrationError } from '../../utils/studentRegistrationValidation';
 
 export const LoginModal: React.FC = () => {
   const {
@@ -117,23 +118,12 @@ export const LoginModal: React.FC = () => {
     e.preventDefault();
     setWarningMsg(null);
 
-    const cleanId = registerForm.studentId.trim().replace(/^s/i, '');
-    if (!cleanId || cleanId.length < 8) {
-      setWarningMsg('กรุณากรอกรหัสนักศึกษา 8-13 หลักให้ถูกต้อง');
+    const registrationError = getStudentRegistrationError(registerForm);
+    if (registrationError) {
+      setWarningMsg(registrationError);
       return;
     }
-    if (!registerForm.name.trim()) {
-      setWarningMsg('กรุณากรอกชื่อ-นามสกุลพร้อมคำนำหน้า');
-      return;
-    }
-    if (!registerForm.email.trim() || !registerForm.email.includes('@')) {
-      setWarningMsg('กรุณากรอกอีเมลมหาวิทยาลัย (@email.kmutnb.ac.th)');
-      return;
-    }
-    if (!registerForm.phone.trim()) {
-      setWarningMsg('กรุณากรอกเบอร์โทรศัพท์สำหรับติดต่อกลับ');
-      return;
-    }
+    const cleanId = registerForm.studentId.trim();
     if (!registerForm.password || registerForm.password.length < 6) {
       setWarningMsg('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
       return;
@@ -192,9 +182,13 @@ export const LoginModal: React.FC = () => {
 
   const handleForgotPassword = (e: React.MouseEvent) => {
     e.preventDefault();
-    const scope = activeTab;
-    const loginIdentifier = scope === 'student' ? studentIdentifier : staffUsername;
-    setResetScope(scope);
+    if (activeTab === 'staff') {
+      showToast('กรุณาติดต่อผู้ดูแลระบบเพื่อรีเซ็ตรหัสผ่านเจ้าหน้าที่', 'info');
+      return;
+    }
+
+    const loginIdentifier = studentIdentifier;
+    setResetScope('student');
     setResetEmail(loginIdentifier.includes('@') ? loginIdentifier.trim() : '');
     setResetOtp('');
     setResetPassword('');
@@ -559,10 +553,12 @@ export const LoginModal: React.FC = () => {
                       <input
                         type="text"
                         className="form-input-light"
-                        placeholder="กรอกรหัสนักศึกษา"
+                        placeholder="13 หลัก"
+                        inputMode="numeric"
+                        pattern="[0-9]{13}"
                         value={registerForm.studentId}
-                        onChange={(e) => setRegisterForm({ ...registerForm, studentId: e.target.value })}
-                        maxLength={14}
+                        onChange={(e) => setRegisterForm({ ...registerForm, studentId: e.target.value.replace(/\D/g, '').slice(0, 13) })}
+                        maxLength={13}
                         required
                       />
                     </div>
@@ -574,7 +570,7 @@ export const LoginModal: React.FC = () => {
                       <input
                         type="text"
                         className="form-input-light"
-                        placeholder="กรอกชื่อ-นามสกุล"
+                        placeholder="มีคำนำหน้า"
                         value={registerForm.name}
                         onChange={(e) => setRegisterForm({ ...registerForm, name: e.target.value })}
                         required
@@ -590,9 +586,11 @@ export const LoginModal: React.FC = () => {
                       <input
                         type="tel"
                         className="form-input-light"
-                        placeholder="เช่น 089-123-4567"
+                        placeholder="10 หลัก เริ่มด้วย 0"
+                        inputMode="numeric"
+                        pattern="0[0-9]{9}"
                         value={registerForm.phone}
-                        onChange={(e) => setRegisterForm({ ...registerForm, phone: e.target.value })}
+                        onChange={(e) => setRegisterForm({ ...registerForm, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
                         required
                       />
                     </div>
@@ -604,9 +602,9 @@ export const LoginModal: React.FC = () => {
                       <input
                         type="email"
                         className="form-input-light"
-                        placeholder="s6604062610099@email.kmutnb.ac.th"
+                        placeholder="อีเมล มจพ."
                         value={registerForm.email}
-                        onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
+                        onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value.trim() })}
                         required
                       />
                     </div>
@@ -622,7 +620,7 @@ export const LoginModal: React.FC = () => {
                           type={showPassword ? 'text' : 'password'}
                           className="form-input-light"
                           style={{ paddingRight: 34 }}
-                          placeholder="รหัสผ่านอย่างน้อย 6 ตัว"
+                          placeholder="อย่างน้อย 6 ตัว"
                           value={registerForm.password}
                           onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
                           minLength={6}
@@ -657,7 +655,7 @@ export const LoginModal: React.FC = () => {
                           type={showConfirmPassword ? 'text' : 'password'}
                           className="form-input-light"
                           style={{ paddingRight: 34 }}
-                          placeholder="พิมพ์รหัสผ่านอีกครั้ง"
+                          placeholder="ยืนยันรหัสผ่าน"
                           value={registerForm.confirmPassword}
                           onChange={(e) => setRegisterForm({ ...registerForm, confirmPassword: e.target.value })}
                           minLength={6}

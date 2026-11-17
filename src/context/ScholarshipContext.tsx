@@ -14,7 +14,10 @@ import { studentAuthService } from '../services/studentAuthService';
 import { StudentAccount, StudentLoginLogInput, StudentPersonalInfo, StudentRegistrationData } from '../types/studentAccount';
 import { calculateStudentYear, normalizeMajorName, normalizePersonalInfo } from '../utils/studentProfile';
 import { getCurrentAcademicYear } from '../utils/academicCalendar';
+import { applicationMatchesPeriod } from '../utils/applicationPeriod';
+import { normalizeStudentId } from '../utils/studentId';
 import { stripScholarshipCode } from '../utils/scholarshipName';
+import { getStudentRegistrationError } from '../utils/studentRegistrationValidation';
 import {
   buildApplicationRecommendations,
   getAutomaticRejectionNotes,
@@ -909,22 +912,13 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const registerStudent = async (data: StudentRegistrationData): Promise<{ success: boolean; message: string }> => {
-    const cleanId = data.studentId.trim().replace(/^s/i, '');
-    if (!cleanId || cleanId.length < 8) {
-      const msg = 'กรุณากรอกรหัสนักศึกษาให้ถูกต้อง (8-13 หลัก)';
+    const registrationError = getStudentRegistrationError(data);
+    if (registrationError) {
+      const msg = registrationError;
       showToast(msg, 'warning');
       return { success: false, message: msg };
     }
-    if (!data.name.trim()) {
-      const msg = 'กรุณากรอกชื่อ-นามสกุล';
-      showToast(msg, 'warning');
-      return { success: false, message: msg };
-    }
-    if (!data.email.trim() || !data.email.includes('@')) {
-      const msg = 'กรุณากรอกอีเมลให้ถูกต้อง';
-      showToast(msg, 'warning');
-      return { success: false, message: msg };
-    }
+    const cleanId = data.studentId.trim();
     if (!data.password || data.password.length < 6) {
       const msg = 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';
       showToast(msg, 'warning');
@@ -1436,11 +1430,15 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const openApplicationModal = (schId?: string) => {
-    if (schId) {
-      setSelectedScholarshipIdForApply(schId);
-    } else if (!selectedScholarshipIdForApply && scholarships.length > 0) {
-      setSelectedScholarshipIdForApply(scholarships[0].id);
+    const targetScholarshipId = schId || selectedScholarshipIdForApply || scholarships[0]?.id;
+    const targetScholarship = scholarships.find(scholarship => scholarship.id === targetScholarshipId);
+
+    if (!targetScholarship || targetScholarship.status === 'closed') {
+      showToast('ทุนนี้ปิดรับสมัครแล้ว ไม่สามารถยื่นใบสมัครได้', 'warning');
+      return;
     }
+
+    setSelectedScholarshipIdForApply(targetScholarship.id);
     setIsWizardModalOpen(true);
   };
 
@@ -1489,9 +1487,34 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const submitApplication = (data: ApplicationFormData, files: UploadedFiles): string => {
     const today = new Date();
     const matchedScholarship = scholarships.find(s => s.id === data.scholarshipId);
+    if (!matchedScholarship) {
+      showToast('ไม่พบข้อมูลทุนที่เลือก กรุณาเลือกทุนอีกครั้ง', 'error');
+      return '';
+    }
+    if (matchedScholarship.status === 'closed') {
+      showToast('ทุนนี้ปิดรับสมัครแล้ว ไม่สามารถยื่นใบสมัครได้', 'warning');
+      return '';
+    }
+    if (!data.reason.trim()) {
+      showToast('กรุณาระบุเหตุผลความจำเป็นก่อนส่งใบสมัคร', 'warning');
+      return '';
+    }
+
     const academicYear = matchedScholarship?.academicYear || siteSettings.academicYear || String(today.getFullYear() + 543);
     const semesterDigits = (matchedScholarship?.term || siteSettings.semester).replace(/\D/g, '');
     const term = semesterDigits ? semesterDigits.padStart(2, '0').slice(-2) : '01';
+    const periodPrefix = `${academicYear.slice(-2)}${term}`;
+    const studentCode = normalizeStudentId(currentUser?.studentId || data.studentId);
+    const alreadyApplied = applications.some(application =>
+      normalizeStudentId(application.studentId) === studentCode &&
+      application.scholarshipId === data.scholarshipId &&
+      applicationMatchesPeriod(application, periodPrefix)
+    );
+    if (alreadyApplied) {
+      showToast('คุณมีใบสมัครทุนนี้ในรอบนี้แล้ว สามารถตรวจสอบสถานะใบสมัครได้', 'warning');
+      return '';
+    }
+
     const studentYear = data.year.replace(/\D/g, '').slice(-1) || '1';
     const trackingPrefix = `${academicYear.slice(-2)}${term}${studentYear}`;
     const nextSequence = applications.reduce((maxSequence, application) => {

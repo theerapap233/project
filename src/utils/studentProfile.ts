@@ -170,4 +170,11 @@ export const normalizeMajorName = (major?: string | null): string => {
   return isSpecial ? DEPARTMENT_MAJOR_OPTIONS[1] : DEPARTMENT_MAJOR_OPTIONS[0];
 };
 
+export const formatMajorShortName = (major?: string | null): string => {
+  const normalizedMajor = normalizeMajorName(major);
+  const majorCode = normalizedMajor.includes('(MC)') ? 'MC' : 'MA';
+  const programType = normalizedMajor.includes('สมทบพิเศษ') ? 'สมทบพิเศษ' : 'ปกติ';
+  return `${majorCode} - ${programType}`;
+};
+
 

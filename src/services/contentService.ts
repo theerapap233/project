@@ -27,9 +27,11 @@ export const contentService = {
         .eq('is_published', true)
         .order('created_at', { ascending: false });
 
-      if (error || !data || data.length === 0) {
+      if (error) {
+        console.warn('ดึงข่าวสารจาก Supabase ไม่สำเร็จ:', error.message);
         return ANNOUNCEMENTS;
       }
+      if (!data?.length) return [];
 
       return data.map((row: Record<string, unknown>, idx: number) => {
         const catObj = row.category as { name?: string } | null;
@@ -43,10 +45,11 @@ export const contentService = {
           tag: categoryName,
           tagType: 'primary',
           summary: (row.content as string) || '',
-          linkText: 'อ่านประกาศฉบับเต็ม'
+          linkText: 'อ่านรายละเอียด'
         };
       });
-    } catch {
+    } catch (err) {
+      console.warn('เกิดข้อผิดพลาดในการดึงข่าวสาร:', err);
       return ANNOUNCEMENTS;
     }
   },

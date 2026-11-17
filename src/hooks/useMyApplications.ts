@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useScholarship } from '../context/ScholarshipContext';
 import { Application } from '../types/application';
+import { applicationMatchesScholarshipPeriod } from '../utils/applicationPeriod';
 import { normalizeStudentId } from '../utils/studentId';
 
 export { normalizeStudentId } from '../utils/studentId';
@@ -10,7 +11,7 @@ export { normalizeStudentId } from '../utils/studentId';
  * คืนค่า [] ถ้ายังไม่ได้ล็อกอินหรือไม่ใช่นักศึกษา
  */
 export const useMyApplications = () => {
-  const { applications, currentUser } = useScholarship();
+  const { applications, currentUser, scholarships } = useScholarship();
   const isStudent = currentUser?.role === 'student';
   const myId = normalizeStudentId(currentUser?.studentId);
 
@@ -29,8 +30,13 @@ export const useMyApplications = () => {
   }), [myApplications]);
 
   /** หาใบสมัครล่าสุดของทุนนี้ (ใช้แสดงป้ายสถานะบนการ์ดทุน) */
-  const findByScholarship = (scholarshipId: string): Application | undefined =>
-    myApplications.find(app => app.scholarshipId === scholarshipId);
+  const findByScholarship = (scholarshipId: string): Application | undefined => {
+    const scholarship = scholarships.find(item => item.id === scholarshipId);
+    return myApplications.find(app =>
+      app.scholarshipId === scholarshipId &&
+      (!scholarship || applicationMatchesScholarshipPeriod(app, scholarship))
+    );
+  };
 
   return { isStudent, myApplications, counts, findByScholarship };
 };
