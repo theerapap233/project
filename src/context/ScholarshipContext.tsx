@@ -69,6 +69,7 @@ interface ScholarshipContextType {
   latestTrackingId: string;
   toasts: ToastMessage[];
   currentUser: UserProfile | null;
+  isRestoringStaffSession: boolean;
   hasStaffCredentials: boolean;
   isLoginModalOpen: boolean;
   isLogoutModalOpen: boolean;
@@ -344,6 +345,18 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
     return null;
   });
 
+  const [isRestoringStaffSession, setIsRestoringStaffSession] = useState<boolean>(() => {
+    if (!isSupabaseConfigured()) return false;
+    try {
+      const saved = localStorage.getItem('KMUTNB_SCH_USER');
+      if (!saved) return false;
+      const user = JSON.parse(saved) as UserProfile;
+      return user.role === 'admin' || user.role === 'officer';
+    } catch {
+      return false;
+    }
+  });
+
   const [isAdminActive, setIsAdminActive] = useState<boolean>(() => {
     if (isSupabaseConfigured()) return false;
     const saved = localStorage.getItem('KMUTNB_SCH_USER');
@@ -420,6 +433,89 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const removeToast = (id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
   };
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+
+    const saved = localStorage.getItem('KMUTNB_SCH_USER');
+    if (!saved) return;
+
+    let savedUser: UserProfile;
+    try {
+      savedUser = JSON.parse(saved) as UserProfile;
+    } catch (error) {
+      console.error('ไม่สามารถอ่านข้อมูลเซสชันเจ้าหน้าที่ที่บันทึกไว้ได้:', error);
+      localStorage.removeItem('KMUTNB_SCH_USER');
+      return;
+    }
+
+    if (savedUser.role !== 'admin' && savedUser.role !== 'officer') return;
+
+    const username = savedUser.username || savedUser.studentId;
+    if (!username) {
+      localStorage.removeItem('KMUTNB_SCH_USER');
+      setIsRestoringStaffSession(false);
+      return;
+    }
+
+    let cancelled = false;
+    const restoreStaffSession = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('staff_users')
+          .select('username, name, email, department, position, avatar_url, staff_roles(role_name, role_title)')
+          .eq('username', username)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        const role = Array.isArray(data?.staff_roles) ? data.staff_roles[0] : data?.staff_roles;
+        if (
+          !data ||
+          !role ||
+          (role.role_name !== 'admin' && role.role_name !== 'committee')
+        ) {
+          localStorage.removeItem('KMUTNB_SCH_USER');
+          return;
+        }
+
+        if (cancelled) return;
+
+        const user: UserProfile = {
+          studentId: data.username,
+          username: data.username,
+          name: data.name,
+          email: data.email,
+          faculty: 'คณะวิทยาศาสตร์ประยุกต์',
+          major: typeof data.department === 'string' ? data.department : 'งานกิจการนักศึกษาและทุนการศึกษา',
+          position: typeof data.position === 'string' && data.position
+            ? data.position
+            : typeof role.role_title === 'string' ? role.role_title : 'เจ้าหน้าที่',
+          avatarUrl: typeof data.avatar_url === 'string' ? data.avatar_url : null,
+          role: role.role_name === 'admin' ? 'admin' : 'officer'
+        };
+
+        setCurrentUser(user);
+        setIsAdminActive(true);
+        safeSetLocalStorage('KMUTNB_SCH_USER', JSON.stringify(user));
+      } catch (error) {
+        console.error('ไม่สามารถตรวจสอบเซสชันเจ้าหน้าที่กับ Supabase ได้:', error);
+        if (!cancelled) {
+          setCurrentUser(savedUser);
+          setIsAdminActive(true);
+          showToast('ตรวจสอบสถานะการเข้าสู่ระบบไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่อแล้วลองใหม่', 'warning');
+        }
+      } finally {
+        if (!cancelled) setIsRestoringStaffSession(false);
+      }
+    };
+
+    void restoreStaffSession();
+    return () => {
+      cancelled = true;
+    };
+  }, [showToast]);
 
   // ดึงข้อมูลจาก Supabase (ถ้ามี) หรือ Fallback ไปยัง LocalStorage
   const loadData = useCallback(async () => {
@@ -1860,6 +1956,7 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
         latestTrackingId,
         toasts,
         currentUser,
+        isRestoringStaffSession,
         hasStaffCredentials: Boolean(
           staffCredentials ||
           (isSupabaseConfigured() && (currentUser?.role === 'admin' || currentUser?.role === 'officer'))

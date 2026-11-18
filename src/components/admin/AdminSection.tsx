@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Pencil, 
   Trash2, 
@@ -60,6 +60,8 @@ const SCHOLARSHIP_YEAR_PRESETS = [
   { value: 'year-4', label: 'ปี 4', years: ['ปี 4'] }
 ];
 
+const ADMIN_TABS: readonly AdminTab[] = ['applications', 'scholarships', 'news', 'faq', 'downloads', 'ratings'];
+
 export const AdminSection: React.FC = () => {
   const { 
     applications, 
@@ -89,7 +91,14 @@ export const AdminSection: React.FC = () => {
     showToast
   } = useScholarship();
 
-  const [activeTab, setActiveTab] = useState<AdminTab>('applications');
+  const [activeTab, setActiveTab] = useState<AdminTab>(() => {
+    const savedTab = localStorage.getItem('KMUTNB_ADMIN_ACTIVE_TAB');
+    return ADMIN_TABS.find(tab => tab === savedTab) || 'applications';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('KMUTNB_ADMIN_ACTIVE_TAB', activeTab);
+  }, [activeTab]);
 
   // Application Filter & Review states
   const [searchTerm, setSearchTerm] = useState('');

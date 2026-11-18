@@ -6124,27 +6124,27 @@ body:has(.modal-backdrop.open) .preview-mode-dock {
 }
 
 .admin-dashboard .admin-applications-minimal .admin-kpi-grid .kpi-card:nth-child(1) {
-  --kpi-accent: #2563eb;
-  border-top-color: #3b82f6 !important;
-  background: linear-gradient(135deg, #eff6ff 0%, #fff 78%) !important;
+  --kpi-accent: #077b38;
+  border-top-color: #077b38 !important;
+  background: linear-gradient(135deg, #f0fdf4 0%, #fff 78%) !important;
 }
 
 .admin-dashboard .admin-applications-minimal .admin-kpi-grid .kpi-card:nth-child(2) {
-  --kpi-accent: #d97706;
-  border-top-color: #f59e0b !important;
-  background: linear-gradient(135deg, #fffbeb 0%, #fff 78%) !important;
+  --kpi-accent: #2563eb;
+  border-top-color: #2563eb !important;
+  background: linear-gradient(135deg, #eff6ff 0%, #fff 78%) !important;
 }
 
 .admin-dashboard .admin-applications-minimal .admin-kpi-grid .kpi-card:nth-child(3) {
   --kpi-accent: #059669;
-  border-top-color: #10b981 !important;
+  border-top-color: #059669 !important;
   background: linear-gradient(135deg, #ecfdf5 0%, #fff 78%) !important;
 }
 
 .admin-dashboard .admin-applications-minimal .admin-kpi-grid .kpi-card:nth-child(4) {
-  --kpi-accent: #e11d48;
-  border-top-color: #f43f5e !important;
-  background: linear-gradient(135deg, #fff1f2 0%, #fff 78%) !important;
+  --kpi-accent: #dc2626;
+  border-top-color: #dc2626 !important;
+  background: linear-gradient(135deg, #fef2f2 0%, #fff 78%) !important;
 }
 
 .admin-dashboard .admin-applications-minimal .admin-kpi-grid .kpi-card[style*="rgb(240, 249, 255)"],

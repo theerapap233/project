@@ -20,8 +20,18 @@ import { ToastContainer } from './components/ui/ToastContainer';
 
 
 const MainContent: React.FC = () => {
-  const { currentUser, isAdminActive, isPreviewMode } = useScholarship();
+  const { currentUser, isAdminActive, isPreviewMode, isRestoringStaffSession } = useScholarship();
   const isStaffMode = Boolean(currentUser && isAdminActive);
+
+  if (isRestoringStaffSession) {
+    return (
+      <div className="app-root">
+        <main role="status" aria-live="polite" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', color: '#64748b' }}>
+          กำลังตรวจสอบสถานะการเข้าสู่ระบบ...
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="app-root">

@@ -16,6 +16,7 @@ import { getStudentRegistrationError } from '../../utils/studentRegistrationVali
 export const LoginModal: React.FC = () => {
   const {
     isLoginModalOpen,
+    currentUser,
     openLoginModal,
     closeLoginModal,
     login,
@@ -76,6 +77,8 @@ export const LoginModal: React.FC = () => {
     };
 
     const handleHashCheck = () => {
+      if (currentUser) return;
+
       if (window.location.hash === '#admin') {
         setActiveTab('staff');
         openLoginModal();
@@ -93,7 +96,7 @@ export const LoginModal: React.FC = () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('hashchange', handleHashCheck);
     };
-  }, [openLoginModal]);
+  }, [currentUser, openLoginModal]);
 
   if (!isLoginModalOpen) return null;
 
