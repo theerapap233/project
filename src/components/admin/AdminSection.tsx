@@ -830,6 +830,11 @@ export const AdminSection: React.FC = () => {
     );
   };
 
+  const handleToggleScholarshipStatus = async (sch: Scholarship) => {
+    const nextStatus = sch.status === 'closed' ? 'open' : 'closed';
+    await updateScholarship(sch.id, { status: nextStatus });
+  };
+
   const handleApplyBulkScholarshipDates = async (event: React.FormEvent) => {
     event.preventDefault();
     if (selectedScholarshipIds.length === 0) {
@@ -2355,7 +2360,7 @@ export const AdminSection: React.FC = () => {
                         type="checkbox"
                         checked={selectedScholarshipIds.includes(sch.id)}
                         onChange={() => toggleScholarshipSelection(sch.id)}
-                        aria-label={`เลือกทุน ${sch.title} เพื่อปรับวันรับสมัครแบบกลุ่ม`}
+                        aria-label={`เลือกทุน ${sch.title} เพื่อปรับวันรับสมัคร`}
                       />
                       <span style={{
                         fontSize: '0.75rem',
@@ -2369,16 +2374,50 @@ export const AdminSection: React.FC = () => {
                       </span>
                     </div>
 
-                    <span style={{
-                      fontSize: '0.72rem',
-                      padding: '3px 8px',
-                      borderRadius: '6px',
-                      fontWeight: 600,
-                      background: statusBg,
-                      color: statusColor
-                    }}>
-                      {statusText}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginLeft: 'auto' }}>
+                      <span style={{
+                        fontSize: '0.72rem',
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        fontWeight: 600,
+                        background: statusBg,
+                        color: statusColor
+                      }}>
+                        {statusText}
+                      </span>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={sch.status !== 'closed'}
+                        aria-label={sch.status === 'closed' ? `เปิดรับสมัคร ${sch.title}` : `ปิดรับสมัคร ${sch.title}`}
+                        title={sch.status === 'closed' ? 'เปิดรับสมัคร' : 'ปิดรับสมัคร'}
+                        onClick={() => handleToggleScholarshipStatus(sch)}
+                        style={{
+                          width: 42,
+                          height: 24,
+                          padding: 3,
+                          border: 0,
+                          borderRadius: 999,
+                          background: sch.status === 'closed' ? '#cbd5e1' : '#10b981',
+                          cursor: 'pointer',
+                          flex: '0 0 auto',
+                          transition: 'background 0.22s ease'
+                        }}
+                      >
+                        <span
+                          style={{
+                            display: 'block',
+                            width: 18,
+                            height: 18,
+                            borderRadius: '50%',
+                            background: '#ffffff',
+                            boxShadow: '0 1px 4px rgba(15, 23, 42, 0.25)',
+                            transform: sch.status === 'closed' ? 'translateX(0)' : 'translateX(18px)',
+                            transition: 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1)'
+                          }}
+                        />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Title */}
@@ -2500,35 +2539,35 @@ export const AdminSection: React.FC = () => {
                   <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--navy-900)', fontWeight: 700 }}>
                     รายการประกาศทุนการศึกษาทั้งหมด ({scholarships.length} ทุน)
                   </h3>
-                  <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => setSelectedScholarshipIds(
-                        selectedScholarshipIds.length === scholarships.length ? [] : scholarships.map(sch => sch.id)
-                      )}
-                    >
-                      {scholarships.length > 0 && selectedScholarshipIds.length === scholarships.length ? 'ยกเลิกเลือกทั้งหมด' : 'เลือกทุนทั้งหมด'}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => setIsBulkDateModalOpen(true)}
-                      disabled={selectedScholarshipIds.length === 0}
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                    >
-                      <Calendar size={14} /> ปรับวันเริ่ม–สิ้นสุดแบบกลุ่ม ({selectedScholarshipIds.length})
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => setIsBulkTermModalOpen(true)}
-                      disabled={selectedScholarshipIds.length === 0}
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                    >
-                      <Calendar size={14} /> ปรับภาคการศึกษาแบบกลุ่ม ({selectedScholarshipIds.length})
-                    </button>
-                  </div>
+                  {selectedScholarshipIds.length > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => setSelectedScholarshipIds(
+                          selectedScholarshipIds.length === scholarships.length ? [] : scholarships.map(sch => sch.id)
+                        )}
+                      >
+                        {selectedScholarshipIds.length === scholarships.length ? 'ยกเลิกเลือกทั้งหมด' : 'เลือกทุนทั้งหมด'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => setIsBulkDateModalOpen(true)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                      >
+                        <Calendar size={14} /> ปรับวันเริ่ม–สิ้นสุด ({selectedScholarshipIds.length}/{scholarships.length})
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => setIsBulkTermModalOpen(true)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                      >
+                        <Calendar size={14} /> ปรับภาคการศึกษา ({selectedScholarshipIds.length}/{scholarships.length})
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <button 
@@ -4353,7 +4392,7 @@ export const AdminSection: React.FC = () => {
         <div className="modal-backdrop open">
           <div className="modal-card announcement-modal" style={{ maxWidth: 480 }}>
             <div className="modal-header">
-              <h3 style={{ margin: 0, fontSize: '1.2rem' }}>ปรับวันรับสมัครแบบกลุ่ม</h3>
+              <h3 style={{ margin: 0, fontSize: '1.2rem' }}>ปรับวันรับสมัคร</h3>
               <button type="button" className="modal-close-btn" onClick={() => setIsBulkDateModalOpen(false)} aria-label="ปิด">&times;</button>
             </div>
             <form onSubmit={handleApplyBulkScholarshipDates}>
@@ -4397,7 +4436,7 @@ export const AdminSection: React.FC = () => {
         <div className="modal-backdrop open">
           <div className="modal-card announcement-modal" style={{ maxWidth: 480 }}>
             <div className="modal-header">
-              <h3 style={{ margin: 0, fontSize: '1.2rem' }}>ปรับภาคการศึกษาแบบกลุ่ม</h3>
+              <h3 style={{ margin: 0, fontSize: '1.2rem' }}>ปรับภาคการศึกษา</h3>
               <button type="button" className="modal-close-btn" onClick={() => setIsBulkTermModalOpen(false)} aria-label="ปิด">&times;</button>
             </div>
             <form onSubmit={handleApplyBulkScholarshipTerm}>
