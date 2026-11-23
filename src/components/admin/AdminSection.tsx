@@ -22,8 +22,7 @@ import {
   X,
   XCircle,
   Star,
-  MessageSquare,
-  ThumbsUp
+  MessageSquare
 } from 'lucide-react';
 import { useScholarship } from '../../context/ScholarshipContext';
 import { DecisionPicker, type Decision } from './DecisionPicker';
@@ -460,7 +459,6 @@ export const AdminSection: React.FC = () => {
         average: 0,
         starCounts: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } as Record<number, number>,
         starPercentages: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } as Record<number, number>,
-        satisfactionRate: 0,
         totalComments: 0
       };
     }
@@ -470,13 +468,11 @@ export const AdminSection: React.FC = () => {
 
     const counts: Record<number, number> = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
     let commentsCount = 0;
-    let highSatisfactionCount = 0;
 
     ratedApps.forEach(a => {
       const r = Math.min(5, Math.max(1, Math.round(a.rating)));
       counts[r] = (counts[r] || 0) + 1;
       if (a.comment && a.comment.trim() !== '') commentsCount++;
-      if (r >= 4) highSatisfactionCount++;
     });
 
     return {
@@ -490,7 +486,6 @@ export const AdminSection: React.FC = () => {
         2: Math.round(((counts[2] || 0) / total) * 100),
         1: Math.round(((counts[1] || 0) / total) * 100)
       },
-      satisfactionRate: Math.round((highSatisfactionCount / total) * 100),
       totalComments: commentsCount
     };
   }, [ratedApps]);
@@ -1850,22 +1845,27 @@ export const AdminSection: React.FC = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '10px 16px',
-                background: 'var(--math-green)',
-                borderRadius: '6px',
-                color: '#ffffff',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                padding: '12px 16px',
+                background: '#ffffff',
+                border: '2px solid #475569',
+                borderRadius: '10px',
+                color: 'var(--navy-800, #1e293b)',
+                boxShadow: '0 2px 8px rgba(15,23,42,0.05)',
                 marginBottom: 12,
                 flexWrap: 'wrap',
                 gap: 10
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{
-                    background: '#ffffff',
+                    background: '#dcfce7',
                     color: 'var(--math-green)',
                     fontWeight: 800,
                     fontSize: '0.84rem',
-                    padding: '2px 9px',
+                    minWidth: 24,
+                    height: 24,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     borderRadius: '999px'
                   }}>
                     {selectedAppIds.size}
@@ -1884,10 +1884,11 @@ export const AdminSection: React.FC = () => {
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: 6,
-                      padding: '6px 14px',
+                      padding: '8px 14px',
                       borderRadius: '7px',
                       background: 'var(--math-green, #077b38)',
                       color: '#ffffff',
+                      border: '1px solid var(--math-green, #077b38)',
                       fontWeight: 700,
                       fontSize: '0.84rem',
                       cursor: 'pointer'
@@ -1904,10 +1905,11 @@ export const AdminSection: React.FC = () => {
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: 6,
-                      padding: '6px 14px',
+                      padding: '8px 14px',
                       borderRadius: '7px',
                       background: '#fef2f2',
                       color: '#b91c1c',
+                      border: '1px solid #fecaca',
                       fontWeight: 700,
                       fontSize: '0.84rem',
                       cursor: 'pointer'
@@ -1923,11 +1925,11 @@ export const AdminSection: React.FC = () => {
                     type="button"
                     onClick={handleToggleSelectAll}
                     style={{
-                      padding: '6px 12px',
+                      padding: '8px 12px',
                       borderRadius: '7px',
-                      background: '#ffffff',
+                      background: '#f0fdf4',
                       color: 'var(--math-green-dark, #166534)',
-                      border: '1px solid rgba(7, 123, 56, 0.35)',
+                      border: '1px solid #bbf7d0',
                       fontSize: '0.82rem',
                       fontWeight: 600,
                       cursor: 'pointer'
@@ -2031,18 +2033,6 @@ export const AdminSection: React.FC = () => {
                               {initials}
                             </div>
                           )}
-                          <label
-                            {...stop}
-                            style={{ position: 'absolute', top: 10, left: 10, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, background: 'rgba(255,255,255,0.92)', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', cursor: 'pointer' }}
-                            title={isSelected ? 'ยกเลิกการเลือก' : 'เลือกรายชื่อนี้'}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => handleToggleApp(app.trackingId)}
-                              style={{ cursor: 'pointer', width: 16, height: 16, accentColor: 'var(--math-green, #077b38)' }}
-                            />
-                          </label>
                           <div style={{ position: 'absolute', top: 10, right: 10, transform: 'scale(0.9)', transformOrigin: 'top right' }}>
                             {getStatusBadge(app.status)}
                           </div>
@@ -2112,15 +2102,6 @@ export const AdminSection: React.FC = () => {
               <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: 'var(--surface-ground, #f8fafc)', borderBottom: '1px solid var(--border-light, #e2e8f0)' }}>
-                    <th style={{ width: 44, padding: '12px 14px', textAlign: 'center' }}>
-                      <input
-                        type="checkbox"
-                        checked={filteredApps.length > 0 && selectedAppIds.size === filteredApps.length}
-                        onChange={handleToggleSelectAll}
-                        style={{ cursor: 'pointer', width: 16, height: 16, accentColor: 'var(--math-green, #077b38)' }}
-                        title="เลือกทั้งหมด / ยกเลิกทั้งหมด"
-                      />
-                    </th>
                     <th style={{ padding: '12px 18px', textAlign: 'left', fontWeight: 600, fontSize: '0.82rem', color: 'var(--text-muted)' }}>ผู้สมัคร</th>
                     <th style={{ padding: '12px 18px', textAlign: 'left', fontWeight: 600, fontSize: '0.82rem', color: 'var(--text-muted)' }}>สาขา / ชั้นปี</th>
                     <th style={{ padding: '12px 18px', textAlign: 'left', fontWeight: 600, fontSize: '0.82rem', color: 'var(--text-muted)' }}>ทุนที่สมัคร</th>
@@ -2134,7 +2115,7 @@ export const AdminSection: React.FC = () => {
                 <tbody>
                   {filteredApps.length === 0 ? (
                     <tr>
-                      <td colSpan={9} style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                      <td colSpan={8} style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
                         ไม่พบข้อมูลใบสมัครที่ตรงกับเงื่อนไขการค้นหา
                       </td>
                     </tr>
@@ -2153,22 +2134,22 @@ export const AdminSection: React.FC = () => {
                             cursor: (isSelectionMode || selectedAppIds.size > 0) ? 'pointer' : 'default'
                           }}
                         >
-                          <td 
-                            style={{ width: 44, padding: '14px 14px', textAlign: 'center' }}
-                            onClick={(e) => e.stopPropagation()}
-                            onMouseDown={(e) => e.stopPropagation()}
-                            onTouchStart={(e) => e.stopPropagation()}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => handleToggleApp(app.trackingId)}
-                              style={{ cursor: 'pointer', width: 16, height: 16, accentColor: 'var(--math-green, #077b38)' }}
-                              title={isSelected ? 'ยกเลิกการเลือก' : 'เลือกรายชื่อนี้'}
-                            />
-                          </td>
                           <td style={{ padding: '14px 18px' }}>
-                            {renderApplicantName(app, 'table')}
+                           <div
+                             style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+                             onClick={(e) => e.stopPropagation()}
+                             onMouseDown={(e) => e.stopPropagation()}
+                             onTouchStart={(e) => e.stopPropagation()}
+                           >
+                             <input
+                               type="checkbox"
+                               checked={isSelected}
+                               onChange={() => handleToggleApp(app.trackingId)}
+                               style={{ cursor: 'pointer', width: 16, height: 16, accentColor: 'var(--math-green, #077b38)', flexShrink: 0 }}
+                               title={isSelected ? 'ยกเลิกการเลือก' : 'เลือกรายชื่อนี้'}
+                             />
+                             {renderApplicantName(app, 'table')}
+                           </div>
                           </td>
                           <td style={{ padding: '14px 18px' }}>
                             <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--navy-900)' }}>
@@ -2980,29 +2961,6 @@ export const AdminSection: React.FC = () => {
                 </div>
               </div>
 
-              {/* Card 2: อัตราความพึงพอใจสูง */}
-              <div style={{
-                background: 'var(--surface-card, #ffffff)',
-                border: '1px solid var(--border-light, #e2e8f0)',
-                borderTop: '3px solid #10b981',
-                borderRadius: '10px',
-                padding: '16px 18px',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--navy-700)' }}>ความพึงพอใจสูง (4-5 ดาว)</span>
-                  <div style={{ width: 32, height: 32, borderRadius: '8px', background: '#d1fae5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#059669' }}>
-                    <ThumbsUp size={16} />
-                  </div>
-                </div>
-                <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#065f46', marginTop: 8, lineHeight: 1 }}>
-                  {ratingStats.satisfactionRate}%
-                </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 6 }}>
-                  {(ratingStats.starCounts[5] || 0) + (ratingStats.starCounts[4] || 0)} จาก {ratingStats.total} คน พึงพอใจมากถึงดีเยี่ยม
-                </div>
-              </div>
-
               {/* Card 3: ข้อคิดเห็นและข้อเสนอแนะ */}
               <div style={{
                 background: 'var(--surface-card, #ffffff)',
@@ -3075,11 +3033,11 @@ export const AdminSection: React.FC = () => {
                 </span>
                 {[
                   { value: 'all', label: 'ทั้งหมด' },
-                  { value: 5, label: '5 ดาว (★ 5)' },
-                  { value: 4, label: '4 ดาว (★ 4)' },
-                  { value: 3, label: '3 ดาว (★ 3)' },
-                  { value: 2, label: '2 ดาว (★ 2)' },
-                  { value: 1, label: '1 ดาว (★ 1)' }
+                  { value: 5, label: '5 ดาว', star: '5' },
+                  { value: 4, label: '4 ดาว', star: '4' },
+                  { value: 3, label: '3 ดาว', star: '3' },
+                  { value: 2, label: '2 ดาว', star: '2' },
+                  { value: 1, label: '1 ดาว', star: '1' }
                 ].map(item => (
                   <button
                     key={String(item.value)}
@@ -3097,7 +3055,11 @@ export const AdminSection: React.FC = () => {
                       transition: 'all 0.15s ease'
                     }}
                   >
-                    {item.label}
+                    {item.value === 'all' ? item.label : (
+                      <>
+                        {item.label} (<span style={{ color: '#eab308', WebkitTextStroke: '0.4px #ca8a04' }}>★</span> {item.star})
+                      </>
+                    )}
                   </button>
                 ))}
               </div>
