@@ -47,7 +47,9 @@ export const Navbar: React.FC = () => {
 
   const isStaffMode = Boolean(currentUser && isAdminActive);
   const isStudent = Boolean(currentUser && currentUser.role === 'student');
-  const staffNamePart = currentUser?.name.trim().split(/\s+/)[0] || (isStudent ? 'นักศึกษา' : 'Staff');
+  // ชื่อเต็มที่แสดงในปุ่มโปรไฟล์ และชื่อที่ตัดคำนำหน้า (นาย/นางสาว/นาง) ออกเพื่อใช้ทำตัวอักษรย่อ
+  const displayFullName = currentUser?.name.trim().replace(/\s+/g, ' ') || (isStudent ? 'นักศึกษา' : 'Staff');
+  const staffNamePart = displayFullName.replace(/^(นางสาว|นาย|นาง|น\.ส\.)\s*/, '').split(' ')[0] || displayFullName;
   const staffInitials = staffNamePart.replace(/^[เแโใไ]/, '').slice(0, 1) || (isStudent ? 'น' : 'S');
 
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -214,6 +216,13 @@ export const Navbar: React.FC = () => {
     setIsPersonalInfoModalOpen(true);
   };
 
+  // เปิดหน้า "ข้อมูลประกอบการพิจารณาทุน" จากที่อื่น (เช่น ปุ่มในฟอร์มสมัครทุน)
+  useEffect(() => {
+    const handleOpenPersonalInfo = () => openPersonalInfoModal();
+    window.addEventListener('kmutnb:open-personal-info', handleOpenPersonalInfo);
+    return () => window.removeEventListener('kmutnb:open-personal-info', handleOpenPersonalInfo);
+  });
+
   const handleChangePassword = async () => {
     const minimumPasswordLength = isStudent ? 6 : 8;
     if (newPassword.length < minimumPasswordLength) {
@@ -379,8 +388,11 @@ export const Navbar: React.FC = () => {
                 </span>
 
                 <div style={{ textAlign: 'left', lineHeight: 1.25 }}>
-                  <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {staffNamePart}
+                  <div
+                    title={displayFullName}
+                    style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)', maxWidth: 'min(260px, 42vw)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  >
+                    {displayFullName}
                   </div>
                   <span style={{
                     fontSize: '0.68rem',
@@ -582,10 +594,10 @@ export const Navbar: React.FC = () => {
       {isEditingProfile && typeof document !== 'undefined' && createPortal(
         <div className="staff-profile-overlay" onClick={() => setIsEditingProfile(false)}>
           <div
-            className="staff-profile-edit-dialog"
+            className={`staff-profile-edit-dialog${isStudent ? ' student-profile-edit-dialog' : ''}`}
             data-profile-menu-root="true"
             onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: isStudent ? 480 : 620, width: `min(100%, ${isStudent ? 480 : 620}px)` }}
+            style={{ maxWidth: isStudent ? 820 : 620, width: `min(100%, ${isStudent ? 820 : 620}px)` }}
           >
             <div className="staff-profile-edit-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -659,7 +671,7 @@ export const Navbar: React.FC = () => {
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', gap: 12 }}>
                     <div className="staff-profile-edit-field">
                       <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--navy-800)', display: 'block', marginBottom: 4 }}>
                         สาขาวิชา

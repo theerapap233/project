@@ -218,6 +218,10 @@ export const ApplicationWizardModal: React.FC = () => {
     }
 
     if (currentStep === 1) {
+      if (!personalInfoReady) {
+        showToast('กรุณากรอก "ข้อมูลประกอบการพิจารณาทุน" ในโปรไฟล์ให้เรียบร้อยก่อน จึงจะไปขั้นตอนถัดไปได้', 'warning');
+        return false;
+      }
       if (!formData.scholarshipId) {
         showToast('กรุณาเลือกทุนที่ต้องการสมัคร', 'warning');
         return false;
@@ -421,9 +425,35 @@ export const ApplicationWizardModal: React.FC = () => {
                         color: personalInfoReady ? '#047857' : '#92400e'
                       }}
                     >
-                      {personalInfoReady
-                        ? '✓ ระบบดึงข้อมูลที่อยู่ ครอบครัว เงินทุน และกิจกรรมจากโปรไฟล์ของท่านมาเติมในใบสมัครแล้ว'
-                        : 'ยังไม่ได้กรอกข้อมูลที่อยู่/ครอบครัว/กิจกรรม — กรุณาเปิดเมนูโปรไฟล์ (มุมขวาบน) แล้วเลือก “ข้อมูลประกอบการพิจารณาทุน” เพื่อให้กรรมการพิจารณาได้ครบถ้วน'}
+                      {personalInfoReady ? (
+                        '✓ ระบบดึงข้อมูลที่อยู่ ครอบครัว เงินทุน และกิจกรรมจากโปรไฟล์ของท่านมาเติมในใบสมัครแล้ว'
+                      ) : (
+                        <>
+                          <strong>ยังไม่ได้กรอกข้อมูลที่อยู่/ครอบครัว/กิจกรรม</strong> — ต้องกรอก “ข้อมูลประกอบการพิจารณาทุน” ให้เรียบร้อยก่อน จึงจะไปขั้นตอนถัดไปได้
+                          <div style={{ marginTop: 8 }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                closeApplicationModal();
+                                window.dispatchEvent(new CustomEvent('kmutnb:open-personal-info'));
+                              }}
+                              style={{
+                                padding: '6px 12px',
+                                borderRadius: 8,
+                                border: '1px solid #f59e0b',
+                                background: '#ffffff',
+                                color: '#92400e',
+                                fontWeight: 700,
+                                fontSize: '0.8rem',
+                                fontFamily: 'inherit',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              ไปกรอกข้อมูลประกอบการพิจารณาทุน →
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -772,7 +802,14 @@ export const ApplicationWizardModal: React.FC = () => {
               </span>
 
               {step < WIZARD_STEPS.length ? (
-                <button type="button" className="btn-wizard-next" onClick={handleNext}>
+                <button
+                  type="button"
+                  className="btn-wizard-next"
+                  onClick={handleNext}
+                  aria-disabled={step === 1 && isStudent && !personalInfoReady}
+                  title={step === 1 && isStudent && !personalInfoReady ? 'กรอกข้อมูลประกอบการพิจารณาทุนก่อน' : undefined}
+                  style={step === 1 && isStudent && !personalInfoReady ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}
+                >
                   <span>ขั้นตอนถัดไป</span>
                   <span className="icon">→</span>
                 </button>

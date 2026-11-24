@@ -3459,6 +3459,50 @@ body:has(.modal-backdrop.open) {
   gap: 10px;
 }
 
+/* จอคอม: หน้าต่างแก้ไขข้อมูลนักศึกษา ให้ระยะขอบกว้างขึ้น */
+@media (min-width: 900px) {
+  .student-profile-edit-dialog {
+    padding: 28px 36px;
+  }
+}
+
+/* จอคอม: ขยายหน้าต่างเข้าสู่ระบบ/ลืมรหัสผ่านให้กว้างขึ้น (ใช้ !important เพราะ maxWidth ตั้งไว้ใน style ของ component) */
+@media (min-width: 900px) {
+  .login-modal-zoom {
+    max-width: min(620px, 92vw) !important;
+  }
+
+  .login-modal-card.login-modal-zoom {
+    max-width: min(780px, 92vw) !important;
+  }
+
+  .login-modal-card .login-modal-header {
+    padding: 26px 36px 20px;
+  }
+
+  .login-modal-card .login-modal-body {
+    padding: 24px 36px 28px;
+  }
+
+  .login-modal-card .login-modal-brand-copy h3 {
+    font-size: 1.35rem;
+  }
+
+  .login-modal-card .login-modal-brand-copy p {
+    font-size: 0.9rem;
+  }
+
+  .login-modal-card .login-role-tab {
+    padding: 11px 12px;
+    font-size: 0.95rem;
+  }
+
+  .login-modal-card .form-input-light {
+    min-height: 50px;
+    font-size: 1rem;
+  }
+}
+
 @media (max-width: 520px) {
   .login-modal-card {
     max-height: calc(100vh - 40px);
