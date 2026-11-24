@@ -22,12 +22,14 @@ import {
   X,
   XCircle,
   Star,
+  Mail,
   MessageSquare
 } from 'lucide-react';
 import { useScholarship } from '../../context/ScholarshipContext';
 import { DecisionPicker, type Decision } from './DecisionPicker';
 import { StudentHistoryModal } from './StudentHistoryModal';
 import { StudentsOverview } from './StudentsOverview';
+import { EmailDigestSettingsPanel } from './EmailDigestSettingsPanel';
 import { normalizeStudentId } from '../../hooks/useMyApplications';
 import { Application, ApplicationStatus, ApplicationFormData } from '../../types/application';
 import { Scholarship } from '../../types/scholarship';
@@ -41,7 +43,7 @@ import {
   compareApplicationRecommendations
 } from '../../utils/applicationRecommendation';
 
-type AdminTab = 'applications' | 'scholarships' | 'news' | 'faq' | 'downloads' | 'ratings';
+type AdminTab = 'applications' | 'scholarships' | 'news' | 'faq' | 'downloads' | 'ratings' | 'email';
 type PrintListField = 'fullName' | 'studentId' | 'year' | 'scholarshipName';
 
 const PRINT_LIST_FIELDS: { key: PrintListField; label: string; heading: string }[] = [
@@ -59,7 +61,7 @@ const SCHOLARSHIP_YEAR_PRESETS = [
   { value: 'year-4', label: 'ปี 4', years: ['ปี 4'] }
 ];
 
-const ADMIN_TABS: readonly AdminTab[] = ['applications', 'scholarships', 'news', 'faq', 'downloads', 'ratings'];
+const ADMIN_TABS: readonly AdminTab[] = ['applications', 'scholarships', 'news', 'faq', 'downloads', 'ratings', 'email'];
 
 export const AdminSection: React.FC = () => {
   const { 
@@ -1368,6 +1370,34 @@ export const AdminSection: React.FC = () => {
             }}>
               {ratingStats.total}
             </span>
+          </button>
+
+          <button
+            className="admin-tab-button"
+            role="tab"
+            aria-selected={activeTab === 'email'}
+            data-active={activeTab === 'email'}
+            onClick={() => setActiveTab('email')}
+            style={{
+              flex: 1,
+              padding: '8px 10px',
+              borderRadius: '8px',
+              border: 'none',
+              background: activeTab === 'email' ? 'var(--math-green, #077b38)' : 'transparent',
+              color: activeTab === 'email' ? 'white' : 'var(--navy-700, #334155)',
+              fontWeight: activeTab === 'email' ? 700 : 500,
+              fontSize: '0.84rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              transition: 'all 0.2s',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            <Mail size={15} />
+            <span>แจ้งเตือนอีเมล</span>
           </button>
 
         </div>
@@ -2914,6 +2944,9 @@ export const AdminSection: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* TAB 7: EMAIL DIGEST SETTINGS */}
+        {activeTab === 'email' && <EmailDigestSettingsPanel />}
 
         {/* TAB 6: STUDENT RATINGS & SATISFACTION */}
         {activeTab === 'ratings' && (
