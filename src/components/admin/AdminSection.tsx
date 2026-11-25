@@ -22,9 +22,13 @@ import {
   XCircle,
   Star,
   Mail,
-  MessageSquare
+  MessageSquare,
+  Sparkles,
+  Upload
 } from 'lucide-react';
 import { useScholarship } from '../../context/ScholarshipContext';
+import { scholarshipService } from '../../services/scholarshipService';
+import { scholarshipAiService } from '../../services/scholarshipAiService';
 import { DecisionPicker, type Decision } from './DecisionPicker';
 import { StudentHistoryModal } from './StudentHistoryModal';
 import { StudentsOverview } from './StudentsOverview';
@@ -161,6 +165,12 @@ export const AdminSection: React.FC = () => {
   const [schScope, setSchScope] = useState<'internal' | 'external'>('internal');
   const [schStatus, setSchStatus] = useState<'open' | 'closed' | 'closing_soon'>('open');
   const [schDesc, setSchDesc] = useState('');
+  const [schRequirements, setSchRequirements] = useState<string[] | undefined>(undefined);
+  const [schDocuments, setSchDocuments] = useState<string[] | undefined>(undefined);
+  const [schFundingSource, setSchFundingSource] = useState<string | undefined>(undefined);
+  const [schPdfUrl, setSchPdfUrl] = useState<string | undefined>(undefined);
+  const [schPdfName, setSchPdfName] = useState<string | undefined>(undefined);
+  const [isParsingPdf, setIsParsingPdf] = useState(false);
 
   // Announcement Modal states
   const [isAnnModalOpen, setIsAnnModalOpen] = useState(false);
@@ -184,6 +194,7 @@ export const AdminSection: React.FC = () => {
   const [docDesc, setDocDesc] = useState('');
   const [docSize, setDocSize] = useState('200 KB');
   const [docType, setDocType] = useState('PDF');
+  const [docUrl, setDocUrl] = useState('');
   const [selectedDocFileName, setSelectedDocFileName] = useState('');
 
   // Statistics
@@ -727,7 +738,7 @@ export const AdminSection: React.FC = () => {
   };
 
   // Handlers for Scholarships CMS
-  const handleOpenNewSch = () => {
+  const handleOpenNewSch = (defaultScope: 'internal' | 'external' = 'internal') => {
     setEditingSchId(null);
     setSchTitle('');
     setSchAmount('20,000 บาท/คน');
@@ -737,9 +748,18 @@ export const AdminSection: React.FC = () => {
     setSchStartDate('');
     setSchDeadline('2026-10-31');
     setSchTerm('ภาคการศึกษาที่ 1');
-    setSchScope('internal');
+    setSchScope(defaultScope);
     setSchStatus('open');
-    setSchDesc('ทุนการศึกษาสำหรับนักศึกษาภาควิชาคณิตศาสตร์ คณะวิทยาศาสตร์ประยุกต์ มจพ.');
+    setSchDesc(
+      defaultScope === 'external'
+        ? 'ทุนการศึกษาภายนอกสำหรับนักศึกษาภาควิชาคณิตศาสตร์ คณะวิทยาศาสตร์ประยุกต์ มจพ.'
+        : 'ทุนการศึกษาสำหรับนักศึกษาภาควิชาคณิตศาสตร์ คณะวิทยาศาสตร์ประยุกต์ มจพ.'
+    );
+    setSchRequirements(undefined);
+    setSchDocuments(undefined);
+    setSchFundingSource(undefined);
+    setSchPdfUrl(undefined);
+    setSchPdfName(undefined);
     setIsSchModalOpen(true);
   };
 
@@ -756,7 +776,63 @@ export const AdminSection: React.FC = () => {
     setSchScope(sch.scope || 'internal');
     setSchStatus(sch.status || 'open');
     setSchDesc(sch.description || '');
+    setSchRequirements(sch.requirements);
+    setSchDocuments(sch.documents);
+    setSchFundingSource(sch.fundingSource);
+    setSchPdfUrl(sch.pdfUrl);
+    setSchPdfName(sch.pdfName);
     setIsSchModalOpen(true);
+  };
+
+  const handleScholarshipPdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      showToast('กรุณาเลือกไฟล์ PDF เท่านั้น', 'warning');
+      return;
+    }
+
+    setIsParsingPdf(true);
+    try {
+      const [uploaded, aiResult] = await Promise.all([
+        scholarshipService.uploadScholarshipPdf(file),
+        scholarshipAiService.parseScholarshipPdf(file)
+      ]);
+
+      setSchPdfUrl(uploaded.url);
+      setSchPdfName(uploaded.name);
+
+      if (aiResult.ok && aiResult.data) {
+        const d = aiResult.data;
+        if (d.title) setSchTitle(d.title);
+        if (d.amount) setSchAmount(d.amount);
+        if (d.totalSlots) setSchSlots(d.totalSlots);
+        if (d.minGPAX !== undefined) setSchMinGPAX(d.minGPAX);
+        if (d.targetYears) setSchTargetYears(d.targetYears);
+        if (d.scope) setSchScope(d.scope);
+        if (d.term) setSchTerm(d.term);
+        if (d.startDate) setSchStartDate(d.startDate);
+        if (d.deadline) setSchDeadline(d.deadline);
+        if (d.description) setSchDesc(d.description);
+        if (d.requirements) setSchRequirements(d.requirements);
+        if (d.documents) setSchDocuments(d.documents);
+        if (d.fundingSource) setSchFundingSource(d.fundingSource);
+
+        showToast('AI อ่านไฟล์ PDF และกรอกข้อมูลทุนให้อัตโนมัติแล้ว กรุณาตรวจสอบก่อนบันทึก', 'success');
+      } else {
+        if (!schTitle.trim()) {
+          setSchTitle(file.name.replace(/\.pdf$/i, ''));
+        }
+        showToast(aiResult.error || 'แนบไฟล์ PDF แล้ว กรุณากรอกข้อมูลเพิ่มเติม', 'info');
+      }
+    } catch (err) {
+      console.error('Error uploading scholarship PDF:', err);
+      showToast('อัปโหลดไฟล์ PDF ไม่สำเร็จ', 'error');
+    } finally {
+      setIsParsingPdf(false);
+      e.target.value = '';
+    }
   };
 
   const selectedSchYearPreset = SCHOLARSHIP_YEAR_PRESETS.find(
@@ -799,7 +875,12 @@ export const AdminSection: React.FC = () => {
         term: schTerm,
         scope: schScope,
         status: schStatus,
-        description: schDesc.trim()
+        description: schDesc.trim(),
+        requirements: schRequirements,
+        documents: schDocuments,
+        fundingSource: schFundingSource,
+        pdfUrl: schPdfUrl || '',
+        pdfName: schPdfName || ''
       });
       if (!saved) return;
     } else {
@@ -809,7 +890,15 @@ export const AdminSection: React.FC = () => {
         startDate: schStartDate,
         deadline: schDeadline,
         academicYear: getCurrentAcademicYear(),
-        term: schTerm
+        term: schTerm,
+        scope: schScope,
+        status: schStatus,
+        description: schDesc.trim(),
+        requirements: schRequirements,
+        documents: schDocuments,
+        fundingSource: schFundingSource,
+        pdfUrl: schPdfUrl,
+        pdfName: schPdfName
       });
     }
     setIsSchModalOpen(false);
@@ -973,6 +1062,7 @@ export const AdminSection: React.FC = () => {
     setDocDesc('');
     setDocSize('200 KB');
     setDocType('PDF');
+    setDocUrl('');
     setSelectedDocFileName('');
     setIsDocModalOpen(true);
   };
@@ -983,6 +1073,7 @@ export const AdminSection: React.FC = () => {
     setDocDesc(doc.desc);
     setDocSize(doc.size || 'PDF');
     setDocType(doc.type || 'PDF');
+    setDocUrl(doc.url && doc.url !== '#' ? doc.url : '');
     setSelectedDocFileName('');
     setIsDocModalOpen(true);
   };
@@ -1013,14 +1104,16 @@ export const AdminSection: React.FC = () => {
         title: docTitle.trim(),
         desc: docDesc.trim(),
         size: docSize.trim() || 'PDF',
-        type: docType.trim() || 'PDF'
+        type: docType.trim() || 'PDF',
+        url: docUrl.trim() || '#'
       });
     } else {
       addDownload({
         title: docTitle.trim(),
         desc: docDesc.trim(),
         size: docSize.trim() || 'PDF',
-        type: docType.trim() || 'PDF'
+        type: docType.trim() || 'PDF',
+        url: docUrl.trim() || '#'
       });
     }
     setIsDocModalOpen(false);
@@ -1513,9 +1606,9 @@ export const AdminSection: React.FC = () => {
               {/* Search Input */}
               <div className="application-filter-search" style={{ position: 'relative', flex: '1 1 260px' }}>
                 <Search size={16} strokeWidth={1.8} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                <input 
-                  type="text" 
-                  className="form-input-light" 
+                <input
+                  type="text"
+                  className="form-input-light"
                   placeholder="ค้นหาชื่อผู้สมัคร, รหัสนักศึกษา หรือชื่อทุน..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -2565,14 +2658,6 @@ export const AdminSection: React.FC = () => {
                     </div>
                   )}
                 </div>
-
-                <button 
-                  className="btn btn-primary btn-sm"
-                  onClick={handleOpenNewSch}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, height: 36, padding: '0 14px' }}
-                >
-                  <span>+</span> เพิ่มประกาศทุนใหม่
-                </button>
               </div>
 
               {/* 2 Layers of Scholarships like Main Page */}
@@ -2585,6 +2670,15 @@ export const AdminSection: React.FC = () => {
                     <span className="scope-block-badge internal" style={{ margin: 0, fontWeight: 700, minWidth: '32px', textAlign: 'center', justifyContent: 'center' }}>
                       {internalSchs.length}
                     </span>
+
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={() => handleOpenNewSch('internal')}
+                      style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, height: 36, padding: '0 14px' }}
+                    >
+                      <span>+</span> เพิ่มทุนภายใน
+                    </button>
                   </div>
 
                   <div className="admin-cards-grid">
@@ -2606,6 +2700,15 @@ export const AdminSection: React.FC = () => {
                     <span className="scope-block-badge external" style={{ margin: 0, fontWeight: 700, minWidth: '32px', textAlign: 'center', justifyContent: 'center' }}>
                       {externalSchs.length}
                     </span>
+
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={() => handleOpenNewSch('external')}
+                      style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, height: 36, padding: '0 14px' }}
+                    >
+                      <span>+</span> เพิ่มทุนภายนอก
+                    </button>
                   </div>
 
                   <div className="admin-cards-grid">
@@ -4384,13 +4487,71 @@ export const AdminSection: React.FC = () => {
           <div className="modal-card announcement-modal" style={{ maxWidth: 540 }}>
             <div className="modal-header">
               <h3 style={{ margin: 0, fontSize: '1.25rem' }}>
-                {editingSchId ? 'แก้ไขประกาศทุนการศึกษา' : 'เพิ่มประกาศทุนการศึกษาใหม่'}
+                {editingSchId
+                  ? 'แก้ไขประกาศทุนการศึกษา'
+                  : schScope === 'external'
+                    ? 'เพิ่มประกาศทุนภายนอกใหม่'
+                    : 'เพิ่มประกาศทุนภายในใหม่'}
               </h3>
               <button className="modal-close-btn" onClick={() => setIsSchModalOpen(false)}>&times;</button>
             </div>
 
             <form onSubmit={handleSaveSch}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div
+                  style={{
+                    background: '#f0fdf4',
+                    border: '1.5px dashed #86efac',
+                    borderRadius: '12px',
+                    padding: '14px 16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, fontSize: '0.88rem', color: '#166534' }}>
+                      <Sparkles size={16} />
+                      <span>อัปโหลด PDF ประกาศทุน (AI กรอกข้อมูลอัตโนมัติ + แนบให้นักศึกษาดู)</span>
+                    </div>
+                    <label
+                      className="btn btn-secondary btn-sm"
+                      style={{
+                        cursor: isParsingPdf ? 'wait' : 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        margin: 0
+                      }}
+                    >
+                      <Upload size={14} />
+                      <span>{isParsingPdf ? 'AI กำลังอ่านไฟล์ PDF...' : 'เลือกไฟล์ PDF'}</span>
+                      <input
+                        type="file"
+                        accept=".pdf,application/pdf"
+                        onChange={handleScholarshipPdfUpload}
+                        disabled={isParsingPdf}
+                        style={{ display: 'none' }}
+                      />
+                    </label>
+                  </div>
+
+                  {schPdfUrl && (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: '0.8rem', color: '#15803d', background: '#ffffff', padding: '6px 10px', borderRadius: 8, border: '1px solid #bbf7d0' }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        แนบไฟล์แล้ว: <strong>{schPdfName || 'ประกาศทุน.pdf'}</strong>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => { setSchPdfUrl(undefined); setSchPdfName(undefined); }}
+                        style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600 }}
+                      >
+                        ลบไฟล์แนบ
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 <div className="form-group">
                   <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
                     ชื่อทุนการศึกษา
@@ -4831,6 +4992,19 @@ export const AdminSection: React.FC = () => {
                       onChange={(e) => setDocSize(e.target.value)}
                     />
                   </div>
+                </div>
+
+                <div className="form-group">
+                  <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)' }}>
+                    ลิงก์ไฟล์ / URL ดาวน์โหลด (ไม่บังคับ)
+                  </label>
+                  <input
+                    type="text"
+                    className="form-input-light"
+                    placeholder="เช่น https://... หรือ /documents/form.pdf"
+                    value={docUrl}
+                    onChange={(e) => setDocUrl(e.target.value)}
+                  />
                 </div>
 
                 <div className="form-group">

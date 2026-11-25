@@ -1,6 +1,9 @@
 import React from 'react';
+import { useScholarship } from '../../context/ScholarshipContext';
 
 export const Footer: React.FC = () => {
+  const { siteSettings } = useScholarship();
+
   return (
     <footer className="site-footer">
       <div className="container">
@@ -37,17 +40,17 @@ export const Footer: React.FC = () => {
 
           <div className="footer-links">
             <h5>
-              <span>🔗</span> ลิงก์ด่วน
+              ลิงก์ด่วน
             </h5>
             <ul>
               <li>
                 <a href="https://kmutnb.ac.th" target="_blank" rel="noopener noreferrer">
-                  🏛️ เว็บไซต์ มหาวิทยาลัย มจพ.
+                  มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ
                 </a>
               </li>
               <li>
                 <a href="https://reg.kmutnb.ac.th" target="_blank" rel="noopener noreferrer">
-                  📋 เว็บไซต์ ทะเบียนนักศึกษา
+                  ระบบสารสนเทศเพื่องานทะเบียนนักศึกษา
                 </a>
               </li>
             </ul>
@@ -55,14 +58,39 @@ export const Footer: React.FC = () => {
 
           <div className="footer-links">
             <h5>
-              <span>🎓</span> หลักสูตรภาควิชา
+              หลักสูตรภาควิชา
             </h5>
             <ul>
               <li>
                 <a href="https://math.sci.kmutnb.ac.th" target="_blank" rel="noopener noreferrer">
-                  📐 หลักสูตร วท.บ. คณิตศาสตร์ประยุกต์
+                  หลักสูตร วท.บ. คณิตศาสตร์ประยุกต์
                 </a>
               </li>
+            </ul>
+          </div>
+
+          <div className="footer-links">
+            <h5>
+              ติดต่อ
+            </h5>
+            <ul>
+              <li>
+                <a href={`tel:${siteSettings.contactPhone.replace(/[^0-9+]/g, '')}`}>
+                  โทร: {siteSettings.contactPhone}
+                </a>
+              </li>
+              <li>
+                <a href={`mailto:${siteSettings.contactEmail}`}>
+                  อีเมล: {siteSettings.contactEmail}
+                </a>
+              </li>
+              {siteSettings.facebookUrl && (
+                <li>
+                  <a href={siteSettings.facebookUrl} target="_blank" rel="noopener noreferrer">
+                    Facebook ภาควิชาคณิตศาสตร์
+                  </a>
+                </li>
+              )}
             </ul>
           </div>
         </div>

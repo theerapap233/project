@@ -19,6 +19,11 @@ interface DbScholarshipProgram {
   min_gpax: number | null;
   target_years: string[] | null;
   description: string | null;
+  requirements?: string[] | null;
+  documents?: string[] | null;
+  funding_source?: string | null;
+  pdf_url?: string | null;
+  pdf_name?: string | null;
   created_at: string;
   updated_at: string;
   category?: {
@@ -87,17 +92,19 @@ const mapProgramToScholarship = (row: DbScholarshipProgram): Scholarship => {
     targetYears: targetYears.length > 0 ? targetYears : ['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4'],
     targetMajors: ['คณิตศาสตร์ประยุกต์', 'สถิติประยุกต์และการวิเคราะห์ข้อมูล'],
     description: row.description || 'ทุนการศึกษาเพื่อส่งเสริมศักยภาพนักศึกษา ภาควิชาคณิตศาสตร์ คณะวิทยาศาสตร์ประยุกต์ มจพ.',
-    requirements: [
+    requirements: row.requirements && row.requirements.length > 0 ? row.requirements : [
       'เป็นนักศึกษาภาควิชาคณิตศาสตร์ คณะวิทยาศาสตร์ประยุกต์ มจพ.',
       categorySlug === 'academic' ? 'มีผลการเรียนสะสม GPAX ไม่ต่ำกว่า 3.00' : 'มีความประพฤติดีและตั้งใจศึกษาเล่าเรียน',
       'ไม่เคยถูกลงโทษทางวินัยนักศึกษา'
     ],
-    documents: [
+    documents: row.documents && row.documents.length > 0 ? row.documents : [
       'ใบแสดงผลการเรียน (Transcript)',
       'สำเนาบัตรประจำตัวนักศึกษา',
       'เอกสารรับรองคุณสมบัติตามเกณฑ์ของทุน'
     ],
-    fundingSource: 'กองทุนภาควิชาคณิตศาสตร์ คณะวิทยาศาสตร์ประยุกต์ มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ'
+    fundingSource: row.funding_source || 'กองทุนภาควิชาคณิตศาสตร์ คณะวิทยาศาสตร์ประยุกต์ มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ',
+    pdfUrl: row.pdf_url || undefined,
+    pdfName: row.pdf_name || undefined
   };
 };
 
@@ -128,6 +135,11 @@ export const scholarshipService = {
           min_gpax,
           target_years,
           description,
+          requirements,
+          documents,
+          funding_source,
+          pdf_url,
+          pdf_name,
           created_at,
           updated_at,
           category:scholarship_categories (
@@ -192,10 +204,16 @@ export const scholarshipService = {
         {
           name: sch.title,
           category_id: matchedCat ? matchedCat.id : null,
+          scholarship_type: sch.scope,
           amount: parsedAmount,
           quota: sch.totalSlots,
           is_open: sch.status === 'open',
           description: sch.description,
+          requirements: sch.requirements,
+          documents: sch.documents,
+          funding_source: sch.fundingSource,
+          pdf_url: sch.pdfUrl || null,
+          pdf_name: sch.pdfName || null,
           application_start_date: sch.startDate || null,
           deadline: sch.deadline ? `${sch.deadline}T00:00:00.000Z` : null,
           academic_year: sch.academicYear,
@@ -239,10 +257,16 @@ export const scholarshipService = {
     try {
       const updates: any = { updated_at: new Date().toISOString() };
       if (sch.title) updates.name = sch.title;
+      if (sch.scope) updates.scholarship_type = sch.scope;
       if (sch.amount) updates.amount = parseInt(sch.amount.replace(/[^0-9]/g, '')) || 20000;
       if (sch.totalSlots !== undefined) updates.quota = sch.totalSlots;
       if (sch.status) updates.is_open = sch.status === 'open';
       if (sch.description !== undefined) updates.description = sch.description;
+      if (sch.requirements !== undefined) updates.requirements = sch.requirements;
+      if (sch.documents !== undefined) updates.documents = sch.documents;
+      if (sch.fundingSource !== undefined) updates.funding_source = sch.fundingSource;
+      if (sch.pdfUrl !== undefined) updates.pdf_url = sch.pdfUrl || null;
+      if (sch.pdfName !== undefined) updates.pdf_name = sch.pdfName || null;
       if (sch.startDate !== undefined) updates.application_start_date = sch.startDate || null;
       if (sch.deadline !== undefined) updates.deadline = `${sch.deadline}T00:00:00.000Z`;
       if (sch.academicYear !== undefined) updates.academic_year = sch.academicYear;
@@ -323,5 +347,44 @@ export const scholarshipService = {
       console.error('Error deleting scholarship from Supabase:', err);
       return false;
     }
+  },
+
+  /**
+   * อัปโหลดไฟล์ PDF ประกาศทุนไปยัง Supabase Storage (bucket: scholarship-pdfs)
+   * หากยังไม่ได้สร้าง bucket หรืออยู่ในโหมด Demo จะแปลงเป็น Data URL ชั่วคราว
+   */
+  async uploadScholarshipPdf(file: File): Promise<{ url: string; name: string }> {
+    const fileToDataUrl = () =>
+      new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+
+    if (isSupabaseConfigured()) {
+      try {
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const path = `announcements/${Date.now()}_${safeName}`;
+        const { error: uploadError } = await supabase.storage
+          .from('scholarship-pdfs')
+          .upload(path, file, { contentType: 'application/pdf', upsert: true });
+
+        if (!uploadError) {
+          const { data: publicData } = supabase.storage
+            .from('scholarship-pdfs')
+            .getPublicUrl(path);
+
+          if (publicData?.publicUrl) {
+            return { url: publicData.publicUrl, name: file.name };
+          }
+        }
+      } catch (err) {
+        console.warn('Upload to Supabase Storage failed, falling back to Data URL:', err);
+      }
+    }
+
+    const dataUrl = await fileToDataUrl();
+    return { url: dataUrl, name: file.name };
   }
 };

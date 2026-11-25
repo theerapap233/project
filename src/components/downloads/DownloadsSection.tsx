@@ -1,15 +1,20 @@
 import React from 'react';
 import { Download } from 'lucide-react';
 import { useScholarship } from '../../context/ScholarshipContext';
+import { DownloadDoc } from '../../types/common';
 
 export const DownloadsSection: React.FC = () => {
   const { downloads, showToast } = useScholarship();
 
-  const handleDownload = (title: string) => {
-    showToast(`กำลังดาวน์โหลด: ${title}`, 'info');
-    setTimeout(() => {
-      showToast(`ดาวน์โหลดเอกสาร "${title}" เรียบร้อยแล้ว`, 'success');
-    }, 800);
+  const handleDownload = (doc: DownloadDoc) => {
+    const targetUrl = doc.url?.trim();
+    if (!targetUrl || targetUrl === '#') {
+      showToast(`ยังไม่มีลิงก์ไฟล์สำหรับ "${doc.title}"`, 'warning');
+      return;
+    }
+
+    showToast(`กำลังเปิดเอกสาร: ${doc.title}`, 'info');
+    window.open(targetUrl, '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -46,7 +51,7 @@ export const DownloadsSection: React.FC = () => {
               </div>
               <button
                 className="btn btn-secondary btn-sm"
-                onClick={() => handleDownload(doc.title)}
+                onClick={() => handleDownload(doc)}
                 title="ดาวน์โหลด"
                 style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', background: '#f8fafc', border: '1px solid var(--border-light)' }}
               >

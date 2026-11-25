@@ -126,6 +126,47 @@ export const ScholarshipDetailModal: React.FC = () => {
             <strong style={{ color: 'var(--navy-800)' }}>แหล่งทุนสนับสนุน:</strong>
             <span>{sch.fundingSource}</span>
           </div>
+
+          {sch.pdfUrl && (
+            <div style={{ marginTop: 22 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 10, flexWrap: 'wrap' }}>
+                <h4 style={{ fontSize: '1rem', color: 'var(--navy-900)', margin: 0, fontWeight: 700 }}>
+                  เอกสารประกาศทุนฉบับเต็ม (PDF)
+                </h4>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <a
+                    href={sch.pdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-secondary btn-sm"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    เปิดเต็มจอ
+                  </a>
+                  <a
+                    href={sch.pdfUrl}
+                    download={sch.pdfName || `${sch.title}.pdf`}
+                    className="btn btn-primary btn-sm"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    ดาวน์โหลด PDF
+                  </a>
+                </div>
+              </div>
+              <div style={{
+                border: '1px solid var(--border-light)',
+                borderRadius: '12px',
+                overflow: 'hidden',
+                background: '#f8fafc'
+              }}>
+                <iframe
+                  src={sch.pdfUrl}
+                  title={sch.pdfName || sch.title}
+                  style={{ width: '100%', height: '460px', border: 'none', display: 'block' }}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="modal-footer">

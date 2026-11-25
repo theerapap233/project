@@ -112,6 +112,8 @@ CREATE TABLE IF NOT EXISTS public.scholarship_programs (
   requirements TEXT[],
   documents TEXT[],
   funding_source CHARACTER VARYING,
+  pdf_url TEXT,
+  pdf_name TEXT,
 
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
@@ -138,6 +140,8 @@ CREATE TABLE IF NOT EXISTS public.news (
 CREATE TABLE IF NOT EXISTS public.pdf_documents (
   id UUID NOT NULL DEFAULT gen_random_uuid(),
   name TEXT NOT NULL CHECK (length(TRIM(BOTH FROM name)) > 0),
+  description TEXT,
+  doc_type TEXT DEFAULT 'PDF',
   category_id UUID,
   size TEXT,
   url TEXT NOT NULL,
@@ -365,6 +369,9 @@ CREATE POLICY "Public read news_categories" ON public.news_categories FOR SELECT
 CREATE POLICY "Public read news" ON public.news FOR SELECT USING (true);
 CREATE POLICY "Public read pdf_document_categories" ON public.pdf_document_categories FOR SELECT USING (true);
 CREATE POLICY "Public read pdf_documents" ON public.pdf_documents FOR SELECT USING (true);
+CREATE POLICY "Public insert pdf_documents" ON public.pdf_documents FOR INSERT WITH CHECK (true);
+CREATE POLICY "Public update pdf_documents" ON public.pdf_documents FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Public delete pdf_documents" ON public.pdf_documents FOR DELETE USING (true);
 CREATE POLICY "Public read staff_roles" ON public.staff_roles FOR SELECT USING (true);
 CREATE POLICY "Public select staff_users" ON public.staff_users FOR SELECT USING (true);
 CREATE POLICY "Public update staff_users" ON public.staff_users FOR UPDATE USING (true) WITH CHECK (true);

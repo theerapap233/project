@@ -91,6 +91,11 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+*:focus {
+  outline: none;
 }
 
 html {
@@ -4241,7 +4246,6 @@ fieldset:disabled .form-input-light {
 
 .download-card:hover {
   transform: translateY(-2px);
-  border-color: var(--math-green);
   box-shadow: var(--shadow-sm);
 }
 
@@ -4275,8 +4279,8 @@ fieldset:disabled .form-input-light {
 
 .footer-grid {
   display: grid;
-  grid-template-columns: 1.5fr 1fr 1fr;
-  gap: 40px;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  gap: 36px;
   margin-bottom: 40px;
 }
 
@@ -4356,12 +4360,14 @@ fieldset:disabled .form-input-light {
   gap: 6px;
   text-decoration: none;
   font-weight: 500;
+  cursor: pointer;
 }
 
 .footer-links a:hover {
   color: #ffffff;
   font-weight: 700;
   transform: translateX(4px);
+  cursor: pointer;
 }
 
 .footer-bottom {

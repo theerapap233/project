@@ -19,6 +19,7 @@ export interface DownloadDoc {
   desc: string;
   size: string;
   type: string;
+  url?: string;
 }
 
 export type ToastType = 'info' | 'success' | 'warning' | 'error';

@@ -57,9 +57,9 @@ export const contentService = {
   /**
    * ดึงรายการเอกสารดาวน์โหลดจากตาราง pdf_documents
    */
-  async getPdfDocuments(): Promise<DownloadDoc[]> {
+  async getPdfDocuments(): Promise<{ source: 'supabase' | 'local'; data: DownloadDoc[] }> {
     if (!isSupabaseConfigured()) {
-      return DOWNLOAD_FORMS;
+      return { source: 'local', data: DOWNLOAD_FORMS };
     }
 
     try {
@@ -68,32 +68,47 @@ export const contentService = {
         .select(`
           id,
           name,
+          description,
+          doc_type,
           size,
           url,
           category:pdf_document_categories (
             name
           )
         `)
-        .order('name');
+        .order('created_at', { ascending: true });
 
-      if (error || !data || data.length === 0) {
-        return DOWNLOAD_FORMS;
+      if (error) {
+        console.warn('ดึงเอกสารดาวน์โหลดจาก Supabase ไม่สำเร็จ:', error.message);
+        return { source: 'local', data: DOWNLOAD_FORMS };
       }
 
-      return data.map((row: Record<string, unknown>, idx: number) => {
-        const catObj = row.category as { name?: string } | null;
-        const categoryName = catObj?.name || 'แบบฟอร์ม';
+      if (!data) {
+        return { source: 'supabase', data: [] };
+      }
 
-        return {
-          id: (row.id as string) || `doc-${idx}`,
-          title: (row.name as string) || '',
-          desc: `หมวดหมู่: ${categoryName}`,
-          size: (row.size as string) || 'PDF',
-          type: 'PDF'
-        };
-      });
-    } catch {
-      return DOWNLOAD_FORMS;
+      return {
+        source: 'supabase',
+        data: data.map((row: Record<string, unknown>, idx: number) => {
+          const catObj = row.category as { name?: string } | null;
+          const categoryName = catObj?.name || 'แบบฟอร์ม';
+          const description = typeof row.description === 'string' && row.description.trim()
+            ? row.description
+            : `หมวดหมู่: ${categoryName}`;
+
+          return {
+            id: (row.id as string) || `doc-${idx}`,
+            title: (row.name as string) || '',
+            desc: description,
+            size: (row.size as string) || 'PDF',
+            type: (row.doc_type as string) || 'PDF',
+            url: (row.url as string) || '#'
+          };
+        })
+      };
+    } catch (err) {
+      console.warn('เกิดข้อผิดพลาดในการดึงเอกสารดาวน์โหลด:', err);
+      return { source: 'local', data: DOWNLOAD_FORMS };
     }
   },
 
@@ -168,23 +183,40 @@ export const contentService = {
   /**
    * เพิ่มเอกสารดาวน์โหลดใหม่ลงตาราง pdf_documents
    */
-  async createPdfDocument(doc: DownloadDoc): Promise<boolean> {
-    if (!isSupabaseConfigured()) return false;
+  async createPdfDocument(doc: Omit<DownloadDoc, 'id'>): Promise<{ ok: boolean; data?: DownloadDoc }> {
+    if (!isSupabaseConfigured()) return { ok: false };
 
     try {
-      const { error } = await supabase.from('pdf_documents').insert([
-        {
-          name: doc.title,
-          size: doc.size || 'PDF',
-          url: '#'
-        }
-      ]);
+      const { data, error } = await supabase
+        .from('pdf_documents')
+        .insert([
+          {
+            name: doc.title,
+            description: doc.desc || '',
+            doc_type: doc.type || 'PDF',
+            size: doc.size || 'PDF',
+            url: doc.url || '#'
+          }
+        ])
+        .select('id, name, description, doc_type, size, url')
+        .single();
 
       if (error) throw error;
-      return true;
+
+      return {
+        ok: true,
+        data: {
+          id: data.id as string,
+          title: (data.name as string) || doc.title,
+          desc: (data.description as string) || doc.desc || '',
+          size: (data.size as string) || doc.size || 'PDF',
+          type: (data.doc_type as string) || doc.type || 'PDF',
+          url: (data.url as string) || doc.url || '#'
+        }
+      };
     } catch (err) {
       console.error('Error creating pdf_document in Supabase:', err);
-      return false;
+      return { ok: false };
     }
   },
 
@@ -196,8 +228,11 @@ export const contentService = {
 
     try {
       const updates: Record<string, unknown> = {};
-      if (doc.title) updates.name = doc.title;
-      if (doc.size) updates.size = doc.size;
+      if (doc.title !== undefined) updates.name = doc.title;
+      if (doc.desc !== undefined) updates.description = doc.desc;
+      if (doc.type !== undefined) updates.doc_type = doc.type;
+      if (doc.size !== undefined) updates.size = doc.size;
+      if (doc.url !== undefined) updates.url = doc.url;
 
       const { error } = await supabase
         .from('pdf_documents')

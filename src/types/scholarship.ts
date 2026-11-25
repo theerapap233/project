@@ -35,4 +35,6 @@ export interface Scholarship {
   requirements: string[];
   documents: string[];
   fundingSource: string;
+  pdfUrl?: string;
+  pdfName?: string;
 }

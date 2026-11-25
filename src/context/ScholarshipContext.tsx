@@ -125,6 +125,14 @@ interface ScholarshipContextType {
       startDate?: string;
       academicYear?: string;
       term?: string;
+      scope?: 'internal' | 'external';
+      status?: 'open' | 'closed' | 'closing_soon';
+      description?: string;
+      requirements?: string[];
+      documents?: string[];
+      fundingSource?: string;
+      pdfUrl?: string;
+      pdfName?: string;
     }
   ) => void;
   updateScholarship: (id: string, data: Partial<Scholarship>) => Promise<boolean>;
@@ -368,7 +376,7 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [reviewingApplication, setReviewingApplication] = useState<Application | null>(null);
   const [latestTrackingId, setLatestTrackingId] = useState<string>('6504062630012');
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(() => !currentUser);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState<boolean>(false);
   const [isPreviewMode, setIsPreviewMode] = useState<boolean>(false);
 
@@ -514,11 +522,12 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     setIsLoadingData(true);
     try {
-      const [schResult, appResult, settingsResult, accountResult] = await Promise.all([
+      const [schResult, appResult, settingsResult, accountResult, pdfResult] = await Promise.all([
         scholarshipService.getAllScholarships(),
         applicationService.getAllApplications(),
         settingsService.getSiteSettings(),
         studentAuthService.getAccounts(),
+        contentService.getPdfDocuments(),
       ]);
 
       if (schResult.source === 'supabase') {
@@ -530,6 +539,9 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
       }
       if (settingsResult.source === 'supabase') {
         setSiteSettings(settingsResult.data);
+      }
+      if (pdfResult.source === 'supabase') {
+        setDownloads(pdfResult.data);
       }
 
       // บัญชีนักศึกษา: ใช้ข้อมูลจาก Supabase เป็นหลัก แล้ว cache ลง localStorage เอาไว้
@@ -583,6 +595,17 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
           settingsService.getSiteSettings().then(res => {
             if (res.source === 'supabase') {
               setSiteSettings(res.data);
+            }
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'pdf_documents' },
+        () => {
+          contentService.getPdfDocuments().then(res => {
+            if (res.source === 'supabase') {
+              setDownloads(res.data);
             }
           });
         }
@@ -1295,38 +1318,52 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const addDownload = (doc: Omit<DownloadDoc, 'id'>) => {
-    const newDoc: DownloadDoc = { ...doc, id: `doc-${Date.now()}` };
-    setDownloads(prev => [...prev, newDoc]);
     if (isSupabaseConfigured()) {
-      contentService.createPdfDocument(newDoc).then(ok => {
-        if (ok) showToast('เพิ่มเอกสารดาวน์โหลดและบันทึกลง Supabase สำเร็จ', 'success');
-        else showToast('เพิ่มเอกสารดาวน์โหลดสำเร็จ (บันทึกในเครื่อง)', 'success');
+      contentService.createPdfDocument(doc).then(res => {
+        if (res.ok && res.data) {
+          setDownloads(prev => [...prev, res.data!]);
+          showToast('เพิ่มเอกสารดาวน์โหลดและบันทึกลง Supabase สำเร็จ', 'success');
+        } else {
+          showToast('บันทึกเอกสารลง Supabase ไม่สำเร็จ กรุณาตรวจสอบสิทธิ์ RLS หรือการเชื่อมต่อฐานข้อมูล', 'error');
+        }
       });
     } else {
+      const newDoc: DownloadDoc = { ...doc, id: `doc-${Date.now()}` };
+      setDownloads(prev => [...prev, newDoc]);
       showToast('เพิ่มเอกสารดาวน์โหลดสำเร็จ', 'success');
     }
   };
 
   const deleteDownload = (id: string) => {
-    setDownloads(prev => prev.filter(d => d.id !== id));
-    if (isSupabaseConfigured()) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (isSupabaseConfigured() && isUuid) {
       contentService.deletePdfDocument(id).then(ok => {
-        if (ok) showToast('ลบเอกสารดาวน์โหลดจาก Supabase เรียบร้อยแล้ว', 'info');
-        else showToast('ลบเอกสารดาวน์โหลดเรียบร้อยแล้ว', 'info');
+        if (ok) {
+          setDownloads(prev => prev.filter(d => d.id !== id));
+          showToast('ลบเอกสารดาวน์โหลดจาก Supabase เรียบร้อยแล้ว', 'info');
+        } else {
+          showToast('ลบเอกสารจาก Supabase ไม่สำเร็จ กรุณาตรวจสอบสิทธิ์ RLS หรือการเชื่อมต่อฐานข้อมูล', 'error');
+        }
       });
     } else {
+      setDownloads(prev => prev.filter(d => d.id !== id));
       showToast('ลบเอกสารดาวน์โหลดเรียบร้อยแล้ว', 'info');
     }
   };
 
   const updateDownload = (id: string, updated: Partial<DownloadDoc>) => {
-    setDownloads(prev => prev.map(d => d.id === id ? { ...d, ...updated } : d));
-    if (isSupabaseConfigured()) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (isSupabaseConfigured() && isUuid) {
       contentService.updatePdfDocument(id, updated).then(ok => {
-        if (ok) showToast('อัปเดตข้อมูลเอกสารและบันทึกลง Supabase สำเร็จ', 'success');
-        else showToast('อัปเดตข้อมูลเอกสารสำเร็จ', 'success');
+        if (ok) {
+          setDownloads(prev => prev.map(d => d.id === id ? { ...d, ...updated } : d));
+          showToast('อัปเดตข้อมูลเอกสารและบันทึกลง Supabase สำเร็จ', 'success');
+        } else {
+          showToast('อัปเดตเอกสารลง Supabase ไม่สำเร็จ กรุณาตรวจสอบสิทธิ์ RLS หรือคอลัมน์ในฐานข้อมูล', 'error');
+        }
       });
     } else {
+      setDownloads(prev => prev.map(d => d.id === id ? { ...d, ...updated } : d));
       showToast('อัปเดตข้อมูลเอกสารสำเร็จ', 'success');
     }
   };
@@ -1423,6 +1460,13 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const openApplicationModal = (schId?: string) => {
+    if (!currentUser) {
+      showToast('กรุณาเข้าสู่ระบบก่อนสมัครทุนการศึกษา', 'info');
+      setIsDetailModalOpen(false);
+      setIsLoginModalOpen(true);
+      return;
+    }
+
     const targetScholarshipId = schId || selectedScholarshipIdForApply || scholarships[0]?.id;
     const targetScholarship = scholarships.find(scholarship => scholarship.id === targetScholarshipId);
 
@@ -1733,16 +1777,25 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
       academicYear?: string;
       term?: string;
       startDate?: string;
+      scope?: 'internal' | 'external';
+      status?: 'open' | 'closed' | 'closing_soon';
+      description?: string;
+      requirements?: string[];
+      documents?: string[];
+      fundingSource?: string;
+      pdfUrl?: string;
+      pdfName?: string;
     }
   ) => {
+    const scope = criteria?.scope ?? 'internal';
     const newSch: Scholarship = {
       id: `sch-${Date.now()}`,
       title,
-      scope: 'internal',
-      scopeName: 'ทุนภายใน (ภาควิชา/มจพ.)',
-      category: 'academic',
-      categoryName: 'ทุนเรียนดี / พัฒนาศักยภาพ',
-      badgeColor: 'gold',
+      scope,
+      scopeName: scope === 'external' ? 'ทุนภายนอก (องค์กร/ศิษย์เก่า)' : 'ทุนภายใน (ภาควิชา/มจพ.)',
+      category: scope === 'external' ? 'alumni' : 'academic',
+      categoryName: scope === 'external' ? 'ทุนภายนอก / องค์กรเครือข่าย' : 'ทุนเรียนดี / พัฒนาศักยภาพ',
+      badgeColor: scope === 'external' ? 'emerald' : 'gold',
       amount: amount || '20,000 บาท / ภาคการศึกษา',
       totalSlots,
       remainingSlots: totalSlots,
@@ -1750,21 +1803,28 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
       term: criteria?.term ?? 'ภาคการศึกษาที่ 1',
       startDate: criteria?.startDate,
       deadline: criteria?.deadline ?? '2026-11-15',
-      status: 'open',
+      status: criteria?.status ?? 'open',
       minGPAX: criteria?.minGPAX ?? 2.75,
       targetYears: criteria?.targetYears ?? ['ปี 1', 'ปี 2', 'ปี 3', 'ปี 4'],
       targetMajors: ['ทุกสาขาวิชาในภาควิชาคณิตศาสตร์'],
-      description: `ประกาศทุนการศึกษาใหม่ของภาควิชาคณิตศาสตร์ มจพ. เพื่อส่งเสริมนักศึกษาตามนโยบายสนับสนุนทุนปี ${criteria?.academicYear ?? getCurrentAcademicYear()}`,
-      requirements: [
-        'เป็นนักศึกษาภาควิชาคณิตศาสตร์ มจพ.',
-        `มีเกรดเฉลี่ยสะสมไม่ต่ำกว่า ${(criteria?.minGPAX ?? 2.75).toFixed(2)}`,
-        'มีความประพฤติเรียบร้อย'
-      ],
-      documents: [
-        'ใบแสดงผลการเรียน (Transcript)',
-        'สำเนาบัตรนักศึกษา'
-      ],
-      fundingSource: 'กองทุนภาควิชาคณิตศาสตร์ มจพ.'
+      description:
+        criteria?.description ||
+        `ประกาศทุนการศึกษาใหม่ของภาควิชาคณิตศาสตร์ มจพ. เพื่อส่งเสริมนักศึกษาตามนโยบายสนับสนุนทุนปี ${criteria?.academicYear ?? getCurrentAcademicYear()}`,
+      requirements:
+        criteria?.requirements && criteria.requirements.length > 0
+          ? criteria.requirements
+          : [
+              'เป็นนักศึกษาภาควิชาคณิตศาสตร์ มจพ.',
+              `มีเกรดเฉลี่ยสะสมไม่ต่ำกว่า ${(criteria?.minGPAX ?? 2.75).toFixed(2)}`,
+              'มีความประพฤติเรียบร้อย'
+            ],
+      documents:
+        criteria?.documents && criteria.documents.length > 0
+          ? criteria.documents
+          : ['ใบแสดงผลการเรียน (Transcript)', 'สำเนาบัตรนักศึกษา'],
+      fundingSource: criteria?.fundingSource || 'กองทุนภาควิชาคณิตศาสตร์ มจพ.',
+      pdfUrl: criteria?.pdfUrl,
+      pdfName: criteria?.pdfName
     };
 
     setScholarships(prev => [newSch, ...prev]);
