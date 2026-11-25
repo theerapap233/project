@@ -3301,6 +3301,7 @@ export const AdminSection: React.FC = () => {
           <div className="modal-card" style={{ maxWidth: 920, width: '95%', maxHeight: '92vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.18)', background: '#ffffff' }}>
             {/* Minimal Header */}
             <div style={{
+              flexShrink: 0,
               padding: '18px 24px',
               background: '#ffffff',
               borderBottom: '1px solid #f1f5f9',
@@ -3417,9 +3418,12 @@ export const AdminSection: React.FC = () => {
             {/* Minimal Step Navigation Tabs */}
             <div style={{
               display: 'flex',
+              flexShrink: 0,
+              alignItems: 'stretch',
               background: '#f8fafc',
               borderBottom: '1px solid #e2e8f0',
               overflowX: 'auto',
+              overflowY: 'hidden',
               padding: '0 20px'
             }}>
               {[
@@ -3432,7 +3436,9 @@ export const AdminSection: React.FC = () => {
                   type="button"
                   onClick={() => setAppModalTab(tab.id)}
                   style={{
-                    padding: '11px 18px',
+                    padding: '12px 18px 11px',
+                    flexShrink: 0,
+                    lineHeight: 1.5,
                     border: 'none',
                     borderBottom: appModalTab === tab.id ? '2.5px solid var(--math-green, #077b38)' : '2.5px solid transparent',
                     background: 'transparent',

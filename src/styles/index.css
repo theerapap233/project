@@ -5729,6 +5729,8 @@ body:has(.modal-backdrop.open) .preview-mode-dock {
     linear-gradient(180deg, #f8fbff 0%, #f6f8fc 100%) !important;
 }
 
+/* ใช้ backwards (ไม่ใช่ both) เพื่อไม่ให้ transform ค้างหลังแอนิเมชันจบ
+   ถ้า transform ค้าง หน้าต่าง popup (position: fixed) ในหน้าแอดมินจะเลื่อนตามหน้าเว็บแทนที่จะอยู่กลางจอ */
 @keyframes adminPageEnter {
   from {
     opacity: 0;
@@ -5752,13 +5754,13 @@ body:has(.modal-backdrop.open) .preview-mode-dock {
 }
 
 .admin-dashboard {
-  animation: adminPageEnter 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: adminPageEnter 0.38s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
 .admin-dashboard .admin-page-heading,
 .admin-dashboard .admin-tabs,
 .admin-dashboard .admin-tab-pane {
-  animation: adminSoftEnter 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: adminSoftEnter 0.42s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
 .admin-dashboard .admin-page-heading {
@@ -5943,7 +5945,7 @@ body:has(.modal-backdrop.open) .preview-mode-dock {
   border-radius: 13px !important;
   border-color: #e2e8f0 !important;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.035) !important;
-  animation: adminSoftEnter 0.36s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: adminSoftEnter 0.36s cubic-bezier(0.16, 1, 0.3, 1) backwards;
   transition:
     transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
     border-color 0.22s ease,
@@ -5969,7 +5971,7 @@ body:has(.modal-backdrop.open) .preview-mode-dock {
 }
 
 .admin-dashboard .scope-block {
-  animation: adminSoftEnter 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: adminSoftEnter 0.42s cubic-bezier(0.16, 1, 0.3, 1) backwards;
   transition:
     border-color 0.22s ease,
     box-shadow 0.22s ease,
