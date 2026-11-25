@@ -4,10 +4,11 @@ import { useScholarship } from '../../context/ScholarshipContext';
 import { Address, ApplicationFormData, UploadedFiles } from '../../types/application';
 import { formatThaiDate } from '../../utils/dateFormatter';
 import { calculateStudentYear, hasFilledPersonalInfo, normalizeMajorName, normalizePersonalInfo } from '../../utils/studentProfile';
+import { ActivityListEditor, cleanActivityList } from './ActivityListEditor';
 
 const WIZARD_STEPS = [
   { id: 1, label: 'ข้อมูลนักศึกษา' },
-  { id: 2, label: 'เหตุผลความจำเป็น' },
+  { id: 2, label: 'เหตุผล & กิจกรรม' },
   { id: 3, label: 'ยืนยันการสมัคร' }
 ];
 
@@ -149,7 +150,11 @@ export const ApplicationWizardModal: React.FC = () => {
       phone: currentUser?.phone || '',
       major: normalizeMajorName(currentUser?.major),
       year: calculateStudentYear(currentUser?.studentId, currentUser?.year || 'ปี 1'),
-      gpax: currentUser?.gpax !== undefined ? currentUser.gpax : ''
+      gpax: currentUser?.gpax !== undefined ? currentUser.gpax : '',
+      // กิจกรรมย้ายมากรอกในใบสมัครแล้ว: ถ้าโปรไฟล์เก่ามีข้อความกิจกรรม ให้เติมเป็นกิจกรรมแรกไว้ให้แก้ต่อ
+      activityList: personalInfo.hasActivities && (personalInfo.activities || '').trim()
+        ? [{ name: personalInfo.activities.trim().slice(0, 150), role: (personalInfo.activityRole || '').trim(), detail: '', photoBase64: null, photoName: '' }]
+        : []
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isWizardModalOpen]);
@@ -251,6 +256,11 @@ export const ApplicationWizardModal: React.FC = () => {
         showToast('กรุณาระบุเหตุผลความจำเป็นอย่างน้อย 1 ข้อ', 'warning');
         return false;
       }
+      const missingNameIndex = cleanActivityList(formData.activityList).findIndex(a => !a.name);
+      if (missingNameIndex >= 0) {
+        showToast(`กรุณากรอกชื่อกิจกรรมที่ ${missingNameIndex + 1} หรือกดลบกิจกรรมนั้น`, 'warning');
+        return false;
+      }
       return true;
     }
 
@@ -304,6 +314,7 @@ export const ApplicationWizardModal: React.FC = () => {
     const activeReasons = reasonsList.filter(r => r.trim());
     const finalReason = activeReasons.join('\n');
     const gpaxNum = Number(formData.gpax);
+    const activities = cleanActivityList(formData.activityList);
 
     // ข้อมูลส่วนตัวที่แก้ในขั้นตอนที่ 1 จะถูกบันทึกกลับเข้าบัญชีนักศึกษา
     updateCurrentUser({
@@ -319,6 +330,10 @@ export const ApplicationWizardModal: React.FC = () => {
         gpax: gpaxNum,
         reason: finalReason,
         reasonsList: activeReasons,
+        activityList: activities,
+        hasActivities: activities.length > 0,
+        activities: activities.map(a => a.name).join(', '),
+        activityRole: activities.map(a => a.role).filter(Boolean).join(', '),
         systemRating: 0,
         systemComment: ''
       },
@@ -666,6 +681,23 @@ export const ApplicationWizardModal: React.FC = () => {
                   </button>
                 )}
               </div>
+
+              <div className="wizard-section-card" style={{ marginTop: 16 }}>
+                <div className="wizard-section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span className="wizard-section-title-clean">กิจกรรมและจิตอาสา</span>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    {(formData.activityList || []).length}/3 กิจกรรม
+                  </span>
+                </div>
+                <p style={{ margin: '0 0 14px', fontSize: '0.84rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                  กิจกรรมของมหาวิทยาลัยหรือจิตอาสาที่เคยเข้าร่วม พร้อมรูปภาพประกอบ (ไม่บังคับ สูงสุด 3 กิจกรรม)
+                </p>
+                <ActivityListEditor
+                  value={formData.activityList || []}
+                  onChange={(next) => setFormData(prev => ({ ...prev, activityList: next }))}
+                  onError={(message) => showToast(message, 'warning')}
+                />
+              </div>
             </div>
           )}
 
@@ -751,6 +783,34 @@ export const ApplicationWizardModal: React.FC = () => {
                   ) : (
                     <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
                       (ไม่ได้ระบุเหตุผลความจำเป็น)
+                    </p>
+                  )}
+                </div>
+
+                <div style={{ background: 'var(--surface-white)', padding: 14, borderRadius: 12, border: '1px solid var(--border-light)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <span className="wizard-summary-label" style={{ margin: 0 }}>กิจกรรมและจิตอาสา</span>
+                    <button type="button" className="wizard-edit-btn" onClick={() => navigateToStep(2)}>
+                      แก้ไข
+                    </button>
+                  </div>
+                  {cleanActivityList(formData.activityList).length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {cleanActivityList(formData.activityList).map((a, i) => (
+                        <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                          {a.photoBase64 ? (
+                            <img src={a.photoBase64} alt={a.name} style={{ width: 72, height: 54, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border-light)', flexShrink: 0 }} />
+                          ) : null}
+                          <div style={{ fontSize: '0.88rem', color: 'var(--navy-800)', lineHeight: 1.55, minWidth: 0 }}>
+                            <strong>{i + 1}. {a.name}</strong>{a.role ? ` (${a.role})` : ''}
+                            {a.detail && <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>{a.detail}</div>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                      (ไม่ได้ระบุกิจกรรม)
                     </p>
                   )}
                 </div>

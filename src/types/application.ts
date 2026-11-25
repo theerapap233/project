@@ -27,6 +27,15 @@ export interface Application {
   systemComment?: string;
 }
 
+/** กิจกรรมที่นักศึกษาเคยเข้าร่วม (สูงสุด 3 กิจกรรมต่อใบสมัคร) */
+export interface ActivityEntry {
+  name: string;
+  role: string;
+  detail?: string;
+  photoBase64: string | null;
+  photoName?: string;
+}
+
 export interface Address {
   houseNo: string;
   moo: string;
@@ -87,7 +96,7 @@ export interface ApplicationFormData {
   activities: string; // Used as summary or combined string
   activityRole: string; // Specific role/duty in activity
   volunteerHours: number; // Keep for backward compatibility
-  activityList?: { name: string; role: string; photoBase64: string | null }[];
+  activityList?: ActivityEntry[];
   
   // 5. General
   reason: string;

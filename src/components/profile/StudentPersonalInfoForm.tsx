@@ -447,38 +447,7 @@ export const StudentPersonalInfoForm: React.FC<StudentPersonalInfoFormProps> = (
         )}
       </div>
 
-      {/* 6. กิจกรรม */}
-      <div className="student-info-section">
-        <div className="student-info-section-title">กิจกรรมและจิตอาสา</div>
-        <label className="student-info-check" style={{ marginTop: 0 }}>
-          <input
-            type="checkbox"
-            checked={value.hasActivities}
-            onChange={e => update('hasActivities', e.target.checked)}
-          />
-          <span>เข้าร่วมกิจกรรมของมหาวิทยาลัย / จิตอาสา</span>
-        </label>
-
-        {value.hasActivities && (
-          <div style={{ marginTop: 10 }}>
-            <label style={labelStyle}>รายละเอียดกิจกรรม</label>
-            <textarea
-              className="form-input-light"
-              rows={3}
-              value={value.activities}
-              onChange={e => update('activities', e.target.value)}
-              placeholder="เช่น ประธานชมรมคณิตศาสตร์, อาสาสมัครสอนน้อง ๆ"
-            />
-            <label style={{ ...labelStyle, marginTop: 8 }}>บทบาท / หน้าที่ในกิจกรรม</label>
-            <input
-              className="form-input-light"
-              value={value.activityRole}
-              onChange={e => update('activityRole', e.target.value)}
-              placeholder="เช่น หัวหน้าโครงการ / สมาชิก"
-            />
-          </div>
-        )}
-      </div>
+      {/* กิจกรรมและจิตอาสา ย้ายไปกรอกในใบสมัครทุน (ขั้นตอน "เหตุผล & กิจกรรม") พร้อมรูปภาพ */}
     </div>
   );
 };

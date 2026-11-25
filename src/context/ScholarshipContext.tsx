@@ -219,7 +219,13 @@ export const safeSetLocalStorage = (key: string, value: string) => {
           const slimApps = apps.map(app => ({
             ...app,
             profilePhoto: (app.profilePhoto && app.profilePhoto.length > 40000) ? '' : app.profilePhoto,
-            documents: []
+            documents: [],
+            formData: app.formData
+              ? {
+                  ...app.formData,
+                  activityList: (app.formData.activityList || []).map(activity => ({ ...activity, photoBase64: null }))
+                }
+              : app.formData
           }));
           localStorage.setItem(key, JSON.stringify(slimApps));
           return;

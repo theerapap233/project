@@ -30,6 +30,7 @@ import { DecisionPicker, type Decision } from './DecisionPicker';
 import { StudentHistoryModal } from './StudentHistoryModal';
 import { StudentsOverview } from './StudentsOverview';
 import { EmailDigestSettingsPanel } from './EmailDigestSettingsPanel';
+import { ActivityListEditor, cleanActivityList } from '../wizard/ActivityListEditor';
 import { normalizeStudentId } from '../../hooks/useMyApplications';
 import { Application, ApplicationStatus, ApplicationFormData } from '../../types/application';
 import { Scholarship } from '../../types/scholarship';
@@ -617,7 +618,8 @@ export const AdminSection: React.FC = () => {
       profilePhoto: appProfilePhoto,
       formData: {
         ...appEditData,
-        activities: (appEditData.activityList || []).map(a => a.name).filter(Boolean).join(', ') || appEditData.activities,
+        activityList: cleanActivityList(appEditData.activityList),
+        activities: cleanActivityList(appEditData.activityList).map(a => a.name).filter(Boolean).join(', ') || appEditData.activities,
         reason: (appEditData.reasonsList || []).filter(Boolean).join('\n') || appEditData.reason
       }
     };
@@ -4121,107 +4123,30 @@ export const AdminSection: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Activities List (Add / Edit / Delete) */}
+                    {/* Activities List: ชื่อ บทบาท รายละเอียด รูปภาพ (สูงสุด 3) */}
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                         <label style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--navy-900)' }}>
-                          ประวัติกิจกรรมที่เคยเข้าร่วม (Activity List)
+                          กิจกรรมและจิตอาสา
                         </label>
-                        {isEditMode && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const current = appEditData.activityList || [];
-                              setAppEditData({
-                                ...appEditData,
-                                activityList: [...current, { name: '', role: '', photoBase64: null }]
-                              });
-                            }}
-                            style={{
-                              padding: '4px 12px',
-                              borderRadius: '6px',
-                              border: '1px solid var(--math-green, #077b38)',
-                              background: '#f0fdf4',
-                              color: 'var(--math-green)',
-                              fontSize: '0.8rem',
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 4
-                            }}
-                          >
-                            <Plus size={14} />
-                            <span>เพิ่มกิจกรรม</span>
-                          </button>
-                        )}
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                          {(appEditData.activityList || []).length}/3 กิจกรรม
+                        </span>
                       </div>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {(!appEditData.activityList || appEditData.activityList.length === 0) ? (
-                          <div style={{ padding: 14, textAlign: 'center', background: '#f8fafc', borderRadius: 8, color: 'var(--text-muted)', fontSize: '0.84rem' }}>
-                            {isEditMode ? 'ยังไม่มีข้อมูลกิจกรรม (กดปุ่ม "+ เพิ่มกิจกรรม" เพื่อเพิ่มรายการ)' : 'ไม่มีข้อมูลกิจกรรม'}
-                          </div>
-                        ) : (
-                          appEditData.activityList.map((act, idx) => (
-                            <div key={idx} style={{ display: 'flex', gap: 10, alignItems: 'center', background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', width: 20 }}>
-                                {idx + 1}.
-                              </span>
-                              <div style={{ flex: 2 }}>
-                                <input
-                                  type="text"
-                                  className="form-input-light"
-                                  placeholder="ชื่อกิจกรรม เช่น ค่ายคณิตศาสตร์สัญจร"
-                                  value={act.name}
-                                  onChange={(e) => {
-                                    const next = [...(appEditData.activityList || [])];
-                                    next[idx].name = e.target.value;
-                                    setAppEditData({ ...appEditData, activityList: next });
-                                  }}
-                                />
-                              </div>
-                              <div style={{ flex: 1 }}>
-                                <input
-                                  type="text"
-                                  className="form-input-light"
-                                  placeholder="บทบาทหน้าที่ เช่น สวัสดิการ"
-                                  value={act.role}
-                                  onChange={(e) => {
-                                    const next = [...(appEditData.activityList || [])];
-                                    next[idx].role = e.target.value;
-                                    setAppEditData({ ...appEditData, activityList: next });
-                                  }}
-                                />
-                              </div>
-                              {isEditMode && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const next = (appEditData.activityList || []).filter((_, i) => i !== idx);
-                                    setAppEditData({ ...appEditData, activityList: next });
-                                  }}
-                                  style={{
-                                    width: 32,
-                                    height: 32,
-                                    border: '1px solid #fca5a5',
-                                    background: '#fef2f2',
-                                    color: '#dc2626',
-                                    borderRadius: 6,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
-                                  }}
-                                  title="ลบกิจกรรมนี้"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              )}
-                            </div>
-                          ))
-                        )}
-                      </div>
+                      {(appEditData.activityList || []).length === 0 && appEditData.activities ? (
+                        <div style={{ padding: 12, background: '#f8fafc', borderRadius: 8, fontSize: '0.86rem', color: 'var(--navy-800)', marginBottom: isEditMode ? 10 : 0 }}>
+                          {appEditData.activities}{appEditData.activityRole ? ` (${appEditData.activityRole})` : ''}
+                          <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: 4 }}>ข้อมูลกิจกรรมแบบเดิม (ก่อนมีระบบแนบรูป)</div>
+                        </div>
+                      ) : null}
+                      {(isEditMode || (appEditData.activityList || []).length > 0 || !appEditData.activities) && (
+                        <ActivityListEditor
+                          value={appEditData.activityList || []}
+                          readOnly={!isEditMode}
+                          onChange={(next) => setAppEditData({ ...appEditData, activityList: next })}
+                          onError={(message) => showToast(message, 'warning')}
+                        />
+                      )}
                     </div>
 
                     {/* Reasons List (Add / Edit / Delete) */}
@@ -5397,11 +5322,16 @@ export const AdminSection: React.FC = () => {
                                 <strong>กิจกรรมที่เคยปฏิบัติ / กิจกรรมจิตอาสา:</strong>{' '}
                                 {fd.activityList?.length
                                   ? fd.activityList.map((activity, index) => (
-                                      <span key={`${activity.name}-${index}`}>
-                                        {index > 0 ? ' • ' : ''}
-                                        {activity.name || 'ไม่ระบุชื่อกิจกรรม'}
-                                        {activity.role ? ` (${activity.role})` : ''}
-                                      </span>
+                                      <div key={`${activity.name}-${index}`} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginTop: 4, breakInside: 'avoid' }}>
+                                        {activity.photoBase64 ? (
+                                          <img src={activity.photoBase64} alt="" style={{ width: '22mm', height: '16mm', objectFit: 'cover', border: '1px solid #cbd5e1', borderRadius: 2, flexShrink: 0 }} />
+                                        ) : null}
+                                        <span>
+                                          {index + 1}. {activity.name || 'ไม่ระบุชื่อกิจกรรม'}
+                                          {activity.role ? ` (${activity.role})` : ''}
+                                          {activity.detail ? <span style={{ display: 'block', color: '#475569' }}>{activity.detail}</span> : null}
+                                        </span>
+                                      </div>
                                     ))
                                   : <span>{fd.activities || 'ไม่มีกิจกรรมระบุ'}{fd.activityRole ? ` (${fd.activityRole})` : ''}</span>}
                                 {fd.volunteerHours > 0 && (
