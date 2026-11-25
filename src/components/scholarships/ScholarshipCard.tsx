@@ -19,7 +19,29 @@ export const ScholarshipCard: React.FC<ScholarshipCardProps> = ({ scholarship })
   const isClosing = scholarship.status === 'closing_soon';
 
   return (
-    <div className="scholarship-card-minimal">
+    <div
+      className="scholarship-card-minimal"
+      style={myStatus ? { borderColor: myStatus.border, boxShadow: `0 0 0 1px ${myStatus.border}` } : undefined}
+    >
+      {myStatus && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            margin: '-4px 0 12px',
+            padding: '6px 10px',
+            borderRadius: 8,
+            background: myStatus.bg,
+            color: myStatus.color,
+            fontSize: '0.78rem',
+            fontWeight: 700
+          }}
+        >
+          <span aria-hidden="true">✓</span>
+          <span>คุณสมัครทุนนี้แล้ว · {myStatus.label}</span>
+        </div>
+      )}
       <div className="card-top-meta">
         <span className="card-category-pill">
           {scholarship.categoryName || (scholarship.scope === 'internal' ? 'ทุนภายใน' : 'ทุนภายนอก')}

@@ -18,11 +18,6 @@ import { applicationMatchesPeriod } from '../utils/applicationPeriod';
 import { normalizeStudentId } from '../utils/studentId';
 import { stripScholarshipCode } from '../utils/scholarshipName';
 import { getStudentRegistrationError } from '../utils/studentRegistrationValidation';
-import {
-  buildApplicationRecommendations,
-  getAutomaticRejectionNotes,
-  shouldAutomaticallyRejectApplication
-} from '../utils/applicationRecommendation';
 
 export type { StudentAccount, StudentPersonalInfo, StudentRegistrationData };
 
@@ -309,18 +304,8 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
               systemComment: app.systemComment || app.formData?.systemComment || initialMatch?.systemComment || ''
             };
           });
-          const recommendations = buildApplicationRecommendations(normalizedApps, scholarships);
-          return normalizedApps.map(app => {
-            const recommendation = recommendations.get(app.trackingId);
-            if (app.status !== 'submitted' || !shouldAutomaticallyRejectApplication(recommendation) || !recommendation) {
-              return app;
-            }
-            return {
-              ...app,
-              status: 'rejected' as const,
-              committeeNotes: getAutomaticRejectionNotes(app.committeeNotes || '', recommendation)
-            };
-          });
+          // ระบบไม่เปลี่ยนสถานะเป็น "ไม่ผ่าน" อัตโนมัติ ให้อาจารย์เป็นผู้พิจารณาเอง
+          return normalizedApps;
         }
       } catch (e) { console.error(e); }
     }
@@ -543,42 +528,8 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
         setScholarships(schResult.data);
       }
       if (appResult.source === 'supabase') {
-        const scholarshipsToAssess = schResult.source === 'supabase' ? schResult.data : scholarships;
-        const recommendations = buildApplicationRecommendations(appResult.data, scholarshipsToAssess);
-        const autoRejectedApps = appResult.data.flatMap(app => {
-          const recommendation = recommendations.get(app.trackingId);
-          return app.status === 'submitted' && shouldAutomaticallyRejectApplication(recommendation) && recommendation
-            ? [{ app, recommendation, notes: getAutomaticRejectionNotes(app.committeeNotes || '', recommendation) }]
-            : [];
-        });
-        const persistenceResults = await Promise.all(autoRejectedApps.map(({ app, notes }) =>
-          applicationService.updateApplicationReview(
-            app.trackingId,
-            'rejected',
-            app.score,
-            app.interviewDate,
-            notes
-          )
-        ));
-        const persistedRejections = new Map(
-          autoRejectedApps
-            .filter((_, index) => persistenceResults[index])
-            .map(({ app, notes }) => [app.trackingId, notes])
-        );
-        setApplications(appResult.data.map(app => {
-          const notes = persistedRejections.get(app.trackingId);
-          return notes
-            ? { ...app, status: 'rejected', committeeNotes: notes }
-            : app;
-        }));
-
-        const failedRejections = persistenceResults.filter(success => !success).length;
-        if (failedRejections > 0) {
-          showToast(`เปลี่ยนสถานะไม่ผ่านอัตโนมัติไม่สำเร็จ ${failedRejections} ใบ กรุณาตรวจสอบและลองอีกครั้ง`, 'warning');
-        }
-        if (persistedRejections.size > 0) {
-          showToast(`เปลี่ยนสถานะเป็นไม่ผ่านการพิจารณา ${persistedRejections.size} ใบตามเกณฑ์อัตโนมัติ`, 'info');
-        }
+        // ระบบไม่เปลี่ยนสถานะเป็น "ไม่ผ่าน" อัตโนมัติ ให้อาจารย์เป็นผู้พิจารณาเอง
+        setApplications(appResult.data);
       }
       if (settingsResult.source === 'supabase') {
         setSiteSettings(settingsResult.data);
@@ -1656,18 +1607,9 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
       systemRating: data.systemRating || 0,
       systemComment: data.systemComment || ''
     };
-    const recommendation = buildApplicationRecommendations(
-      [...applications, newApp],
-      scholarships
-    ).get(trackingId);
-    const autoReject = shouldAutomaticallyRejectApplication(recommendation);
-    const applicationToSave: Application = autoReject && recommendation
-      ? {
-          ...newApp,
-          status: 'rejected',
-          committeeNotes: getAutomaticRejectionNotes(newApp.committeeNotes, recommendation)
-        }
-      : newApp;
+    // ใบสมัครใหม่อยู่ในสถานะ "รอพิจารณา" เสมอ (ไม่ตัดสินไม่ผ่านอัตโนมัติ)
+    const autoReject = false;
+    const applicationToSave: Application = newApp;
 
     setApplications(prev => [applicationToSave, ...prev]);
     setLatestTrackingId(trackingId);

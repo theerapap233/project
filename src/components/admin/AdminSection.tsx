@@ -403,7 +403,7 @@ export const AdminSection: React.FC = () => {
   const handleBulkDecision = (decision: Decision) => {
     const targets = selectedAppsList;
     if (targets.length === 0) return;
-    const label = decision === 'approved' ? 'ผ่าน (อนุมัติทุน)' : 'ไม่ผ่าน';
+    const label = decision === 'approved' ? 'ผ่าน (อนุมัติทุน)' : decision === 'rejected' ? 'ไม่ผ่าน' : 'รอพิจารณา';
     if (!window.confirm(`ยืนยันตั้งผลพิจารณา "${label}" ให้ใบสมัครที่เลือกทั้งหมด ${targets.length} ใบ ใช่หรือไม่?`)) return;
     bulkUpdateApplicationStatus(targets.map(app => app.trackingId), decision);
     handleClearSelection();

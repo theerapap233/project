@@ -2,7 +2,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ApplicationStatus } from '../../types/application';
 
-export type Decision = 'approved' | 'rejected';
+export type Decision = 'submitted' | 'approved' | 'rejected';
 
 interface DecisionPickerProps {
   status: ApplicationStatus;
@@ -10,9 +10,10 @@ interface DecisionPickerProps {
   applicantName?: string;
 }
 
-const OPTIONS: { value: Decision; label: string; icon: string; color: string }[] = [
-  { value: 'approved', label: 'อนุมัติทุน', icon: '✓', color: '#047857' },
-  { value: 'rejected', label: 'ไม่ผ่าน', icon: '✕', color: '#b91c1c' }
+const OPTIONS: { value: Decision; label: string; icon: string; color: string; bg: string; border: string }[] = [
+  { value: 'submitted', label: 'รอพิจารณา', icon: '⏳', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
+  { value: 'approved', label: 'อนุมัติทุน', icon: '✓', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },
+  { value: 'rejected', label: 'ไม่ผ่าน', icon: '✕', color: '#b91c1c', bg: '#fef2f2', border: '#fecaca' }
 ];
 
 const MENU_WIDTH = 180;
@@ -33,7 +34,7 @@ export const DecisionPicker: React.FC<DecisionPickerProps> = ({ status, onChange
     const rect = buttonRef.current?.getBoundingClientRect();
     if (!rect) return;
     const left = Math.max(8, Math.min(rect.right - MENU_WIDTH, window.innerWidth - MENU_WIDTH - 8));
-    const menuHeight = 104;
+    const menuHeight = 146;
     const below = rect.bottom + 6;
     const top = below + menuHeight > window.innerHeight ? rect.top - menuHeight - 6 : below;
     setPos({ top, left });
@@ -79,8 +80,8 @@ export const DecisionPicker: React.FC<DecisionPickerProps> = ({ status, onChange
 
   const buttonStyle: React.CSSProperties = current
     ? {
-        border: `1px solid ${current.value === 'approved' ? '#a7f3d0' : '#fecaca'}`,
-        background: current.value === 'approved' ? '#ecfdf5' : '#fef2f2',
+        border: `1px solid ${current.border}`,
+        background: current.bg,
         color: current.color
       }
     : {

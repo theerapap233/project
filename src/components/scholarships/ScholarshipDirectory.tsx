@@ -1,26 +1,15 @@
 import React, { useMemo, useState } from 'react';
 import { ScholarshipCard } from './ScholarshipCard';
 import { useScholarship } from '../../context/ScholarshipContext';
-import { useMyApplications } from '../../hooks/useMyApplications';
-import { applicationMatchesScholarshipPeriod } from '../../utils/applicationPeriod';
 
 
 export const ScholarshipDirectory: React.FC = () => {
   const { scholarships } = useScholarship();
-  const { isStudent, myApplications } = useMyApplications();
   const [showAllInternal, setShowAllInternal] = useState(false);
   const [showAllExternal, setShowAllExternal] = useState(false);
 
-  const visibleScholarships = useMemo(() => {
-    if (!isStudent) return scholarships;
-    const appliedScholarshipIds = new Set(scholarships
-      .filter(scholarship => myApplications.some(application =>
-        application.scholarshipId === scholarship.id &&
-        applicationMatchesScholarshipPeriod(application, scholarship)
-      ))
-      .map(scholarship => scholarship.id));
-    return scholarships.filter(scholarship => !appliedScholarshipIds.has(scholarship.id));
-  }, [scholarships, isStudent, myApplications]);
+  // แสดงทุนทั้งหมด รวมทุนที่นักศึกษาสมัครไปแล้ว (การ์ดจะขึ้นป้าย "สมัครแล้ว" และสถานะแทนปุ่มสมัคร)
+  const visibleScholarships = scholarships;
 
   // แยกทุนออกเป็น 2 ส่วนชัดเจน: ทุนภายใน vs ทุนภายนอก
   const internalScholarships = useMemo(() => {
@@ -44,12 +33,6 @@ export const ScholarshipDirectory: React.FC = () => {
             รวมรายการทุนการศึกษาของภาควิชาคณิตศาสตร์ มจพ. ทั้งทุนภายในมหาวิทยาลัยและทุนสนับสนุนจากองค์กรภายนอก
           </p>
         </div>
-
-        {isStudent && myApplications.length > 0 && visibleScholarships.length === 0 && (
-          <p className="section-subtitle">
-            สมัครทุนที่แสดงครบแล้ว สามารถตรวจสอบสถานะได้ในเมนูใบสมัครของฉัน
-          </p>
-        )}
 
         {/* ส่วนที่ 1: ทุนภายใน */}
         {internalScholarships.length > 0 && (
