@@ -373,42 +373,6 @@ button, input, select, textarea {
   filter: drop-shadow(0 24px 44px rgba(16, 185, 129, 0.28));
 }
 
-/* Cute Floating Mini Cards */
-.hero-floating-card {
-  position: absolute;
-  z-index: 3;
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.95);
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08), 0 2px 6px rgba(15, 23, 42, 0.04);
-  border-radius: 18px;
-  padding: 10px 16px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  transition: all 0.3s ease;
-  user-select: none;
-}
-
-.hero-floating-card:hover {
-  transform: translateY(-4px) scale(1.04);
-  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.12);
-  background: rgba(255, 255, 255, 0.95);
-}
-
-.hero-floating-card.card-top-left {
-  top: 10%;
-  left: -20px;
-  animation: floatSlow 4.5s ease-in-out infinite alternate;
-}
-
-.hero-floating-card.card-bottom-right {
-  bottom: 8%;
-  right: -15px;
-  animation: floatReverse 5s ease-in-out infinite alternate;
-}
-
 .hero-chip-badge {
   position: absolute;
   z-index: 3;
@@ -449,51 +413,6 @@ button, input, select, textarea {
   color: #3b82f6;
   background: #eff6ff;
   animation: floatReverse 4.2s ease-in-out infinite alternate;
-}
-
-.card-icon-pill {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.2rem;
-}
-
-.card-icon-green {
-  background: #ecfdf5;
-  color: #059669;
-}
-
-.card-icon-orange {
-  background: #fff7ed;
-  color: #ea580c;
-}
-
-.card-text-title {
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: var(--navy-900);
-  line-height: 1.2;
-}
-
-.card-text-sub {
-  font-size: 0.72rem;
-  color: var(--navy-500);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.pulse-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: #10b981;
-  display: inline-block;
-  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
-  animation: pulseDot 2s infinite;
 }
 
 @keyframes heroFloat {
@@ -543,30 +462,7 @@ button, input, select, textarea {
   }
 }
 
-@keyframes pulseDot {
-  0% {
-    transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
-  }
-  70% {
-    transform: scale(1);
-    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
-  }
-  100% {
-    transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
-  }
-}
-
 @media (max-width: 900px) {
-  .hero-floating-card.card-top-left {
-    top: 5%;
-    left: 0;
-  }
-  .hero-floating-card.card-bottom-right {
-    bottom: 4%;
-    right: 0;
-  }
   .hero-glow-backdrop {
     width: 300px;
     height: 300px;
@@ -574,18 +470,6 @@ button, input, select, textarea {
 }
 
 @media (max-width: 600px) {
-  .hero-floating-card {
-    padding: 8px 12px;
-    border-radius: 14px;
-  }
-  .hero-floating-card.card-top-left {
-    top: -5px;
-    left: 0;
-  }
-  .hero-floating-card.card-bottom-right {
-    bottom: -10px;
-    right: 0;
-  }
   .hero-chip-badge {
     width: 36px;
     height: 36px;
@@ -595,20 +479,6 @@ button, input, select, textarea {
     width: 240px;
     height: 240px;
   }
-}
-
-.hero-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
-  background: var(--math-green-soft);
-  color: var(--math-green-dark);
-  border-radius: var(--radius-full);
-  font-size: 0.85rem;
-  font-weight: 600;
-  margin-bottom: 20px;
-  border: 1px solid var(--math-green-border);
 }
 
 .hero-title {
@@ -1182,10 +1052,10 @@ button, input, select, textarea {
 .scholarship-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
+  gap: 18px;
 }
 
-@media (max-width: 1080px) {
+@media (max-width: 1024px) {
   .scholarship-grid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -5817,12 +5687,26 @@ body:has(.modal-backdrop.open) .preview-mode-dock {
   font-size: 0.88rem;
 }
 
+.admin-console-layout {
+  display: grid;
+  grid-template-columns: minmax(245px, 280px) minmax(0, 1fr);
+  align-items: start;
+  gap: 24px;
+}
+
+.admin-console-content {
+  min-width: 0;
+}
+
 .admin-dashboard .admin-tabs {
   display: grid !important;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 6px !important;
-  margin-bottom: 22px !important;
-  padding: 6px !important;
+  grid-template-columns: minmax(0, 1fr);
+  align-self: start;
+  position: sticky;
+  top: 88px;
+  gap: 10px !important;
+  margin-bottom: 0 !important;
+  padding: 10px !important;
   border-color: #e2e8f0 !important;
   border-radius: 14px !important;
   background: rgba(255, 255, 255, 0.82) !important;
@@ -5832,14 +5716,17 @@ body:has(.modal-backdrop.open) .preview-mode-dock {
 
 .admin-dashboard .admin-tab-button {
   min-width: 0;
-  justify-content: center !important;
-  gap: 7px !important;
-  padding: 10px 12px !important;
+  min-height: 54px;
+  justify-content: flex-start !important;
+  gap: 12px !important;
+  padding: 14px 16px !important;
   border: 1px solid transparent !important;
   border-radius: 10px !important;
   color: #475569 !important;
-  font-size: 0.82rem !important;
+  font-size: 0.9rem !important;
   font-weight: 600 !important;
+  text-align: left;
+  white-space: normal !important;
   transition:
     color 0.2s ease,
     background 0.2s ease,
@@ -5853,8 +5740,14 @@ body:has(.modal-backdrop.open) .preview-mode-dock {
 }
 
 .admin-dashboard .admin-tab-button > svg {
+  width: 19px;
+  height: 19px;
   flex: 0 0 auto;
   color: #64748b;
+}
+
+.admin-dashboard .admin-tab-button > span:nth-child(2) {
+  flex: 1;
 }
 
 .admin-dashboard .admin-tab-button > span:last-child {
@@ -6054,7 +5947,7 @@ body:has(.modal-backdrop.open) .preview-mode-dock {
 
 @media (max-width: 960px) {
   .admin-dashboard .admin-tabs {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .admin-dashboard .admin-cards-grid {
@@ -6098,20 +5991,26 @@ body:has(.modal-backdrop.open) .preview-mode-dock {
   }
 
   .admin-dashboard .admin-tabs {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 5px !important;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px !important;
     margin-bottom: 18px !important;
+    position: static;
+  }
+
+  .admin-console-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
   }
 
   .admin-dashboard .admin-tab-button {
     justify-content: flex-start !important;
-    padding: 9px 10px !important;
-    font-size: 0.76rem !important;
+    padding: 14px 14px !important;
+    font-size: 0.9rem !important;
   }
 
   .admin-dashboard .admin-tab-button > span:nth-child(2) {
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow: visible;
+    text-overflow: clip;
   }
 
   .admin-dashboard .admin-tab-pane h3 {
@@ -6434,20 +6333,10 @@ body:has(.modal-backdrop.open) .preview-mode-dock {
 
 .news-card-top {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   margin-bottom: 14px;
   gap: 8px;
-}
-
-.news-tag-pill {
-  font-size: 0.72rem;
-  font-weight: 600;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: #f1f5f9;
-  color: #334155;
-  border: 1px solid #e2e8f0;
 }
 
 .news-date {
@@ -6565,7 +6454,7 @@ body:has(.modal-backdrop.open) .preview-mode-dock {
   background: #ffffff;
   border: 1px solid var(--border-light, #e2e8f0);
   border-radius: 14px;
-  padding: 22px;
+  padding: 18px;
   display: flex;
   flex-direction: column;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
@@ -6587,22 +6476,13 @@ body:has(.modal-backdrop.open) .preview-mode-dock {
   gap: 8px;
 }
 
-.card-category-pill {
-  font-size: 0.72rem;
-  font-weight: 600;
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: #f8fafc;
-  color: #475569;
-  border: 1px solid #e2e8f0;
-}
-
 .card-status-dot {
   font-size: 0.72rem;
   font-weight: 600;
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  margin-left: auto;
 }
 
 .card-status-dot::before {
@@ -6655,47 +6535,10 @@ body:has(.modal-backdrop.open) .preview-mode-dock {
   border: 1px solid #f1f5f9;
 }
 
-.card-amount-clean .amount-label {
-  font-size: 0.72rem;
-  color: #64748b;
-  display: block;
-  margin-bottom: 2px;
-}
-
 .card-amount-clean .amount-val {
   font-size: 1.15rem;
   font-weight: 700;
   color: var(--math-green, #077b38);
-}
-
-.card-criteria-clean {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 18px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  flex: 1;
-}
-
-.card-criteria-clean li {
-  font-size: 0.82rem;
-  color: #475569;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.card-criteria-clean li::before {
-  content: '•';
-  color: var(--math-green, #077b38);
-  font-size: 1.1rem;
-  line-height: 1;
-}
-
-.card-criteria-clean li strong {
-  color: #1e293b;
-  font-weight: 600;
 }
 
 .card-footer-clean {
@@ -6831,12 +6674,6 @@ body:has(.modal-backdrop.open) .preview-mode-dock {
     min-width: 0;
   }
 
-  .hero-badge {
-    margin-bottom: 12px;
-    padding: 5px 11px;
-    font-size: 0.78rem;
-  }
-
   .hero-title {
     font-size: clamp(1.7rem, 7vw, 2.2rem);
     line-height: 1.28;
@@ -6863,16 +6700,6 @@ body:has(.modal-backdrop.open) .preview-mode-dock {
     width: min(100%, 360px);
     max-height: 340px;
     object-fit: contain;
-  }
-
-  .hero-floating-card.card-top-left {
-    top: 2%;
-    left: 0;
-  }
-
-  .hero-floating-card.card-bottom-right {
-    right: 0;
-    bottom: 1%;
   }
 
   .section {
@@ -6951,7 +6778,6 @@ body:has(.modal-backdrop.open) .preview-mode-dock {
   }
 
   .card-amount-clean .amount-val,
-  .card-criteria-clean li,
   .card-deadline-text {
     overflow-wrap: anywhere;
   }
@@ -7044,28 +6870,6 @@ body:has(.modal-backdrop.open) .preview-mode-dock {
     padding: 28px 0 32px;
   }
 
-  .hero-floating-card {
-    max-width: calc(100% - 12px);
-    gap: 8px;
-    padding: 7px 10px;
-  }
-
-  .hero-floating-card.card-top-left {
-    left: 0;
-  }
-
-  .hero-floating-card.card-bottom-right {
-    right: 0;
-  }
-
-  .card-text-title {
-    font-size: 0.74rem;
-  }
-
-  .card-text-sub {
-    font-size: 0.66rem;
-  }
-
   .news-section-minimal,
   .scholarship-section-minimal,
   .section {
@@ -7090,7 +6894,6 @@ body:has(.modal-backdrop.open) .preview-mode-dock {
 @media (prefers-reduced-motion: reduce) {
   .hero-student-img,
   .hero-glow-backdrop,
-  .hero-floating-card,
   .hero-chip-badge {
     animation: none;
     transition: none;

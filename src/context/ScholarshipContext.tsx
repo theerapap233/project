@@ -23,7 +23,6 @@ export type { StudentAccount, StudentPersonalInfo, StudentRegistrationData };
 
 export interface UserProfile {
   studentId: string;
-  username?: string;
   name: string;
   email: string;
   phone?: string;
@@ -39,8 +38,7 @@ export interface UserProfile {
 }
 
 interface StoredStaffCredentials {
-  username: string;
-  email?: string;
+  email: string;
   salt: string;
   passwordHash: string;
 }
@@ -140,9 +138,9 @@ interface ScholarshipContextType {
   openLogoutModal: () => void;
   closeLogoutModal: () => void;
   updateCurrentUser: (updates: Partial<UserProfile>) => void;
-  saveStaffProfile: (updates: Pick<UserProfile, 'name' | 'username' | 'email' | 'position' | 'avatarUrl'>) => Promise<boolean>;
+  saveStaffProfile: (updates: Pick<UserProfile, 'name' | 'email' | 'position' | 'avatarUrl'>) => Promise<boolean>;
   login: (identifier: string, password: string, customName?: string) => Promise<{ success: boolean; message?: string }>;
-  changeStaffCredentials: (username: string, newPassword: string, currentPassword?: string) => Promise<boolean>;
+  changeStaffCredentials: (newPassword: string, currentPassword?: string) => Promise<boolean>;
   logout: () => void;
 
   // Website CMS Actions
@@ -442,8 +440,8 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     if (savedUser.role !== 'admin' && savedUser.role !== 'officer') return;
 
-    const username = savedUser.username || savedUser.studentId;
-    if (!username) {
+    const email = savedUser.email?.trim().toLowerCase();
+    if (!email) {
       localStorage.removeItem('KMUTNB_SCH_USER');
       setIsRestoringStaffSession(false);
       return;
@@ -454,8 +452,8 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
       try {
         const { data, error } = await supabase
           .from('staff_users')
-          .select('username, name, email, department, position, avatar_url, staff_roles(role_name, role_title)')
-          .eq('username', username)
+          .select('name, email, department, position, avatar_url, staff_roles(role_name, role_title)')
+          .eq('email', email)
           .eq('is_active', true)
           .maybeSingle();
 
@@ -474,8 +472,7 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
         if (cancelled) return;
 
         const user: UserProfile = {
-          studentId: data.username,
-          username: data.username,
+          studentId: data.email,
           name: data.name,
           email: data.email,
           faculty: 'คณะวิทยาศาสตร์ประยุกต์',
@@ -672,31 +669,25 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
     showToast('บันทึกข้อมูลส่วนตัวสำเร็จ', 'success');
   };
 
-  const changeStaffCredentials = async (username: string, newPassword: string, currentPassword = ''): Promise<boolean> => {
+  const changeStaffCredentials = async (newPassword: string, currentPassword = ''): Promise<boolean> => {
     if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'officer')) return false;
-    const cleanUsername = username.trim();
+    if (!newPassword) return false;
 
     if (isSupabaseConfigured()) {
-      const oldUsername = currentUser.username || currentUser.studentId;
-      const updates: { username: string; password?: string } = { username: cleanUsername };
-      if (newPassword) {
-        if (!currentPassword) {
-          showToast('กรุณากรอกรหัสผ่านเดิมเพื่อยืนยัน', 'warning');
-          return false;
-        }
-        updates.password = newPassword;
+      if (!currentPassword) {
+        showToast('กรุณากรอกรหัสผ่านเดิมเพื่อยืนยัน', 'warning');
+        return false;
       }
 
-      let update = supabase
+      const { data, error } = await supabase
         .from('staff_users')
-        .update(updates)
-        .eq('username', oldUsername);
-      if (newPassword) update = update.eq('password', currentPassword);
-
-      const { data, error } = await update.select('username');
+        .update({ password: newPassword })
+        .eq('email', currentUser.email.toLowerCase())
+        .eq('password', currentPassword)
+        .select('email');
       if (error) {
         console.error('ไม่สามารถเปลี่ยนรหัสผ่านเจ้าหน้าที่ได้:', error.message);
-        showToast(`เปลี่ยนข้อมูลเจ้าหน้าที่ไม่สำเร็จ (${error.code || 'database error'})`, 'error');
+        showToast(`เปลี่ยนรหัสผ่านเจ้าหน้าที่ไม่สำเร็จ (${error.code || 'database error'})`, 'error');
         return false;
       }
       if (!data?.length) {
@@ -704,48 +695,33 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
         return false;
       }
 
-      const updatedUser = { ...currentUser, username: cleanUsername, studentId: cleanUsername };
-      setCurrentUser(updatedUser);
-      safeSetLocalStorage('KMUTNB_SCH_USER', JSON.stringify(updatedUser));
-      showToast(newPassword ? 'เปลี่ยนรหัสผ่านเจ้าหน้าที่เรียบร้อยแล้ว' : 'เปลี่ยนชื่อผู้ใช้เจ้าหน้าที่เรียบร้อยแล้ว', 'success');
+      showToast('เปลี่ยนรหัสผ่านเจ้าหน้าที่เรียบร้อยแล้ว', 'success');
       return true;
     }
 
-    if (!cleanUsername || (!staffCredentials && !newPassword)) return false;
+    if (!staffCredentials) return false;
 
     try {
-      let credentials: StoredStaffCredentials;
-      if (newPassword) {
-        if (staffCredentials) {
-          if (!currentPassword) {
-            showToast('กรุณากรอกรหัสผ่านเดิมเพื่อยืนยัน', 'warning');
-            return false;
-          }
-          const currentHash = await createPasswordHash(currentPassword, staffCredentials.salt);
-          if (currentHash !== staffCredentials.passwordHash) {
-            showToast('รหัสผ่านเดิมไม่ถูกต้อง', 'error');
-            return false;
-          }
-        }
-        const salt = createPasswordSalt();
-        credentials = {
-          username: cleanUsername,
-          email: staffCredentials?.email || DEFAULT_STAFF_EMAIL,
-          salt,
-          passwordHash: await createPasswordHash(newPassword, salt)
-        };
-      } else if (staffCredentials) {
-        credentials = { ...staffCredentials, username: cleanUsername };
-      } else {
+      if (!currentPassword) {
+        showToast('กรุณากรอกรหัสผ่านเดิมเพื่อยืนยัน', 'warning');
         return false;
       }
 
+      const currentHash = await createPasswordHash(currentPassword, staffCredentials.salt);
+      if (currentHash !== staffCredentials.passwordHash) {
+        showToast('รหัสผ่านเดิมไม่ถูกต้อง', 'error');
+        return false;
+      }
+
+      const salt = createPasswordSalt();
+      const credentials: StoredStaffCredentials = {
+        ...staffCredentials,
+        salt,
+        passwordHash: await createPasswordHash(newPassword, salt)
+      };
       safeSetLocalStorage(LOCAL_STORAGE_STAFF_CREDENTIALS_KEY, JSON.stringify(credentials));
       setStaffCredentials(credentials);
-      const updatedUser = { ...currentUser, username: cleanUsername };
-      setCurrentUser(updatedUser);
-      safeSetLocalStorage('KMUTNB_SCH_USER', JSON.stringify(updatedUser));
-      showToast('เปลี่ยนชื่อผู้ใช้และรหัสผ่านเรียบร้อยแล้ว', 'success');
+      showToast('เปลี่ยนรหัสผ่านเจ้าหน้าที่เรียบร้อยแล้ว', 'success');
       return true;
     } catch (err) {
       console.error('Error updating staff credentials:', err);
@@ -755,16 +731,15 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const saveStaffProfile = async (
-    updates: Pick<UserProfile, 'name' | 'username' | 'email' | 'position' | 'avatarUrl'>
+    updates: Pick<UserProfile, 'name' | 'email' | 'position' | 'avatarUrl'>
   ): Promise<boolean> => {
     if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'officer')) return false;
 
     const name = updates.name.trim();
-    const username = updates.username?.trim() || '';
-    const email = updates.email.trim();
+    const email = updates.email.trim().toLowerCase();
     const position = updates.position?.trim();
-    if (!name || !username || !email || !position) {
-      showToast('กรุณากรอกชื่อ ชื่อผู้ใช้ อีเมล และตำแหน่งให้ครบถ้วน', 'warning');
+    if (!name || !email || !position) {
+      showToast('กรุณากรอกชื่อ อีเมล และตำแหน่งให้ครบถ้วน', 'warning');
       return false;
     }
 
@@ -773,18 +748,17 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
         .from('staff_users')
         .update({
           name,
-          username,
           email,
           position,
           avatar_url: updates.avatarUrl || null
         })
-        .eq('username', currentUser.username || currentUser.studentId)
-        .select('username, name')
+        .eq('email', currentUser.email.toLowerCase())
+        .select('email, name')
         .maybeSingle();
 
       if (error) {
         if (error.code === '23505') {
-          showToast('ชื่อผู้ใช้นี้มีผู้ใช้งานแล้ว กรุณาเลือกชื่ออื่น', 'warning');
+          showToast('อีเมลนี้มีผู้ใช้งานแล้ว กรุณาใช้อีเมลอื่น', 'warning');
           return false;
         }
         console.error('ไม่สามารถบันทึกข้อมูลโปรไฟล์เจ้าหน้าที่ลง Supabase ได้:', error.message);
@@ -795,13 +769,10 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
         showToast('ไม่พบบัญชีเจ้าหน้าที่ใน Supabase กรุณาเข้าสู่ระบบใหม่', 'error');
         return false;
       }
-    } else if (username !== (currentUser.username || currentUser.studentId) && !staffCredentials) {
-      showToast('ไม่สามารถเปลี่ยนชื่อผู้ใช้ในโหมดเดโมได้ กรุณาเข้าสู่ระบบใหม่ก่อน', 'warning');
-      return false;
     }
 
     if (staffCredentials) {
-      const updatedCredentials = { ...staffCredentials, username, email };
+      const updatedCredentials = { ...staffCredentials, email };
       safeSetLocalStorage(LOCAL_STORAGE_STAFF_CREDENTIALS_KEY, JSON.stringify(updatedCredentials));
       setStaffCredentials(updatedCredentials);
     }
@@ -809,8 +780,7 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
     updateCurrentUser({
       ...updates,
       name,
-      username,
-      studentId: username,
+      studentId: email,
       email,
       position,
       avatarUrl: updates.avatarUrl || null
@@ -1128,22 +1098,17 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const login = async (identifier: string, password: string, customName?: string): Promise<{ success: boolean; message?: string }> => {
-    const cleanId = (identifier || '').trim();
-    if (!cleanId || !password) return { success: false, message: 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน' };
+    const cleanEmail = (identifier || '').trim().toLowerCase();
+    if (!cleanEmail || !password) return { success: false, message: 'กรุณากรอกอีเมลและรหัสผ่าน' };
 
     if (isSupabaseConfigured()) {
-      const findStaffUser = (field: 'username' | 'email', value: string) => supabase
+      const { data, error } = await supabase
         .from('staff_users')
-        .select('username, name, email, department, position, avatar_url, role_id, staff_roles(role_name, role_title)')
-        .eq(field, value)
+        .select('name, email, department, position, avatar_url, role_id, staff_roles(role_name, role_title)')
+        .eq('email', cleanEmail)
         .eq('password', password)
         .eq('is_active', true)
         .maybeSingle();
-      let result = await findStaffUser('username', cleanId);
-      if (!result.error && !result.data && cleanId.includes('@')) {
-        result = await findStaffUser('email', cleanId.toLowerCase());
-      }
-      const { data, error } = result;
       if (error) {
         console.error('ไม่สามารถตรวจสอบบัญชี staff_users ได้:', error.message);
         return {
@@ -1155,7 +1120,6 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
       const role = Array.isArray(data?.staff_roles) ? data.staff_roles[0] : data?.staff_roles;
       if (
         !data ||
-        typeof data.username !== 'string' ||
         typeof data.name !== 'string' ||
         typeof data.email !== 'string' ||
         !role ||
@@ -1163,13 +1127,12 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
       ) {
         return {
           success: false,
-          message: 'ไม่พบบัญชีที่ใช้งานได้ หรือ username/อีเมล/รหัสผ่านไม่ตรงกับ staff_users กรุณาตรวจสอบข้อมูลเข้าสู่ระบบและสิทธิ์บัญชี'
+          message: 'ไม่พบบัญชีที่ใช้งานได้ หรืออีเมล/รหัสผ่านไม่ตรงกับ staff_users กรุณาตรวจสอบข้อมูลเข้าสู่ระบบและสิทธิ์บัญชี'
         };
       }
 
       const user: UserProfile = {
-        studentId: data.username,
-        username: data.username,
+        studentId: data.email,
         name: data.name,
         email: data.email,
         faculty: 'คณะวิทยาศาสตร์ประยุกต์',
@@ -1189,41 +1152,21 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
       return { success: true };
     }
 
-    const matchesLocalStaffEmail = cleanId.toLowerCase() ===
+    const matchesLocalStaffEmail = cleanEmail ===
       (staffCredentials?.email || DEFAULT_STAFF_EMAIL).toLowerCase();
-    const legacyStaffName = cleanId.toLowerCase() === 'admin' ||
-      cleanId.toLowerCase().includes('staff') ||
-      cleanId.toLowerCase().includes('officer') ||
-      cleanId.toLowerCase().includes('committee') ||
-      cleanId.toLowerCase().includes('math') ||
-      matchesLocalStaffEmail;
-    const isStudentFormat = /^s?[0-9]{8,13}$/i.test(cleanId) || cleanId.includes('@email.kmutnb.ac.th') || (!legacyStaffName && (!staffCredentials || cleanId.toLowerCase() !== staffCredentials.username.toLowerCase()));
-
-    if (isStudentFormat) {
-      const studentRes = await loginStudent(cleanId, password);
-      return { success: studentRes.success, message: studentRes.message };
+    if (!matchesLocalStaffEmail) {
+      return { success: false, message: 'ไม่พบอีเมลเจ้าหน้าที่นี้หรือรหัสผ่านไม่ถูกต้อง' };
     }
 
     if (staffCredentials) {
-      const matchesUsername = cleanId.toLowerCase() === staffCredentials.username.toLowerCase();
-      const matchesEmail = cleanId.toLowerCase() ===
-        (staffCredentials.email || DEFAULT_STAFF_EMAIL).toLowerCase();
-      if ((!matchesUsername && !matchesEmail) || !password) {
-        return { success: false, message: 'ชื่อผู้ใช้หรือรหัสผ่านเจ้าหน้าที่ไม่ถูกต้อง' };
-      }
       const submittedHash = await createPasswordHash(password, staffCredentials.salt);
       if (submittedHash !== staffCredentials.passwordHash) {
-        return { success: false, message: 'ชื่อผู้ใช้หรือรหัสผ่านเจ้าหน้าที่ไม่ถูกต้อง' };
+        return { success: false, message: 'อีเมลหรือรหัสผ่านเจ้าหน้าที่ไม่ถูกต้อง' };
       }
     } else {
-      if (!legacyStaffName || !password) {
-        return { success: false, message: 'ชื่อผู้ใช้หรือรหัสผ่านเจ้าหน้าที่ไม่ถูกต้อง' };
-      }
       const salt = createPasswordSalt();
-      const username = matchesLocalStaffEmail ? 'admin' : cleanId;
-      const credentials = {
-        username,
-        email: DEFAULT_STAFF_EMAIL,
+      const credentials: StoredStaffCredentials = {
+        email: cleanEmail,
         salt,
         passwordHash: await createPasswordHash(password, salt)
       };
@@ -1231,14 +1174,11 @@ export const ScholarshipProvider: React.FC<{ children: React.ReactNode }> = ({ c
       setStaffCredentials(credentials);
     }
 
-    const username = staffCredentials
-      ? staffCredentials.username
-      : matchesLocalStaffEmail ? 'admin' : cleanId;
+    const email = staffCredentials?.email || cleanEmail;
     const user: UserProfile = {
-      studentId: username,
-      username,
+      studentId: email,
       name: customName || 'เจ้าหน้าที่ธุรการ/กรรมการทุน ภาควิชาคณิตศาสตร์',
-      email: DEFAULT_STAFF_EMAIL,
+      email,
       faculty: 'คณะวิทยาศาสตร์ประยุกต์',
       major: 'งานกิจการนักศึกษาและทุนการศึกษา',
       position: 'เจ้าหน้าที่ธุรการ/กรรมการทุน',

@@ -43,9 +43,6 @@ export const ScholarshipCard: React.FC<ScholarshipCardProps> = ({ scholarship })
         </div>
       )}
       <div className="card-top-meta">
-        <span className="card-category-pill">
-          {scholarship.categoryName || (scholarship.scope === 'internal' ? 'ทุนภายใน' : 'ทุนภายนอก')}
-        </span>
         <span className={`card-status-dot ${isClosed ? 'closed' : isClosing ? 'closing' : 'open'}`}>
           {isClosed ? 'ปิดรับแล้ว' : isClosing ? 'ใกล้ปิดรับ' : 'เปิดรับสมัคร'}
         </span>
@@ -56,21 +53,9 @@ export const ScholarshipCard: React.FC<ScholarshipCardProps> = ({ scholarship })
       </h3>
 
       <div className="card-amount-clean">
-        <span className="amount-label">มูลค่าทุนสนับสนุน</span>
+        <span className="amount-label">มูลค่าทุน</span>
         <div className="amount-val">{scholarship.amount}</div>
       </div>
-
-      <ul className="card-criteria-clean">
-        <li>
-          <span>เกรดขั้นต่ำ: <strong>GPAX ≥ {(typeof scholarship.minGPAX === 'number' ? scholarship.minGPAX : 2.0).toFixed(2)}</strong></span>
-        </li>
-        <li>
-          <span>ชั้นปี: <strong>{(Array.isArray(scholarship.targetYears) && scholarship.targetYears.length > 0 ? scholarship.targetYears : ['ทุกชั้นปี']).join(', ')}</strong></span>
-        </li>
-        <li>
-          <span>จำนวนทุน: <strong>{scholarship.totalSlots ?? 0} ทุน</strong></span>
-        </li>
-      </ul>
 
       <div className="card-footer-clean">
         <div className="card-deadline-text">

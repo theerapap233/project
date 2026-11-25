@@ -1,11 +1,15 @@
 -- ✅ SCHEMA HAS BEEN TUNED & ORDERED
--- สคริปต์ที่จัดลำดับตาราง Foreign Keys, Indexes, RLS Policies และ Seed Data เรียบร้อยแล้ว
--- สามารถนำไฟล์ `supabase/schema.sql` ไปกด Run ใน Supabase SQL Editor ได้ทันที 100%
+-- ไฟล์ schema.sql รวมตาราง, Foreign Keys, Indexes, RLS Policies, Seed Data,
+-- ระบบบัญชีนักศึกษา, ตั้งค่าอีเมลสรุปประจำวัน และระบบ OTP รีเซ็ตรหัสผ่าน
+-- ใช้กับ Supabase โปรเจกต์ใหม่ โดยรัน `supabase/schema.sql` ใน SQL Editor
+-- ข้อมูลจริงจากฐานข้อมูลเดิม (เช่น ผู้ใช้/ใบสมัคร) ต้อง export/import แยกต่างหาก
 -- สำหรับฐานข้อมูลเดิม ให้รัน `supabase/remove_scholarship_codes.sql` หนึ่งครั้ง
 -- สำหรับฐานข้อมูลเดิม ให้รัน `supabase/application_tracking_id.sql` เพื่อเปิดใช้เลข YYTTYNNN และแปลงเลขที่ใบสมัครเดิม
 -- สำหรับฐานข้อมูลเดิม ให้รัน `supabase/staff_profile.sql` เพื่อเพิ่มฟิลด์ตำแหน่งในโปรไฟล์เจ้าหน้าที่
+-- สำหรับฐานข้อมูลเดิม ให้รัน `supabase/staff_email_login.sql` เพื่อลบ username จากบัญชีเจ้าหน้าที่
 -- สำหรับฐานข้อมูลเดิม ให้รัน `supabase/scholarship_bulk_dates.sql` เพื่อเพิ่มวันเริ่มรับสมัครของทุน
--- สำหรับระบบ OTP ลืมรหัสผ่าน ให้รัน `supabase/password_reset_otp.sql` และ deploy Edge Function ตาม README.md
+-- สำหรับระบบอีเมลรายวัน ให้ตั้งค่า Apps Script หรือ deploy Edge Function และกำหนด Secrets แยก
+-- ดูขั้นตอนตั้งเวลาส่งใน `supabase/daily_application_digest.sql` และคู่มือใน README.md
 
 CREATE TABLE public.staff_roles (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -15,7 +19,6 @@ CREATE TABLE public.staff_roles (
 );
 CREATE TABLE public.staff_users (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  username character varying NOT NULL UNIQUE,
   password text NOT NULL,
   name character varying NOT NULL,
   email character varying NOT NULL UNIQUE,
@@ -36,7 +39,7 @@ CREATE POLICY "Public update staff_users" ON public.staff_users FOR UPDATE USING
 
 -- Direct-password login reads the password value from this table.
 -- Reset a staff member's password with:
--- UPDATE public.staff_users SET password = 'your-password' WHERE username = 'admin';
+-- UPDATE public.staff_users SET password = 'your-password' WHERE email = 'admin@example.com';
 CREATE TABLE public.students (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   student_code character varying UNIQUE,

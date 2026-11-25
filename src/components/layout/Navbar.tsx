@@ -61,7 +61,6 @@ export const Navbar: React.FC = () => {
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
 
   const [profileForm, setProfileForm] = useState({
-    username: currentUser?.username || currentUser?.studentId || '',
     name: currentUser?.name || '',
     email: currentUser?.email || '',
     phone: currentUser?.phone || '',
@@ -79,7 +78,6 @@ export const Navbar: React.FC = () => {
   useEffect(() => {
     if (currentUser) {
       setProfileForm({
-        username: currentUser.username || currentUser.studentId,
         name: currentUser.name,
         email: currentUser.email,
         phone: currentUser.phone || '',
@@ -181,7 +179,6 @@ export const Navbar: React.FC = () => {
 
     const saved = await saveStaffProfile({
       name: trimmedName,
-      username: profileForm.username.trim(),
       email: trimmedEmail,
       avatarUrl: profileForm.avatarUrl || null,
       position: profileForm.position.trim()
@@ -250,8 +247,7 @@ export const Navbar: React.FC = () => {
       showToast('กรุณากรอกรหัสผ่านเดิมเพื่อยืนยัน', 'warning');
       return;
     }
-    const username = currentUser?.username || currentUser?.studentId || '';
-    const changed = await changeStaffCredentials(username, newPassword, currentPassword);
+    const changed = await changeStaffCredentials(newPassword, currentPassword);
     if (!changed) return;
     setCurrentPassword('');
     setNewPassword('');
@@ -292,12 +288,12 @@ export const Navbar: React.FC = () => {
               {/* Desktop Nav */}
               <ul className="nav-links">
                 <li><button className="nav-item" onClick={() => { scrollToSection('hero'); document.querySelector('.nav-links')?.classList.remove('mobile-open'); }}>หน้าหลัก</button></li>
-                <li><button className="nav-item" onClick={() => { scrollToSection('news'); document.querySelector('.nav-links')?.classList.remove('mobile-open'); }}>ข่าวสาร</button></li>
-                <li><button className="nav-item" onClick={() => { scrollToSection('scholarships'); document.querySelector('.nav-links')?.classList.remove('mobile-open'); }}>ทุนการศึกษา</button></li>
-                <li><button className="nav-item" onClick={() => { scrollToSection('downloads'); document.querySelector('.nav-links')?.classList.remove('mobile-open'); }}>เอกสารดาวน์โหลด</button></li>
                 {isStudent && (
                   <li><button className="nav-item" onClick={() => { openMyApplications(); document.querySelector('.nav-links')?.classList.remove('mobile-open'); }}>สถานะใบสมัคร</button></li>
                 )}
+                <li><button className="nav-item" onClick={() => { scrollToSection('scholarships'); document.querySelector('.nav-links')?.classList.remove('mobile-open'); }}>ทุนการศึกษา</button></li>
+                <li><button className="nav-item" onClick={() => { scrollToSection('downloads'); document.querySelector('.nav-links')?.classList.remove('mobile-open'); }}>เอกสาร</button></li>
+                <li><button className="nav-item" onClick={() => { scrollToSection('news'); document.querySelector('.nav-links')?.classList.remove('mobile-open'); }}>ข่าวสาร</button></li>
               </ul>
             </>
           )}
@@ -802,22 +798,6 @@ export const Navbar: React.FC = () => {
                         value={profileForm.name}
                         onChange={(e) => setProfileForm(prev => ({ ...prev, name: e.target.value }))}
                         placeholder="ชื่อ-นามสกุล"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="staff-profile-edit-field">
-                    <label>ชื่อผู้ใช้</label>
-                    <div className="staff-profile-input-wrap">
-                      <AtSign size={17} aria-hidden="true" />
-                      <input
-                        className="form-input-light"
-                        aria-label="ชื่อผู้ใช้"
-                        autoComplete="username"
-                        value={profileForm.username}
-                        onChange={(e) => setProfileForm(prev => ({ ...prev, username: e.target.value }))}
-                        placeholder="ชื่อผู้ใช้"
                         required
                       />
                     </div>

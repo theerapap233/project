@@ -33,10 +33,6 @@ export const Footer: React.FC = () => {
               คณะวิทยาศาสตร์ประยุกต์ มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ<br />
               1518 ถนนประชาราษฎร์ 1 แขวงวงศ์สว่าง เขตบางซื่อ กรุงเทพฯ 10800
             </p>
-            <div className="footer-contact-chips">
-              <span className="footer-contact-pill">📞 02-555-2000 ต่อ 4601-4602</span>
-              <span className="footer-contact-pill">✉️ math@sci.kmutnb.ac.th</span>
-            </div>
           </div>
 
           <div className="footer-links">

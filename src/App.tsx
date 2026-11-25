@@ -52,11 +52,11 @@ const MainContent: React.FC = () => {
             {/* Section 0: Hero Section (หน้าหลัก) */}
             <HeroSection />
 
-            {/* Section 1: News & Announcements (ข่าวสาร) */}
-            <NewsSection />
-
-            {/* Section 2: Scholarships Catalog */}
+            {/* Section 1: Scholarships Catalog */}
             <ScholarshipDirectory />
+
+            {/* Section 2: News & Announcements (ข่าวสาร) */}
+            <NewsSection />
 
             {/* Section 3: Documents & Downloads */}
             <DownloadsSection />

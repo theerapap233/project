@@ -7,7 +7,6 @@ import {
   GraduationCap, 
   Bell, 
   HelpCircle, 
-  LayoutDashboard,
   Clock, 
   CheckCircle2, 
   Search,
@@ -1126,26 +1125,9 @@ export const AdminSection: React.FC = () => {
   return (
     <section id="adminSection" className="admin-section admin-dashboard" style={{ minHeight: 'calc(100vh - 160px)', background: 'var(--surface-ground)', paddingTop: 14, paddingBottom: 60, borderTop: '1px solid var(--border-light, #e2e8f0)' }}>
       <div className="container" style={{ paddingTop: 0 }}>
-        <header className="admin-page-heading">
-          <div className="admin-page-mark"><LayoutDashboard size={20} strokeWidth={1.8} /></div>
-          <div>
-            <span className="admin-page-eyebrow">ADMIN CONSOLE</span>
-            <h1>ระบบจัดการเว็บไซต์</h1>
-            <p>จัดการใบสมัครทุนและเนื้อหาสำหรับนักศึกษาในที่เดียว</p>
-          </div>
-        </header>
-
+        <div className="admin-console-layout">
         {/* Navigation Tabs for CMS */}
-        <div style={{
-          display: 'flex',
-          gap: 5,
-          background: 'var(--surface-card)',
-          padding: '5px',
-          borderRadius: '12px',
-          border: '1px solid var(--border-light, #e2e8f0)',
-          marginBottom: 24,
-          overflowX: 'auto'
-        }} className="admin-tabs" role="tablist" aria-label="เมนูจัดการเว็บไซต์">
+        <div className="admin-tabs" role="tablist" aria-label="เมนูจัดการเว็บไซต์" aria-orientation="vertical">
           <button
             className="admin-tab-button"
             role="tab"
@@ -1404,6 +1386,7 @@ export const AdminSection: React.FC = () => {
 
         </div>
 
+        <div className="admin-console-content">
         {/* TAB 1: APPLICATIONS MANAGEMENT */}
         {activeTab === 'applications' && (
           <div className="admin-applications-minimal">
@@ -5388,6 +5371,8 @@ export const AdminSection: React.FC = () => {
         </div>
       )}
 
+        </div>
+        </div>
     </section>
   );
 };

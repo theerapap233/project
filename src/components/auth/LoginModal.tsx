@@ -36,7 +36,7 @@ export const LoginModal: React.FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Staff login state
-  const [staffUsername, setStaffUsername] = useState('admin');
+  const [staffEmail, setStaffEmail] = useState('');
   const [staffPassword, setStaffPassword] = useState('');
 
   // Student login state
@@ -158,10 +158,10 @@ export const LoginModal: React.FC = () => {
   const handleStaffSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setWarningMsg(null);
-    const cleanUser = staffUsername.trim();
+    const cleanEmail = staffEmail.trim();
 
-    if (!cleanUser) {
-      showToast('กรุณากรอกชื่อผู้ใช้หรืออีเมลเจ้าหน้าที่', 'warning');
+    if (!cleanEmail) {
+      showToast('กรุณากรอกอีเมลเจ้าหน้าที่', 'warning');
       return;
     }
 
@@ -172,9 +172,9 @@ export const LoginModal: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      const result = await login(cleanUser, staffPassword, 'เจ้าหน้าที่ธุรการ/กรรมการทุน ภาควิชาคณิตศาสตร์');
+      const result = await login(cleanEmail, staffPassword, 'เจ้าหน้าที่ธุรการ/กรรมการทุน ภาควิชาคณิตศาสตร์');
       if (!result.success) {
-        const msg = result.message || 'ชื่อผู้ใช้หรือรหัสผ่านเจ้าหน้าที่ไม่ถูกต้อง';
+        const msg = result.message || 'อีเมลหรือรหัสผ่านเจ้าหน้าที่ไม่ถูกต้อง';
         setWarningMsg(msg);
         showToast(msg, 'error');
       }
@@ -258,7 +258,7 @@ export const LoginModal: React.FC = () => {
         setStudentIdentifier(resetEmail);
         setStudentPassword('');
       } else {
-        setStaffUsername(resetEmail);
+        setStaffEmail(resetEmail);
         setStaffPassword('');
       }
       showToast('เปลี่ยนรหัสผ่านสำเร็จ กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่', 'success');
@@ -719,7 +719,7 @@ export const LoginModal: React.FC = () => {
 
               <div className="form-group">
                 <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--navy-800)', marginBottom: 6, display: 'block' }}>
-                  ชื่อผู้ใช้หรืออีเมลเจ้าหน้าที่
+                  อีเมลเจ้าหน้าที่
                 </label>
                 <div style={{ position: 'relative' }}>
                   <User
@@ -733,15 +733,15 @@ export const LoginModal: React.FC = () => {
                     }}
                   />
                   <input
-                    type="text"
+                    type="email"
                     className="form-input-light"
                     style={{ paddingLeft: 38 }}
-                    placeholder="กรอก username หรืออีเมลเจ้าหน้าที่"
-                    value={staffUsername}
+                    placeholder="กรอกอีเมลเจ้าหน้าที่"
+                    value={staffEmail}
                     autoCapitalize="none"
-                    autoComplete="username"
+                    autoComplete="email"
                     onChange={(e) => {
-                      setStaffUsername(e.target.value);
+                      setStaffEmail(e.target.value);
                       if (warningMsg) setWarningMsg(null);
                     }}
                     required

@@ -74,7 +74,6 @@ CREATE TABLE IF NOT EXISTS public.feedbacks_categories (
 -- 2.1 ข้อมูลเจ้าหน้าที่ / กรรมการพิจารณาทุน
 CREATE TABLE IF NOT EXISTS public.staff_users (
   id UUID NOT NULL DEFAULT gen_random_uuid(),
-  username CHARACTER VARYING NOT NULL UNIQUE,
   password TEXT NOT NULL,
   name CHARACTER VARYING NOT NULL,
   email CHARACTER VARYING NOT NULL UNIQUE,
@@ -239,93 +238,6 @@ BEGIN
   RETURN v_prefix || lpad(v_sequence::TEXT, 3, '0');
 END;
 $$;
-
--- Convert existing legacy IDs to the numeric format and initialize counters.
-WITH legacy_prefixes AS (
-  SELECT
-    application.id,
-    right(
-      COALESCE(
-        NULLIF(regexp_replace(COALESCE(program.academic_year, ''), '[^0-9]', '', 'g'), ''),
-        (EXTRACT(YEAR FROM application.created_at AT TIME ZONE 'Asia/Bangkok')::INTEGER + 543)::TEXT
-      ),
-      2
-    )
-    || lpad(
-      COALESCE(
-        NULLIF(regexp_replace(COALESCE(program.term, ''), '[^0-9]', '', 'g'), ''),
-        NULLIF((
-          SELECT regexp_replace(COALESCE(settings.semester, ''), '[^0-9]', '', 'g')
-          FROM public.site_settings AS settings
-          WHERE settings.setting_key = 'general'
-          LIMIT 1
-        ), ''),
-        '1'
-      ),
-      2,
-      '0'
-    )
-    || left(
-      COALESCE(
-        NULLIF(regexp_replace(COALESCE(student.year::TEXT, application.form_data->>'year', ''), '[^0-9]', '', 'g'), ''),
-        '1'
-      ),
-      1
-    ) AS tracking_prefix,
-    application.created_at
-  FROM public.scholarship_applications AS application
-  LEFT JOIN public.scholarship_programs AS program ON program.id = application.program_id
-  LEFT JOIN public.students AS student ON student.id = application.student_id
-  WHERE COALESCE(application.form_data->>'trackingId', '') !~ '^[0-9]{8}$'
-),
-legacy_applications AS (
-  SELECT
-    legacy_prefixes.*,
-    GREATEST(
-      COALESCE((
-        SELECT MAX(substring(existing.form_data->>'trackingId' FROM 6 FOR 3)::INTEGER)
-        FROM public.scholarship_applications AS existing
-        WHERE existing.form_data->>'trackingId' ~ '^[0-9]{8}$'
-          AND left(existing.form_data->>'trackingId', 5) = legacy_prefixes.tracking_prefix
-      ), 0),
-      COALESCE((
-        SELECT counter.last_sequence
-        FROM public.application_tracking_counters AS counter
-        WHERE counter.tracking_prefix = legacy_prefixes.tracking_prefix
-      ), 0)
-    ) AS starting_sequence
-  FROM legacy_prefixes
-),
-numbered_applications AS (
-  SELECT
-    id,
-    tracking_prefix,
-    starting_sequence + row_number() OVER (PARTITION BY tracking_prefix ORDER BY created_at, id) AS sequence
-  FROM legacy_applications
-)
-UPDATE public.scholarship_applications AS application
-SET form_data = jsonb_set(
-  COALESCE(application.form_data, '{}'::JSONB),
-  '{trackingId}',
-  to_jsonb(numbered.tracking_prefix || lpad(numbered.sequence::TEXT, 3, '0')),
-  true
-)
-FROM numbered_applications AS numbered
-WHERE application.id = numbered.id
-  AND numbered.sequence <= 999;
-
-INSERT INTO public.application_tracking_counters (tracking_prefix, last_sequence)
-SELECT
-  left(form_data->>'trackingId', 5),
-  MAX(substring(form_data->>'trackingId' FROM 6 FOR 3)::INTEGER)
-FROM public.scholarship_applications
-WHERE form_data->>'trackingId' ~ '^[0-9]{8}$'
-GROUP BY left(form_data->>'trackingId', 5)
-ON CONFLICT (tracking_prefix) DO UPDATE
-SET last_sequence = GREATEST(
-  public.application_tracking_counters.last_sequence,
-  EXCLUDED.last_sequence
-);
 
 REVOKE ALL ON FUNCTION public.allocate_application_tracking_id(TEXT, TEXT, TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.allocate_application_tracking_id(TEXT, TEXT, TEXT) TO anon, authenticated;
@@ -736,3 +648,287 @@ INSERT INTO public.site_settings (
   '📢 เปิดรับสมัครทุนการศึกษาภาควิชาคณิตศาสตร์ ประจำภาคการศึกษาที่ 1/2567 ยื่นใบสมัครออนไลน์ได้ตั้งแต่วันนี้',
   'https://facebook.com/kmutnb.math'
 ) ON CONFLICT (setting_key) DO NOTHING;
+
+-- ===================================================================
+-- หมวดที่ 11: ตั้งค่าอีเมลสรุปใบสมัครรายวัน
+-- ===================================================================
+CREATE TABLE IF NOT EXISTS public.email_digest_settings (
+  id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  enabled BOOLEAN NOT NULL DEFAULT false,
+  send_time CHARACTER VARYING(5) NOT NULL DEFAULT '18:00'
+    CHECK (send_time ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'),
+  recipients TEXT[] NOT NULL DEFAULT '{}',
+  test_requested_at TIMESTAMP WITH TIME ZONE,
+  last_window_end TIMESTAMP WITH TIME ZONE,
+  last_digest_date DATE,
+  last_run_at TIMESTAMP WITH TIME ZONE,
+  last_sent_at TIMESTAMP WITH TIME ZONE,
+  last_sent_count INTEGER,
+  last_status TEXT,
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+
+INSERT INTO public.email_digest_settings (id) VALUES (1)
+ON CONFLICT (id) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS public.email_digest_logs (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  ran_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  kind CHARACTER VARYING(10) NOT NULL CHECK (kind IN ('daily', 'test')),
+  sent BOOLEAN NOT NULL DEFAULT false,
+  application_count INTEGER NOT NULL DEFAULT 0,
+  recipient_count INTEGER NOT NULL DEFAULT 0,
+  message TEXT
+);
+
+CREATE INDEX IF NOT EXISTS email_digest_logs_ran_at_idx
+  ON public.email_digest_logs (ran_at DESC);
+
+ALTER TABLE public.email_digest_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.email_digest_logs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public select email_digest_settings"
+  ON public.email_digest_settings FOR SELECT USING (true);
+CREATE POLICY "Public update email_digest_settings"
+  ON public.email_digest_settings FOR UPDATE USING (id = 1) WITH CHECK (id = 1);
+CREATE POLICY "Public select email_digest_logs"
+  ON public.email_digest_logs FOR SELECT USING (true);
+CREATE POLICY "Public insert email_digest_logs"
+  ON public.email_digest_logs FOR INSERT WITH CHECK (true);
+
+-- ===================================================================
+-- หมวดที่ 12: จัดเก็บ OTP สำหรับรีเซ็ตรหัสผ่าน
+-- ===================================================================
+CREATE TABLE IF NOT EXISTS public.password_reset_otps (
+  scope TEXT NOT NULL CHECK (scope IN ('student', 'staff')),
+  email TEXT NOT NULL,
+  code_hash TEXT NOT NULL,
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+  sent_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  window_started_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  send_count INTEGER NOT NULL DEFAULT 1 CHECK (send_count >= 1),
+  CONSTRAINT password_reset_otps_pkey PRIMARY KEY (scope, email)
+);
+
+ALTER TABLE public.password_reset_otps ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.password_reset_otps FROM PUBLIC, anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.password_reset_otps TO service_role;
+
+CREATE OR REPLACE FUNCTION public.request_password_reset_otp(
+  p_scope TEXT,
+  p_email TEXT,
+  p_code_hash TEXT
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  current_record public.password_reset_otps%ROWTYPE;
+  next_window_started_at TIMESTAMP WITH TIME ZONE;
+  next_send_count INTEGER;
+  active_account_count INTEGER;
+BEGIN
+  IF p_scope IS NULL
+    OR p_scope NOT IN ('student', 'staff')
+    OR p_email IS NULL
+    OR length(trim(p_email)) = 0
+    OR length(p_email) > 254
+    OR p_code_hash IS NULL
+    OR p_code_hash !~ '^[0-9a-f]{64}$'
+  THEN
+    RAISE EXCEPTION 'Invalid password reset request';
+  END IF;
+
+  PERFORM pg_advisory_xact_lock(hashtext(p_scope || ':' || lower(p_email)));
+  IF p_scope = 'staff' THEN
+    SELECT count(*) INTO active_account_count
+    FROM public.staff_users
+    WHERE lower(email) = lower(p_email) AND is_active = true;
+  ELSE
+    SELECT count(*) INTO active_account_count
+    FROM public.student_accounts
+    WHERE lower(email) = lower(p_email) AND is_active = true;
+  END IF;
+
+  IF active_account_count <> 1 THEN
+    RETURN false;
+  END IF;
+
+  DELETE FROM public.password_reset_otps
+  WHERE expires_at < now() - interval '1 day';
+
+  SELECT * INTO current_record
+  FROM public.password_reset_otps
+  WHERE scope = p_scope AND email = lower(p_email)
+  FOR UPDATE;
+
+  IF FOUND THEN
+    IF current_record.sent_at > now() - interval '60 seconds'
+      OR (
+        current_record.window_started_at > now() - interval '1 hour'
+        AND current_record.send_count >= 5
+      )
+    THEN
+      RETURN false;
+    END IF;
+
+    IF current_record.window_started_at <= now() - interval '1 hour' THEN
+      next_window_started_at := now();
+      next_send_count := 1;
+    ELSE
+      next_window_started_at := current_record.window_started_at;
+      next_send_count := current_record.send_count + 1;
+    END IF;
+
+    UPDATE public.password_reset_otps
+    SET code_hash = p_code_hash,
+        expires_at = now() + interval '10 minutes',
+        attempt_count = 0,
+        sent_at = now(),
+        window_started_at = next_window_started_at,
+        send_count = next_send_count
+    WHERE scope = p_scope AND email = lower(p_email);
+  ELSE
+    INSERT INTO public.password_reset_otps (
+      scope, email, code_hash, expires_at, attempt_count, sent_at, window_started_at, send_count
+    )
+    VALUES (p_scope, lower(p_email), p_code_hash, now() + interval '10 minutes', 0, now(), now(), 1);
+  END IF;
+
+  RETURN true;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.complete_password_reset_with_otp(
+  p_scope TEXT,
+  p_email TEXT,
+  p_code_hash TEXT,
+  p_new_password TEXT,
+  p_student_password_hash TEXT,
+  p_student_password_salt TEXT
+)
+RETURNS TEXT
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  current_record public.password_reset_otps%ROWTYPE;
+  affected_rows INTEGER;
+  active_account_count INTEGER;
+  account_id UUID;
+BEGIN
+  IF p_scope IS NULL
+    OR p_scope NOT IN ('student', 'staff')
+    OR p_email IS NULL
+    OR length(trim(p_email)) = 0
+    OR length(p_email) > 254
+    OR p_code_hash IS NULL
+    OR p_code_hash !~ '^[0-9a-f]{64}$'
+    OR p_new_password IS NULL
+    OR length(p_new_password) < 8
+    OR length(p_new_password) > 128
+  THEN
+    RAISE EXCEPTION 'Invalid password reset request';
+  END IF;
+
+  IF p_scope = 'student'
+    AND (
+      p_student_password_hash IS NULL
+      OR p_student_password_hash !~ '^[0-9a-f]{64}$'
+      OR p_student_password_salt IS NULL
+      OR p_student_password_salt !~ '^[0-9a-f]{32}$'
+    )
+  THEN
+    RAISE EXCEPTION 'Invalid student password hash';
+  END IF;
+
+  PERFORM pg_advisory_xact_lock(hashtext(p_scope || ':' || lower(p_email)));
+  SELECT * INTO current_record
+  FROM public.password_reset_otps
+  WHERE scope = p_scope AND email = lower(p_email)
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RETURN 'invalid';
+  END IF;
+
+  IF current_record.expires_at <= now() THEN
+    DELETE FROM public.password_reset_otps WHERE scope = p_scope AND email = lower(p_email);
+    RETURN 'invalid';
+  END IF;
+
+  IF current_record.attempt_count >= 5 THEN
+    RETURN 'locked';
+  END IF;
+
+  IF current_record.code_hash <> p_code_hash THEN
+    UPDATE public.password_reset_otps
+    SET attempt_count = attempt_count + 1
+    WHERE scope = p_scope AND email = lower(p_email);
+    IF current_record.attempt_count + 1 >= 5 THEN
+      RETURN 'locked';
+    END IF;
+    RETURN 'invalid';
+  END IF;
+
+  IF p_scope = 'staff' THEN
+    SELECT count(*) INTO active_account_count
+    FROM public.staff_users
+    WHERE lower(email) = lower(p_email) AND is_active = true;
+    SELECT id INTO account_id
+    FROM public.staff_users
+    WHERE lower(email) = lower(p_email) AND is_active = true
+    ORDER BY id
+    LIMIT 1
+    FOR UPDATE;
+  ELSE
+    SELECT count(*) INTO active_account_count
+    FROM public.student_accounts
+    WHERE lower(email) = lower(p_email) AND is_active = true;
+    SELECT id INTO account_id
+    FROM public.student_accounts
+    WHERE lower(email) = lower(p_email) AND is_active = true
+    ORDER BY id
+    LIMIT 1
+    FOR UPDATE;
+  END IF;
+
+  IF active_account_count <> 1 OR account_id IS NULL THEN
+    DELETE FROM public.password_reset_otps WHERE scope = p_scope AND email = lower(p_email);
+    RETURN 'invalid';
+  END IF;
+
+  IF p_scope = 'staff' THEN
+    UPDATE public.staff_users
+    SET password = p_new_password
+    WHERE id = account_id AND is_active = true;
+  ELSE
+    UPDATE public.student_accounts
+    SET password_hash = p_student_password_hash,
+        password_salt = p_student_password_salt,
+        updated_at = now()
+    WHERE id = account_id AND is_active = true;
+  END IF;
+
+  GET DIAGNOSTICS affected_rows = ROW_COUNT;
+  DELETE FROM public.password_reset_otps WHERE scope = p_scope AND email = lower(p_email);
+
+  IF affected_rows = 0 THEN
+    RETURN 'invalid';
+  END IF;
+
+  RETURN 'success';
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.request_password_reset_otp(TEXT, TEXT, TEXT)
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.complete_password_reset_with_otp(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.request_password_reset_otp(TEXT, TEXT, TEXT) TO service_role;
+GRANT EXECUTE ON FUNCTION public.complete_password_reset_with_otp(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)
+  TO service_role;

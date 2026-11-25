@@ -20,11 +20,8 @@ export const NewsSection: React.FC = () => {
     <section className="section news-section-minimal" id="news">
       <div className="container" style={{ maxWidth: '1024px' }}>
         <div className="section-header">
-          <span className="section-tag-minimal">News & Announcements</span>
-          <h2 className="section-title">ข่าวสารและประกาศทุนการศึกษา</h2>
-          <p className="section-subtitle">
-            ติดตามข่าวสารล่าสุด กำหนดการสัมภาษณ์ และผลการพิจารณาจัดสรรทุนของภาควิชาคณิตศาสตร์ มจพ.
-          </p>
+          <span className="section-tag-minimal">News &amp; Announcements</span>
+          <h2 className="section-title">ข่าวสาร</h2>
         </div>
 
         {/* News Grid - Minimalist 3 Columns */}
@@ -46,9 +43,6 @@ export const NewsSection: React.FC = () => {
                 }}
               >
                 <div className="news-card-top">
-                  <span className="news-tag-pill">
-                    {item.tag}
-                  </span>
                   <time className="news-date">
                     <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
